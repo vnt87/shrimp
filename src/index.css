@@ -200,10 +200,60 @@ body,
   cursor: pointer;
   white-space: nowrap;
   transition: background var(--transition);
+  position: relative;
 }
 
-.header-menu-item:hover {
+.header-menu-item:hover,
+.header-menu-item.active {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.header-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  min-width: 200px;
+  z-index: 1000;
+  padding: 4px 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.header-menu-dropdown-item {
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.header-menu-dropdown-item:hover {
+  background: var(--accent-active);
+  color: white;
+}
+
+.header-menu-dropdown-item .shortcut {
+  color: var(--text-secondary);
+  font-size: 10px;
+  margin-left: 16px;
+}
+
+.header-menu-dropdown-item:hover .shortcut {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.header-menu-dropdown-item .submenu-arrow {
+  margin-left: 10px;
+  color: var(--text-secondary);
+}
+
+.header-menu-dropdown-item:hover .submenu-arrow {
+  color: white;
 }
 
 .header-right {

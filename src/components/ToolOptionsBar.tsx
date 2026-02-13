@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
     ChevronDown,
     FlipVertical,
@@ -7,13 +8,29 @@ import {
     Square,
 } from 'lucide-react'
 
-function Checkbox({ checked, label }: { checked: boolean; label: string }) {
+function Checkbox({
+    checked: initialChecked,
+    label,
+}: {
+    checked: boolean
+    label: string
+}) {
+    const [checked, setChecked] = useState(initialChecked)
     return (
-        <div className="tool-options-checkbox">
+        <div
+            className="tool-options-checkbox"
+            onClick={() => setChecked(!checked)}
+        >
             <div className={`checkbox-box ${checked ? 'checked' : 'unchecked'}`}>
                 {checked ? <CheckSquare size={16} /> : <Square size={16} />}
             </div>
             <span>{label}</span>
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => { }}
+                style={{ display: 'none' }}
+            />
         </div>
     )
 }
