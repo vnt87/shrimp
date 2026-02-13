@@ -19,7 +19,7 @@ const brushVariants = [
 
 export default function BrushesPanel() {
     return (
-        <div className="dialogue" style={{ height: 310 }}>
+        <div className="dialogue" style={{ flex: 1, overflow: 'hidden' }}>
             {/* Header tabs */}
             <div className="dialogue-header">
                 <div className="dialogue-tabs">
@@ -49,7 +49,7 @@ export default function BrushesPanel() {
             <div className="dialogue-divider" />
 
             {/* Brush grid */}
-            <div className="brush-grid-container" style={{ height: 220 }}>
+            <div className="brush-grid-container" style={{ flex: 1, overflow: 'hidden' }}>
                 {[0, 1, 2, 3, 4].map((row) => (
                     <div key={row} className="brush-grid-row">
                         {[0, 1, 2, 3, 4].map((col) => {

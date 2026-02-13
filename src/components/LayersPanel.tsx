@@ -45,7 +45,7 @@ const layers: LayerItem[] = [
 
 export default function LayersPanel() {
     return (
-        <div className="dialogue" style={{ height: 524 }}>
+        <div className="dialogue" style={{ flex: 1, overflow: 'hidden' }}>
             {/* Header tabs */}
             <div className="dialogue-header">
                 <div className="dialogue-tabs">
@@ -98,7 +98,7 @@ export default function LayersPanel() {
             <div className="dialogue-divider" />
 
             {/* Layer list */}
-            <div className="layer-list">
+            <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
                 {layers.map((layer, i) => (
                     <div
                         key={i}

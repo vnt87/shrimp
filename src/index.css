@@ -123,8 +123,8 @@ body,
 
 /* ===== App Layout ===== */
 .app {
-  width: 1920px;
-  height: 1080px;
+  width: 100vw;
+  height: 100vh;
   display: grid;
   grid-template-rows: var(--header-h) var(--tooloptions-h) 1fr var(--statusbar-h);
   grid-template-columns: 1fr;
@@ -859,13 +859,22 @@ body,
   flex-direction: column;
   background: var(--bg-panel);
   border-left: 1px solid var(--border-main);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   min-height: 0;
 }
 
-.right-panel::-webkit-scrollbar {
-  display: none;
+.panel-resize-handle {
+  height: 5px;
+  background: var(--border-main);
+  cursor: row-resize;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+  position: relative;
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle:active {
+  background: var(--accent-active);
 }
 
 /* Dialogue (Dockable Panel Unit) */

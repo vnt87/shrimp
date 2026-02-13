@@ -42,7 +42,7 @@ export default function HistogramPanel() {
     ]
 
     return (
-        <div className="dialogue" style={{ height: 160 }}>
+        <div className="dialogue" style={{ flex: 1, overflow: 'hidden' }}>
             {/* Header tabs */}
             <div className="dialogue-header">
                 <div className="dialogue-tabs">
@@ -56,7 +56,7 @@ export default function HistogramPanel() {
             </div>
 
             {/* Chart area */}
-            <div className="histogram-container" style={{ height: 132, position: 'relative' }}>
+            <div className="histogram-container" style={{ flex: 1, position: 'relative' }}>
                 {/* Grid */}
                 <div className="histogram-grid">
                     {Array.from({ length: 34 }).map((_, i) => (
