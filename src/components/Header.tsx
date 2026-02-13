@@ -5,12 +5,12 @@ import {
     Save,
     Upload,
     Settings,
-    Dog,
     ChevronRight,
     SlidersHorizontal,
     Puzzle,
 } from 'lucide-react'
 import PreferencesDialog from './PreferencesDialog'
+import ShrimpIcon from './ShrimpIcon'
 
 const menuData: Record<string, string[]> = {
     File: ['New...', 'Create', 'Open...', 'Open as Layers...', 'Open Location...', 'Save', 'Save As...', 'Export As...', 'Print...', 'Close View', 'Close All', 'Quit'],
@@ -57,7 +57,7 @@ export default function Header() {
             <header className="header">
                 <div className="header-left">
                     <div className="header-brand">
-                        <Dog className="brand-icon" size={16} />
+                        <ShrimpIcon className="brand-icon" size={16} />
                         <span className="brand-text">SHRIMP</span>
                         <ChevronDown className="brand-caret" size={16} />
                     </div>
@@ -162,4 +162,3 @@ function getShortcut(option: string): string {
             return ''
     }
 }
-

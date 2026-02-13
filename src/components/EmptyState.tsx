@@ -1,4 +1,5 @@
-import { Dog, FolderOpen, ClipboardPaste, Image } from 'lucide-react'
+import { FolderOpen, ClipboardPaste, Image } from 'lucide-react'
+import ShrimpIcon from './ShrimpIcon'
 
 interface EmptyStateProps {
     onLoadSample: () => void
@@ -12,7 +13,7 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
             <div className="empty-state-card">
                 <div className="empty-state-logo">
                     <div className="empty-state-logo-glow" />
-                    <Dog size={48} strokeWidth={1.5} />
+                    <ShrimpIcon size={48} strokeWidth={1.5} />
                 </div>
                 <h1 className="empty-state-title">Welcome to SHRIMP</h1>
                 <p className="empty-state-subtitle">Open an image to get started</p>
