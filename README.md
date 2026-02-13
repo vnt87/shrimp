@@ -7,9 +7,9 @@
 Background: I was a big fan of GIMP back in the days (think early 2000s). I used it for photo editing, graphic design, and web development. I wrote a couple of popular graphic tutorial for the GIMP that was trending on the GIMP forum and Good-Tutorials (high five if you're one of the OGs who still remember Good-Tutorials).
 Anyway, one of my biggest gripe with GIMP is its user interface. Don't get me wrong, GIMP is an awesome pieceo of software and I appreciate decades of work poured into it from the developers who did it for free. But as a UI/UX designer, I just couldn't bare to use such a dated and unintuitive interface. 
 Inpspirations:
-- GIMP - the OG of course
-- Pixel Editor by Pavel Kanzelsberger: I remember back then there was a project called Pixel Editor or someething along that line, created by a a solo developer from Slovakia. It had a great interface, it was everything GIMP user wished GIMP would be. But unfortunately it was proprietary, and that obviously doesn't pan out for the developer in the Linux community. It died after a few years.
-- PhotoPea: an amazing piece of software. The first image editor that works fully inside your browser, and it even works entirely offline. It's not opensource, but the very fact that it is free in the first place was already amazing. One of the biggest inspiration to this project, I have nowhere near that level of technical know-how to make something like that but damn if I don't try
+- **GIMP** - the OG of course
+- **Pixel Editor by Pavel Kanzelsberger**: I remember back then there was a project called Pixel Editor or someething along that line, created by a a solo developer from Slovakia. It had a great interface, it was everything GIMP user wished GIMP would be. But unfortunately it was proprietary, and that obviously doesn't pan out for the developer in the Linux community. It died after a few years.
+- **PhotoPea by Ivan Kuckir**: an amazing piece of software. The first image editor that works fully inside your browser, and it even works entirely offline. It's not opensource, but the very fact that it is free in the first place was already amazing. One of the biggest inspiration to this project, I have nowhere near that level of technical know-how to make something like that but damn if I don't try
 
 ![SHRIMP App Screenshot](public/screenshot.png)
 

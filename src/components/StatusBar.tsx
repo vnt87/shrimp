@@ -1,9 +1,36 @@
-export default function StatusBar() {
+export default function StatusBar({
+    cursorPos,
+}: {
+    cursorPos: { x: number; y: number } | null
+}) {
     return (
         <footer className="status-bar">
             <div className="status-group">
-                <span className="status-text">Cursor Position x:810</span>
-                <span className="status-text" style={{ marginLeft: 26 }}>y:518</span>
+                <span className="status-text">Cursor Position</span>
+                <span className="status-text" style={{ marginLeft: 8 }}>x:</span>
+                <span
+                    className="status-text"
+                    style={{
+                        width: 40,
+                        display: 'inline-block',
+                        textAlign: 'left',
+                        fontVariantNumeric: 'tabular-nums',
+                    }}
+                >
+                    {cursorPos ? cursorPos.x : '---'}
+                </span>
+                <span className="status-text" style={{ marginLeft: 8 }}>y:</span>
+                <span
+                    className="status-text"
+                    style={{
+                        width: 40,
+                        display: 'inline-block',
+                        textAlign: 'left',
+                        fontVariantNumeric: 'tabular-nums',
+                    }}
+                >
+                    {cursorPos ? cursorPos.y : '---'}
+                </span>
             </div>
             <div className="status-group">
                 <span className="status-text">Width: 1920px</span>

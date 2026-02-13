@@ -117,7 +117,11 @@ function Ruler({
     return <canvas ref={canvasRef} style={{ display: 'block' }} />
 }
 
-export default function Canvas() {
+export default function Canvas({
+    onCursorMove,
+}: {
+    onCursorMove?: (pos: { x: number; y: number } | null) => void
+}) {
     const [imageSrc, setImageSrc] = useState<string | null>(null)
     const [fileName, setFileName] = useState<string>('')
     const [transform, setTransform] = useState<CanvasTransform>({
@@ -262,8 +266,22 @@ export default function Canvas() {
                     offsetY: dragStart.current.offsetY + dy,
                 }))
             }
+
+            // Cursor position tracking
+            if (imageSrc && viewportRef.current && onCursorMove) {
+                const rect = viewportRef.current.getBoundingClientRect()
+                // Calculate position relative to the image
+                // Image is at (offsetX, offsetY) with scale
+                const x = Math.round(
+                    (e.clientX - rect.left - transform.offsetX) / transform.scale
+                )
+                const y = Math.round(
+                    (e.clientY - rect.top - transform.offsetY) / transform.scale
+                )
+                onCursorMove({ x, y })
+            }
         },
-        [isDragging]
+        [isDragging, imageSrc, transform, onCursorMove]
     )
 
     const handleMouseUp = useCallback(() => {
@@ -272,6 +290,13 @@ export default function Canvas() {
             setIsPanning(false)
         }
     }, [isSpaceHeld])
+
+    const handleMouseLeave = useCallback(() => {
+        handleMouseUp()
+        if (onCursorMove) {
+            onCursorMove(null)
+        }
+    }, [handleMouseUp, onCursorMove])
 
     // Wheel zoom
     const handleWheel = useCallback(
@@ -333,6 +358,7 @@ export default function Canvas() {
                                     setImageSrc(null)
                                     setFileName('')
                                     setTransform({ offsetX: 0, offsetY: 0, scale: 1 })
+                                    if (onCursorMove) onCursorMove(null)
                                 }}
                             >
                                 <X size={10} />
@@ -362,15 +388,15 @@ export default function Canvas() {
                         <div
                             ref={viewportRef}
                             className={`canvas-viewport ${isPanning
-                                    ? 'panning-active'
-                                    : isSpaceHeld
-                                        ? 'panning-ready'
-                                        : ''
+                                ? 'panning-active'
+                                : isSpaceHeld
+                                    ? 'panning-ready'
+                                    : ''
                                 }`}
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
+                            onMouseLeave={handleMouseLeave}
                             onWheel={handleWheel}
                         >
                             <div
