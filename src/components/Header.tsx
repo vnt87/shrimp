@@ -8,9 +8,13 @@ import {
     ChevronRight,
     SlidersHorizontal,
     Puzzle,
+    Sun,
+    Moon,
+    Monitor,
 } from 'lucide-react'
 import PreferencesDialog from './PreferencesDialog'
 import ShrimpIcon from './ShrimpIcon'
+import { useTheme } from './ThemeContext'
 
 const menuData: Record<string, string[]> = {
     File: ['New...', 'Create', 'Open...', 'Open as Layers...', 'Open Location...', 'Save', 'Save As...', 'Export As...', 'Print...', 'Close View', 'Close All', 'Quit'],
@@ -27,6 +31,12 @@ const menuData: Record<string, string[]> = {
     Help: ['Help', 'Context Help', 'Tip of the Day', 'About', 'Action Search', 'SHRIMP Online', 'User Manual'],
 }
 
+const themeOptions = [
+    { value: 'light' as const, label: 'Light', icon: Sun },
+    { value: 'dark' as const, label: 'Dark', icon: Moon },
+    { value: 'system' as const, label: 'System', icon: Monitor },
+]
+
 export default function Header() {
     const [activeMenu, setActiveMenu] = useState<string | null>(null)
     const [autosave, setAutosave] = useState(true)
@@ -34,6 +44,7 @@ export default function Header() {
     const [showPreferences, setShowPreferences] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
+    const { theme, setTheme } = useTheme()
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -131,6 +142,22 @@ export default function Header() {
                                     <Puzzle size={14} />
                                     <span>Integrations</span>
                                 </div>
+                                <div className="settings-dropdown-divider" />
+                                <div className="settings-dropdown-section-label">Theme</div>
+                                {themeOptions.map((opt) => (
+                                    <div
+                                        key={opt.value}
+                                        className={`settings-dropdown-item${theme === opt.value ? ' selected' : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setTheme(opt.value)
+                                        }}
+                                    >
+                                        <opt.icon size={14} />
+                                        <span>{opt.label}</span>
+                                        {theme === opt.value && <span className="theme-check">✓</span>}
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>

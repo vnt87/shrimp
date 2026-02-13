@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTheme } from './ThemeContext'
 import {
     X,
     Cpu,
@@ -141,7 +142,11 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
         'image-windows': true,
         'input-devices': true,
     })
-    const [prefs, setPrefs] = useState<PrefsState>({ ...defaultPrefs })
+    const { theme: currentTheme } = useTheme()
+    const [prefs, setPrefs] = useState<PrefsState>(() => ({
+        ...defaultPrefs,
+        uiTheme: currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1),
+    }))
 
     // Close on Escape
     useEffect(() => {
@@ -396,12 +401,20 @@ function ColorManagementPage({ prefs, update }: { prefs: PrefsState; update: Upd
 }
 
 function ThemePage({ prefs, update }: { prefs: PrefsState; update: UpdateFn }) {
+    const { setTheme } = useTheme()
+
+    const handleThemeChange = (v: string) => {
+        update('uiTheme', v)
+        const mapped = v.toLowerCase() as 'dark' | 'light' | 'system'
+        setTheme(mapped)
+    }
+
     return (
         <PrefSection title="UI Theme">
             <PrefRow label="Theme:">
-                <PrefSelect value={prefs.uiTheme} options={['Dark', 'Light', 'System']} onChange={(v) => update('uiTheme', v)} width={160} />
+                <PrefSelect value={prefs.uiTheme} options={['Dark', 'Light', 'System']} onChange={handleThemeChange} width={160} />
             </PrefRow>
-            <div className="pref-info">Theme changes will take effect after restarting the application.</div>
+            <div className="pref-info">Theme changes are applied instantly.</div>
         </PrefSection>
     )
 }
