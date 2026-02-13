@@ -14,7 +14,7 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
                     <div className="empty-state-logo-glow" />
                     <Dog size={48} strokeWidth={1.5} />
                 </div>
-                <h1 className="empty-state-title">Welcome to WebGIMP</h1>
+                <h1 className="empty-state-title">Welcome to SHRIMP</h1>
                 <p className="empty-state-subtitle">Open an image to get started</p>
                 <div className="empty-state-actions">
                     <button className="empty-state-btn" onClick={onOpenFile}>

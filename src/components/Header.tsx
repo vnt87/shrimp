@@ -24,7 +24,7 @@ const menuData: Record<string, string[]> = {
     Filters: ['Repeat Last', 'Re-Show Last', 'Reset All Filters', 'Blur', 'Enhance', 'Distorts', 'Light and Shadow', 'Noise', 'Edge-Detect', 'Generic', 'Combine', 'Artistic', 'Decor', 'Map', 'Render', 'Web', 'Animation'],
     'Python-Fu': ['Console', 'Selection', 'Sketch', 'Sphere'],
     Windows: ['Recently Closed Docks', 'Dockable Dialogs', 'Toolbox', 'Hide Docks', 'Single-Window Mode'],
-    Help: ['Help', 'Context Help', 'Tip of the Day', 'About', 'Action Search', 'GIMP Online', 'User Manual'],
+    Help: ['Help', 'Context Help', 'Tip of the Day', 'About', 'Action Search', 'SHRIMP Online', 'User Manual'],
 }
 
 export default function Header() {
@@ -58,7 +58,7 @@ export default function Header() {
                 <div className="header-left">
                     <div className="header-brand">
                         <Dog className="brand-icon" size={16} />
-                        <span className="brand-text">The GIMP 2020</span>
+                        <span className="brand-text">SHRIMP</span>
                         <ChevronDown className="brand-caret" size={16} />
                     </div>
                     <nav className="header-menu" ref={menuRef}>
