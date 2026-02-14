@@ -59,6 +59,58 @@ export default function Header() {
         activeLayerId, layers
     } = useEditor()
 
+    // Key handlers
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return
+            }
+
+            const isCmd = e.metaKey || e.ctrlKey // Mac (Meta) or Windows (Ctrl)
+
+            if (isCmd) {
+                switch (e.key.toLowerCase()) {
+                    case 'n':
+                        e.preventDefault()
+                        setShowNewImage(true)
+                        break
+                    case 'o':
+                        e.preventDefault()
+                        fileInputRef.current?.click()
+                        break
+                    case 's':
+                        e.preventDefault()
+                        if (layers.length > 0) exportImage('png')
+                        break
+                    case 'z':
+                        e.preventDefault()
+                        if (e.shiftKey) {
+                            if (canRedo) redo()
+                        } else {
+                            if (canUndo) undo()
+                        }
+                        break
+                    case 'a':
+                        e.preventDefault()
+                        if (e.shiftKey) selectNone()
+                        else selectAll()
+                        break
+                    case 'd':
+                        // Common for "Deselect" in standard image editors
+                        e.preventDefault()
+                        selectNone()
+                        break
+                    // 'w' is risky to override (Close Tab), skipping
+                }
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [undo, redo, canUndo, canRedo, selectAll, selectNone, layers, exportImage]) // Dependencies
+
+    // Click outside handlers
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -76,7 +128,6 @@ export default function Header() {
         setActiveMenu(activeMenu === item ? null : item)
     }
 
-    // Handle file open
     const handleFileOpen = () => {
         fileInputRef.current?.click()
     }
