@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 
+export interface LayerFilter {
+    type: 'blur' | 'brightness' | 'hue-saturation' | 'noise' | 'color-matrix' | 'custom'
+    enabled: boolean
+    params: Record<string, number>
+}
+
 export interface Layer {
     id: string
     name: string
@@ -7,7 +13,8 @@ export interface Layer {
     locked: boolean
     opacity: number
     blendMode: string
-    data: HTMLCanvasElement | null // Offscreen canvas for layer data
+    data: HTMLCanvasElement | null // Offscreen canvas for layer data (CPU-side)
+    filters: LayerFilter[]         // Non-destructive GPU filter stack
     x: number
     y: number
     type: 'layer' | 'group'
@@ -39,8 +46,11 @@ interface EditorContextType {
     setLayerOpacity: (id: string, opacity: number) => void
     updateLayerData: (id: string, canvas: HTMLCanvasElement) => void
     updateLayerPosition: (id: string, x: number, y: number) => void
+    addFilter: (layerId: string, filter: LayerFilter) => void
+    removeFilter: (layerId: string, filterIndex: number) => void
     setSelection: (selection: Selection | null) => void
     reorderLayers: (startIndex: number, endIndex: number) => void
+    closeImage: () => void
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
@@ -64,6 +74,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             opacity: 100,
             blendMode: 'normal',
             data: canvas,
+            filters: [],
             x: 0,
             y: 0,
             type: 'layer'
@@ -150,6 +161,18 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         }))
     }, [])
 
+    const addFilter = useCallback((layerId: string, filter: LayerFilter) => {
+        setLayers(prev => prev.map(l =>
+            l.id === layerId ? { ...l, filters: [...l.filters, filter] } : l
+        ))
+    }, [])
+
+    const removeFilter = useCallback((layerId: string, filterIndex: number) => {
+        setLayers(prev => prev.map(l =>
+            l.id === layerId ? { ...l, filters: l.filters.filter((_, i) => i !== filterIndex) } : l
+        ))
+    }, [])
+
     const reorderLayers = useCallback((startIndex: number, endIndex: number) => {
         setLayers(prev => {
             const result = Array.from(prev)
@@ -157,6 +180,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             result.splice(endIndex, 0, removed)
             return result
         })
+    }, [])
+
+    const closeImage = useCallback(() => {
+        setLayers([])
+        setActiveLayerId(null)
+        setSelection(null)
+        setCanvasSize({ width: 800, height: 600 })
     }, [])
 
     return (
@@ -174,8 +204,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setLayerOpacity,
             updateLayerData,
             updateLayerPosition,
+            addFilter,
+            removeFilter,
             setSelection,
-            reorderLayers
+            reorderLayers,
+            closeImage
         }}>
             {children}
         </EditorContext.Provider>

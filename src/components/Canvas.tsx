@@ -1,7 +1,14 @@
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Application, extend, useApplication } from '@pixi/react'
+import { Container, Sprite, Graphics } from 'pixi.js'
 import EmptyState from './EmptyState'
 import { useEditor } from './EditorContext'
+import PixiLayerSprite from './PixiLayerSprite'
+import SelectionOverlay from './SelectionOverlay'
+
+// Register Pixi components for @pixi/react
+extend({ Container, Sprite, Graphics })
 
 interface CanvasTransform {
     offsetX: number
@@ -118,6 +125,71 @@ function Ruler({
     return <canvas ref={canvasRef} style={{ display: 'block' }} />
 }
 
+/**
+ * Inner Pixi scene that renders layers and selection overlay.
+ * Must be a child of <Application> to use useApplication().
+ */
+function PixiScene({
+    transform,
+}: {
+    transform: CanvasTransform
+}) {
+    const { layers, canvasSize, selection } = useEditor()
+    const { app } = useApplication()
+
+    // Draw the checkerboard background pattern via <pixiGraphics>
+    const drawBackground = useCallback(
+        (g: Graphics) => {
+            g.clear()
+            const checkSize = 10
+            const cols = Math.ceil(canvasSize.width / checkSize)
+            const rows = Math.ceil(canvasSize.height / checkSize)
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const isLight = (row + col) % 2 === 0
+                    g.setFillStyle({ color: isLight ? 0xe0e0e0 : 0xcccccc })
+                    g.rect(col * checkSize, row * checkSize, checkSize, checkSize)
+                    g.fill()
+                }
+            }
+        },
+        [canvasSize]
+    )
+
+    // Resize the renderer when the app's canvas parent changes
+    useEffect(() => {
+        if (app?.renderer) {
+            app.renderer.resize(
+                app.canvas.parentElement?.clientWidth || canvasSize.width,
+                app.canvas.parentElement?.clientHeight || canvasSize.height
+            )
+        }
+    }, [app, canvasSize])
+
+    return (
+        <pixiContainer
+            x={transform.offsetX}
+            y={transform.offsetY}
+            scale={transform.scale}
+        >
+            {/* Checkerboard background */}
+            <pixiGraphics draw={drawBackground} />
+
+            {/* GPU-rendered layers */}
+            {layers.slice().reverse().map(layer => (
+                <PixiLayerSprite key={layer.id} layer={layer} />
+            ))}
+
+            {/* GPU-rendered selection overlay */}
+            {selection && selection.width > 0 && selection.height > 0 && (
+                <SelectionOverlay selection={selection} />
+            )}
+        </pixiContainer>
+    )
+}
+
+
 export default function Canvas({
     onCursorMove,
     activeTool = 'move',
@@ -134,7 +206,8 @@ export default function Canvas({
         updateLayerData,
         updateLayerPosition,
         selection,
-        setSelection
+        setSelection,
+        closeImage
     } = useEditor()
 
     const [transform, setTransform] = useState<CanvasTransform>({
@@ -186,7 +259,7 @@ export default function Canvas({
             // Create new layer
             const id = addLayer(name)
 
-            // Draw image to layer canvas
+            // Draw image to layer's offscreen canvas (CPU side)
             const canvas = document.createElement('canvas')
             canvas.width = img.naturalWidth
             canvas.height = img.naturalHeight
@@ -410,7 +483,9 @@ export default function Canvas({
                     <div className="canvas-tabs">
                         <div className="canvas-tab active">
                             <span>Image</span>
-                            <div className="tab-close"><X size={10} /></div>
+                            <div className="tab-close" onClick={closeImage} style={{ cursor: 'pointer' }}>
+                                <X size={10} />
+                            </div>
                         </div>
                     </div>
                     <div className="canvas-separator" />
@@ -432,39 +507,16 @@ export default function Canvas({
                             onMouseLeave={handleMouseUp}
                             onWheel={handleWheel}
                         >
-                            <div
-                                className="canvas-infinite"
-                                style={{
-                                    width: canvasSize.width,
-                                    height: canvasSize.height,
-                                    transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
-                                    transformOrigin: '0 0',
-                                    backgroundColor: '#fff', // Canvas background
-                                    backgroundImage: 'conic-gradient(#eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee), conic-gradient(#eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee)',
-                                    backgroundSize: '20px 20px',
-                                    backgroundPosition: '0 0, 10px 10px'
-                                }}
+                            {/* GPU-accelerated Pixi.js Application */}
+                            <Application
+                                resizeTo={viewportRef as any}
+                                background={'#3a3a3a'}
+                                antialias
+                                autoDensity
+                                resolution={window.devicePixelRatio || 1}
                             >
-                                {/* Layers */}
-                                {layers.map(layer => (
-                                    <LayerRenderer key={layer.id} layer={layer} />
-                                ))}
-
-                                {/* Selection Overlay */}
-                                {selection && (
-                                    <div
-                                        className="selection-overlay"
-                                        style={{
-                                            position: 'absolute',
-                                            left: selection.x,
-                                            top: selection.y,
-                                            width: selection.width,
-                                            height: selection.height,
-                                            borderRadius: selection.type === 'ellipse' ? '50%' : '0'
-                                        }}
-                                    />
-                                )}
-                            </div>
+                                <PixiScene transform={transform} />
+                            </Application>
                         </div>
                     </div>
                 </>
@@ -476,38 +528,5 @@ export default function Canvas({
                 />
             )}
         </div>
-    )
-}
-
-// Helper component to render a layer canvas
-function LayerRenderer({ layer }: { layer: import('./EditorContext').Layer }) {
-    const canvasRef = useRef<HTMLCanvasElement>(null)
-
-    useEffect(() => {
-        const canvas = canvasRef.current
-        if (canvas && layer.data) {
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height)
-                ctx.drawImage(layer.data, 0, 0)
-            }
-        }
-    }, [layer.data, layer.visible, layer.opacity]) // Re-draw key
-
-    return (
-        <canvas
-            ref={canvasRef}
-            width={layer.data?.width || 1}
-            height={layer.data?.height || 1}
-            style={{
-                position: 'absolute',
-                left: layer.x,
-                top: layer.y,
-                opacity: layer.opacity / 100,
-                mixBlendMode: layer.blendMode as any,
-                visibility: layer.visible ? 'visible' : 'hidden',
-                pointerEvents: 'none'
-            }}
-        />
     )
 }
