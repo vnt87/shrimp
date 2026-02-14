@@ -92,7 +92,7 @@ export default function App() {
         <ThemeProvider>
             <EditorProvider>
                 <div className="app">
-                    <Header />
+                    <Header onToolSelect={setActiveTool} />
                     <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
                     <div className="main-content">
                         <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />

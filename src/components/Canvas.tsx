@@ -3,38 +3,57 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Application, extend, useApplication, useTick } from '@pixi/react'
 import { Container, Sprite, Graphics } from 'pixi.js'
 import EmptyState from './EmptyState'
-import { useEditor, type Layer } from './EditorContext'
+import { useEditor, type Layer, type TransformData } from './EditorContext'
 import PixiLayerSprite from './PixiLayerSprite'
 import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
 import type { ToolOptions } from '../App'
+import TransformOverlay from './TransformOverlay'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics })
 
 interface LayerOutlineProps {
     layer: import('./EditorContext').Layer
+    transform?: TransformData
 }
 
-function LayerOutline({ layer }: LayerOutlineProps) {
+function LayerOutline({ layer, transform }: LayerOutlineProps) {
     const draw = useCallback((g: import('pixi.js').Graphics) => {
         g.clear()
         if (!layer.data) return
 
-        console.log('Drawing outline for layer', layer.id)
+        // If transform is provided, the graphics object itself will be transformed by the parent container?
+        // No, LayerOutline is a sibling of PixiLayerSprite in the fragment.
+        // It is NOT inside the transformed sprite.
+        // So we must apply the transform to this graphics object.
 
-        // Draw black border for contrast
-        g.lineStyle(4, 0x000000, 1) // thick black outline
-        g.drawRect(layer.x, layer.y, layer.data.width, layer.data.height)
+        // Draw rect relative to (0,0) of the graphics object
+        // The graphics object's position/scale/etc will be set via props.
 
-        // Draw cyan border
-        g.lineStyle(2, 0x00ffff, 1) // cyan inner outline
-        g.drawRect(layer.x, layer.y, layer.data.width, layer.data.height)
+        // Draw black border based on layer dimensions (0,0 to w,h)
+        g.rect(0, 0, layer.data.width, layer.data.height)
+        g.stroke({ width: 2, color: 0x5294e2, alpha: 1 }) // Blue selection color
 
-        // Optional: Corner handles could be added here
-    }, [layer.x, layer.y, layer.data])
+    }, [layer.data])
 
-    return <graphics draw={draw} />
+    // Determine transform properties
+    const x = transform ? transform.x : layer.x
+    const y = transform ? transform.y : layer.y
+    const scale = transform ? { x: transform.scaleX, y: transform.scaleY } : { x: 1, y: 1 }
+    const rotation = transform ? transform.rotation : 0
+    const skew = transform ? { x: transform.skewX, y: transform.skewY } : { x: 0, y: 0 }
+    const pivot = transform ? { x: transform.pivotX, y: transform.pivotY } : { x: 0, y: 0 }
+
+    return <graphics
+        draw={draw}
+        x={x}
+        y={y}
+        scale={scale}
+        rotation={rotation}
+        skew={skew}
+        pivot={pivot}
+    />
 }
 
 interface CanvasTransform {
@@ -164,7 +183,8 @@ function Ruler({
  * Recursive component to render layers and groups.
  */
 function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer }) {
-    const { activeLayerId } = useEditor()
+    const { activeLayerId, transientTransforms } = useEditor()
+    const transform = transientTransforms?.[layer.id]
 
     if (!layer.visible) return null
 
@@ -172,8 +192,12 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
     if (layer.type === 'group') {
         return (
             <pixiContainer
-                x={layer.x}
-                y={layer.y}
+                x={transform ? transform.x : layer.x}
+                y={transform ? transform.y : layer.y}
+                scale={transform ? { x: transform.scaleX, y: transform.scaleY } : { x: 1, y: 1 }}
+                rotation={transform ? transform.rotation : 0}
+                skew={transform ? { x: transform.skewX, y: transform.skewY } : { x: 0, y: 0 }}
+                pivot={transform ? { x: transform.pivotX, y: transform.pivotY } : { x: 0, y: 0 }}
                 alpha={layer.opacity / 100}
             >
                 {layer.children?.slice().reverse().map(child => (
@@ -184,11 +208,17 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
     }
 
     // For regular layers, render the sprite and optional outline
+    // Note: The outline might need to follow the transform too, or we rely on the implementation of LayerOutline matching the sprite?
+    // LayerOutline currently reads layer.x/y/width/height directly. 
+    // It WON'T match the transform if we don't update it to use the transient transform too.
+    // However, LayerOutline is a debug/assist feature. 
+    // If we want it to match, we should pass the transform to it as well.
+
     return (
         <React.Fragment>
-            <PixiLayerSprite layer={layer} />
+            <PixiLayerSprite layer={layer} transform={transform} />
             {layer.id === activeLayerId && (
-                <LayerOutline layer={layer} />
+                <LayerOutline layer={layer} transform={transform} />
             )}
         </React.Fragment>
     )
@@ -220,10 +250,14 @@ function BrushCursor({
             if (visible) {
                 graphicsRef.current.position.set(x, y)
                 graphicsRef.current.clear()
-                graphicsRef.current.lineStyle(1, 0xFFFFFF, 0.8) // White outer
-                graphicsRef.current.drawCircle(0, 0, brushSize / 2)
-                graphicsRef.current.lineStyle(1, 0x000000, 0.5) // Black inner for contrast
-                graphicsRef.current.drawCircle(0, 0, (brushSize / 2) - 1)
+
+                // White outer
+                graphicsRef.current.circle(0, 0, brushSize / 2)
+                graphicsRef.current.stroke({ width: 1, color: 0xFFFFFF, alpha: 0.8 })
+
+                // Black inner for contrast
+                graphicsRef.current.circle(0, 0, (brushSize / 2) - 1)
+                graphicsRef.current.stroke({ width: 1, color: 0x000000, alpha: 0.5 })
             }
         }
     })
@@ -955,6 +989,10 @@ export default function Canvas({
                                     toolOptions={toolOptions}
                                     activeTool={activeTool}
                                 />
+                                { /* Transform Overlay (must be inside Application for Pixi context) */}
+                                {activeTool === 'transform' && activeLayerId && (
+                                    <TransformOverlay layerId={activeLayerId} />
+                                )}
                             </Application>
 
                             {/* Crop Overlay */}

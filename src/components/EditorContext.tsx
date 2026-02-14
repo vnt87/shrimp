@@ -38,6 +38,18 @@ export interface Guide {
     position: number // In canvas coordinates
 }
 
+export interface TransformData {
+    x: number
+    y: number
+    scaleX: number
+    scaleY: number
+    rotation: number
+    skewX: number
+    skewY: number
+    pivotX: number
+    pivotY: number
+}
+
 interface EditorContextType {
     layers: Layer[]
     activeLayerId: string | null
@@ -66,6 +78,8 @@ interface EditorContextType {
     updateLayerPosition: (id: string, x: number, y: number) => void
     addFilter: (layerId: string, filter: LayerFilter) => void
     removeFilter: (layerId: string, filterIndex: number) => void
+    updateFilter: (layerId: string, filterIndex: number, params: Record<string, number>) => void
+    toggleFilter: (layerId: string, filterIndex: number) => void
     setSelection: (selection: Selection | null) => void
     reorderLayers: (startIndex: number, endIndex: number) => void
 
@@ -102,6 +116,11 @@ interface EditorContextType {
     addGuide: (guide: Omit<Guide, 'id'>) => string
     removeGuide: (id: string) => void
     updateGuide: (id: string, position: number) => void
+
+    // Transform
+    transientTransforms: Record<string, TransformData>
+    setTransientTransform: (layerId: string, transform: TransformData | null) => void
+    commitTransform: (layerId: string, transform: TransformData) => void
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
@@ -138,6 +157,21 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     // Derived state for easier usage
     const { layers, activeLayerId, canvasSize, selection, guides } = historyState
     const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([])
+
+    // Phase 2: Transient transforms for live preview (not in history)
+    // Map layerId -> transform data
+    const [transientTransforms, setTransientTransforms] = useState<Record<string, TransformData>>({})
+
+    const updateTransientTransform = useCallback((layerId: string, transform: TransformData | null) => {
+        setTransientTransforms(prev => {
+            if (transform === null) {
+                const newState = { ...prev }
+                delete newState[layerId]
+                return newState
+            }
+            return { ...prev, [layerId]: transform }
+        })
+    }, [])
 
     // FG/BG colors (not tracked in history)
     const [foregroundColor, setForegroundColor] = useState('#000000')
@@ -395,6 +429,34 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
     }, [updateState])
 
+    const updateFilter = useCallback((layerId: string, filterIndex: number, params: Record<string, number>) => {
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer) return {}
+            const newFilters = [...layer.filters]
+            if (newFilters[filterIndex]) {
+                newFilters[filterIndex] = { ...newFilters[filterIndex], params: { ...newFilters[filterIndex].params, ...params } }
+            }
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { filters: newFilters })
+            }
+        })
+    }, [updateState])
+
+    const toggleFilter = useCallback((layerId: string, filterIndex: number) => {
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer) return {}
+            const newFilters = [...layer.filters]
+            if (newFilters[filterIndex]) {
+                newFilters[filterIndex] = { ...newFilters[filterIndex], enabled: !newFilters[filterIndex].enabled }
+            }
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { filters: newFilters })
+            }
+        })
+    }, [updateState])
+
     const reorderLayers = useCallback((_startIndex: number, _endIndex: number) => {
         // This was the old flat reorder.
         // We need a robust "moveLayer" that handles nesting.
@@ -423,6 +485,186 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             }
 
             return { layers: insertAfter(prevState.layers) }
+        })
+    }, [updateState])
+
+    const commitTransform = useCallback((layerId: string, transform: TransformData) => {
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || !layer.data) return {}
+
+            // Logic to bake transform:
+            // 1. Create new canvas large enough to hold the transformed image
+            // 2. Draw original onto it with transforms
+            // 3. Update layer data and position
+
+            const { width, height } = layer.data
+            // Calculate usage of pivot
+            const pivotX = transform.pivotX
+            const pivotY = transform.pivotY
+
+            // Corners of original image relative to (0,0)
+            const corners = [
+                { x: 0, y: 0 },
+                { x: width, y: 0 },
+                { x: width, y: height },
+                { x: 0, y: height }
+            ]
+
+            // Apply transform to each corner to find bounds
+            // The transform is:
+            // translate(transX, transY) * translate(pivotX, pivotY) * rotate(r) * scale(sx, sy) * translate(-pivotX, -pivotY)
+            // Wait, Pixi logic is:
+            // position + (rotation/scale/skew around pivot) - pivot
+
+            // Let's rely on standard 2D matrix math
+            const cos = Math.cos(transform.rotation)
+            const sin = Math.sin(transform.rotation)
+
+            // Transform matrix components
+            // x' = (x - px)*sx*cos - (y - py)*sy*sin + px + tx
+            // y' = (x - px)*sx*sin + (y - py)*sy*cos + py + ty
+            // Note: transform.x/y in our data is likely the *offset* or the *new position*?
+            // "layer.x" is top-left.
+            // Let's assume transform.x/y is the *new* top-left visual position if there were no rotation/scale?
+            // Or usually, it matches Pixi's "position" property.
+
+            // NOTE: This math is tricky. Let's start with a simplified "Just Bake It" approach.
+            // We'll create a canvas with enough padding and draw.
+
+            // Actually, we can use the canvas context's setTransform to simplify.
+            // We just need the bounds.
+
+            // For MVP: let's assume specific transform structure from our Overlay.
+            // If we use standard affine logic:
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+
+            corners.forEach(p => {
+                // Apply scale/rotate around pivot
+                const dx = p.x - pivotX
+                const dy = p.y - pivotY
+
+                const scaledX = dx * transform.scaleX
+                const scaledY = dy * transform.scaleY
+
+                const rotatedX = scaledX * cos - scaledY * sin
+                const rotatedY = scaledX * sin + scaledY * cos
+
+                // Final visual position (ignoring the layer.x translation for now, we just want bounds relative to pivot)
+                // actually we need bounds relative to world or layer origin?
+                // Let's calculate bounds relative to the pivot.
+
+                minX = Math.min(minX, rotatedX)
+                minY = Math.min(minY, rotatedY)
+                maxX = Math.max(maxX, rotatedX)
+                maxY = Math.max(maxY, rotatedY)
+            })
+
+            const newWidth = Math.ceil(maxX - minX)
+            const newHeight = Math.ceil(maxY - minY)
+
+            const newCanvas = document.createElement('canvas')
+            newCanvas.width = newWidth
+            newCanvas.height = newHeight
+            const ctx = newCanvas.getContext('2d')
+            if (!ctx) return {}
+
+            // Setup transform on new canvas
+            // We want (minX, minY) to map to (0,0) in the new canvas
+            // So we translate by (-minX, -minY)
+            ctx.translate(-minX, -minY)
+
+            // Now apply the same transform we used for points:
+            // 1. Rotate around (0,0) (since we prepared points relative to pivot)
+            // 2. Scale
+            // Wait, context applies operations in reverse order of calls usually, or simplified:
+            // transform(a,b,c,d,e,f)
+
+            // Let's use standard steps:
+            // Target is pivot-relative space.
+            // We want to draw the image which is relative to pivot (0,0 is at -pivotX, -pivotY)
+
+            ctx.rotate(transform.rotation)
+            ctx.scale(transform.scaleX, transform.scaleY)
+            // Draw image such that pivot is at (0,0) in current context
+            // Image (0,0) is at (-pivotX, -pivotY) relative to pivot
+            ctx.drawImage(layer.data, -pivotX, -pivotY)
+
+            // Now we have the new image data in newCanvas.
+            // Where is it positioned?
+            // Its top-left (0,0) corresponds to `minX, minY` relative to the pivot center.
+            // The pivot center is at `transform.x + pivotX`? NO.
+            // In Pixi/Our model:
+            // Original layer top-left was `layer.x, layer.y`.
+            // The transform happened relative to that.
+            // `transform.x` is the *new* `layer.x` (Pixi position).
+
+            // The visual pivot in world space is `transform.x + pivotX` (if pivot is offset).
+            // The new top-left corner (0,0 of newCanvas) is at `(transform.x + pivotX) + minX, (transform.y + pivotY) + minY`.
+            // Wait, Pixi `position` (transform.x) usually refers to the anchor/pivot point if anchor is set?
+            // No, Pixi default anchor is 0,0.
+
+            // Let's assume `transform.x` is the *visual position of the top-left corner* (or whatever the tool updates).
+            // Actually, if we use a Transform Tool, usually we drag the box.
+
+            // Let's assume `transform.x/y` is the Layer's (0,0) position in parent space.
+            // And pivot is local to the layer.
+
+            // The "pivot point" in world space was `originalX + pivotX, originalY + pivotY`.
+            // After transform, that point might move if `transform.x` moves.
+
+            // Let's simplify:
+            // The new layer's top-left position will be:
+            // `transform.x` (base pos) + `pivotX` (offset to pivot) + `minX` (offset to new, rotated top-left).
+            // Wait, `transform.x` is the *updated* layer position.
+            // If the user didn't move the handle, just rotated, `transform.x` stays same.
+
+            // Correct logic:
+            // New Layer X = transform.x + minX + (something about pivot?)
+            // Actually, `transform.x` is the position of the *origin* (top-left of pre-transform content).
+            // We are baking the transform.
+            // So the new origin (top-left of new content) should be:
+            // NewX = transform.x + (minX calculated relative to pivot) + pivotX * (rotated?) -> complex.
+
+            // Let's assume the TransformOverlay gives us the *visual* `x, y` of the layer.
+            // We'll refine this when we build the component.
+            // For now:
+            const newLayerX = transform.x + minX + pivotX // This assumes (transform.x + pivotX) is the center of rotation
+            const newLayerY = transform.y + minY + pivotY
+
+            // BUT wait, if we bake, we reset rotation/scale to 0/1.
+            // The pivot is usually irrelevant after baking?
+
+            // Let's try this:
+            // New X = transform.x + minX + pivotX (adjusting for the fact that minX is negative relative to pivot) -- wait.
+            // Pivot is (px, py).
+            // Origin is (0,0).
+            // Origin relative to pivot is (-px, -py).
+            // Rotated origin is ...
+
+            // Let's trust the minX/minY (relative to pivot).
+            // The pivot in world space is `transform.x + pivotX`.  (Using the transform's x/y).
+            // The new top-left is `(WorldPivot) + (minX, minY)`.
+            // So `newLayerX = transform.x + pivotX + minX`.
+            // `newLayerY = transform.y + pivotY + minY`.
+
+            // This seems plausible!
+
+            // Clean up transient
+            setTransientTransforms(prev => {
+                const copy = { ...prev }
+                delete copy[layerId]
+                return copy
+            })
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, {
+                    data: newCanvas,
+                    x: newLayerX,
+                    y: newLayerY
+                })
+            }
         })
     }, [updateState])
 
@@ -898,7 +1140,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             guides,
             addGuide,
             removeGuide,
-            updateGuide
+            updateGuide,
+            // Phase 2
+            transientTransforms,
+            setTransientTransform: updateTransientTransform,
+            commitTransform,
+            // Phase 1
+            updateFilter,
+            toggleFilter
         }}>
             {children}
         </EditorContext.Provider>

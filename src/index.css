@@ -2668,3 +2668,266 @@ body,
   background: var(--pref-titlebar-bg);
   flex-shrink: 0;
 }
+
+
+/* ===== Filters Dialog ===== */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  /* Or var(--overlay-bg) if we want a dimmer */
+  pointer-events: none;
+  /* Let clicks pass through to canvas if not on dialog? No, usually overlays block. */
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Make the dialog itself accept pointer events */
+.filters-dialog {
+  pointer-events: auto;
+
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+  overflow: hidden;
+}
+
+.dialogue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 10px;
+  background: var(--pref-titlebar-bg);
+  border-bottom: 1px solid var(--border-main);
+  flex-shrink: 0;
+}
+
+.dialogue-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dialogue-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition);
+}
+
+.dialogue-close:hover {
+  background: var(--pref-close-hover);
+  color: white;
+}
+
+.dialogue-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-main);
+  background: var(--pref-titlebar-bg);
+  flex-shrink: 0;
+}
+
+.filters-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.filters-sidebar {
+  width: 150px;
+  background: var(--bg-toolbar);
+  border-right: 1px solid var(--border-subtle);
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-type-item {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.filter-type-item:hover {
+  background: var(--hover-overlay);
+  color: var(--text-primary);
+}
+
+.filter-type-item.active {
+  background: var(--accent-active);
+  color: white;
+}
+
+.filters-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-panel);
+}
+
+.filters-params-area {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.filters-params-area h3 {
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.filter-slider-group {
+  margin-bottom: 12px;
+}
+
+.filter-slider-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.filter-slider-header .slider-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.filter-slider-header .slider-value {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.filter-slider-group input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  background: var(--bg-input);
+  border-radius: 2px;
+  outline: none;
+}
+
+.filter-slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-active);
+  cursor: pointer;
+  border: 2px solid var(--bg-panel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.filters-existing-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--bg-input);
+}
+
+.filters-list-header {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.empty-filters {
+  text-align: center;
+  padding: 32px 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.filters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-item {
+  background: var(--bg-layer-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-item-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-stripe {
+  width: 4px;
+  height: 24px;
+  background: var(--accent-active);
+  border-radius: 2px;
+}
+
+.filter-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-action-btn {
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.filter-action-btn:hover {
+  background: var(--bg-toolbar);
+  color: var(--text-primary);
+}
+
+.filter-action-btn.disabled {
+  color: var(--text-muted);
+}
+
+.filter-action-btn.danger:hover {
+  background: rgba(255, 80, 80, 0.1);
+  color: #ff5050;
+}

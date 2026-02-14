@@ -8,7 +8,7 @@ import {
     NoiseFilter,
     type Filter
 } from 'pixi.js'
-import type { Layer, LayerFilter } from './EditorContext'
+import type { Layer, LayerFilter, TransformData } from './EditorContext'
 
 // Register the Sprite component with @pixi/react
 extend({ Sprite })
@@ -79,15 +79,17 @@ function createPixiFilter(filter: LayerFilter): Filter | null {
 
 interface PixiLayerSpriteProps {
     layer: Layer
+    transform?: TransformData
 }
 
 /**
  * Renders a single editor layer as a Pixi.js Sprite with GPU-accelerated
  * blend modes and non-destructive filters.
  */
-export default function PixiLayerSprite({ layer }: PixiLayerSpriteProps) {
+export default function PixiLayerSprite({ layer, transform }: PixiLayerSpriteProps) {
     const textureRef = useRef<Texture | null>(null)
 
+    // ... (texture logic same)
     // Create texture from the layer's HTMLCanvasElement data
     const texture = useMemo(() => {
         if (textureRef.current) {
@@ -102,14 +104,16 @@ export default function PixiLayerSprite({ layer }: PixiLayerSpriteProps) {
         return tex
     }, [layer.data])
 
+    // ... (useEffect for update same)
     // When layer.data canvas content changes (but the same canvas object),
     // we need to force texture update
     useEffect(() => {
         if (textureRef.current && layer.data) {
             textureRef.current.source.update()
         }
-    }, [layer.data, layer.opacity]) // opacity as a proxy for "something changed"
+    }, [layer.data, layer.opacity])
 
+    // ... (pixiFilters logic same)
     // Build the Pixi filter array from our LayerFilter descriptors
     const pixiFilters = useMemo(() => {
         if (!layer.filters || layer.filters.length === 0) return undefined
@@ -119,6 +123,7 @@ export default function PixiLayerSprite({ layer }: PixiLayerSpriteProps) {
         return filters.length > 0 ? filters : undefined
     }, [layer.filters])
 
+    // ... (cleanup same)
     // Cleanup texture on unmount
     useEffect(() => {
         return () => {
@@ -131,14 +136,27 @@ export default function PixiLayerSprite({ layer }: PixiLayerSpriteProps) {
 
     if (!layer.visible || !layer.data) return null
 
+    // Determine transform properties
+    const x = transform ? transform.x : layer.x
+    const y = transform ? transform.y : layer.y
+    const scale = transform ? { x: transform.scaleX, y: transform.scaleY } : { x: 1, y: 1 }
+    const rotation = transform ? transform.rotation : 0
+    const skew = transform ? { x: transform.skewX, y: transform.skewY } : { x: 0, y: 0 }
+    const pivot = transform ? { x: transform.pivotX, y: transform.pivotY } : { x: 0, y: 0 }
+
     return (
         <pixiSprite
             texture={texture}
-            x={layer.x}
-            y={layer.y}
+            x={x}
+            y={y}
+            scale={scale}
+            rotation={rotation}
+            skew={skew}
+            pivot={pivot}
             alpha={layer.opacity / 100}
             blendMode={mapBlendMode(layer.blendMode) as any}
             filters={pixiFilters}
         />
     )
 }
+

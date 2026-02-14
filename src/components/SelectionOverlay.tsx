@@ -31,20 +31,18 @@ export default function SelectionOverlay({ selection }: SelectionOverlayProps) {
             const offset = dashOffset.current
 
             // Draw black solid outline (background)
-            g.setStrokeStyle({ width: 1, color: 0x000000, alpha: 0.7 })
             if (type === 'ellipse') {
                 g.ellipse(x + width / 2, y + height / 2, Math.abs(width / 2), Math.abs(height / 2))
             } else {
                 g.rect(x, y, width, height)
             }
-            g.stroke()
+            g.stroke({ width: 1, color: 0x000000, alpha: 0.7 })
 
             // Draw white dashed outline (foreground, animated)
             // We simulate dashes by drawing small line segments
             const dashLength = 4
             const gapLength = 4
-
-            g.setStrokeStyle({ width: 1, color: 0xffffff, alpha: 1 })
+            const strokeStyle = { width: 1, color: 0xffffff, alpha: 1 }
 
             if (type === 'ellipse') {
                 // For ellipse, draw dashed segments along the perimeter
@@ -80,7 +78,7 @@ export default function SelectionOverlay({ selection }: SelectionOverlayProps) {
                         stepInSegment = 0
                     }
                 }
-                g.stroke()
+                g.stroke(strokeStyle)
             } else {
                 // Rectangle: draw four edges with dashes
                 const edges = [
@@ -110,7 +108,7 @@ export default function SelectionOverlay({ selection }: SelectionOverlayProps) {
                         pos += dashLength + gapLength
                     }
                 }
-                g.stroke()
+                g.stroke(strokeStyle)
             }
         },
         [selection, dashOffset.current]

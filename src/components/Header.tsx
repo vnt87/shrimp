@@ -18,11 +18,12 @@ import KeyboardShortcutsDialog from './KeyboardShortcutsDialog'
 import NewImageDialog from './NewImageDialog'
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
-import { useEditor } from './EditorContext'
+import { useEditor, type LayerFilter } from './EditorContext'
+import FiltersDialog from './FiltersDialog'
 
 const menuData: Record<string, string[]> = {
     File: ['New...', 'Open...', 'Open as Layers...', 'Export As PNG', 'Export As JPEG', 'Export As WebP', 'Close', 'Close All'],
-    Edit: ['Undo', 'Redo', '---', 'Cut', 'Copy', 'Paste', 'Clear'],
+    Edit: ['Undo', 'Redo', '---', 'Cut', 'Copy', 'Paste', 'Clear', '---', 'Free Transform'],
     Select: ['All', 'None', 'Invert'],
     View: ['Fit Image in Window', 'Zoom In', 'Zoom Out'],
     Image: ['Flatten Image', 'Merge Visible Layers', '---', 'Canvas Size...'],
@@ -39,7 +40,7 @@ const themeOptions = [
     { value: 'system' as const, label: 'System', icon: Monitor },
 ]
 
-export default function Header() {
+export default function Header({ onToolSelect }: { onToolSelect?: (tool: string) => void }) {
     const [activeMenu, setActiveMenu] = useState<string | null>(null)
     const [autosave, setAutosave] = useState(true)
     const [settingsOpen, setSettingsOpen] = useState(false)
@@ -47,6 +48,8 @@ export default function Header() {
     const [showAbout, setShowAbout] = useState(false)
     const [showShortcuts, setShowShortcuts] = useState(false)
     const [showNewImage, setShowNewImage] = useState(false)
+    const [showFilters, setShowFilters] = useState(false)
+    const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -167,6 +170,7 @@ export default function Header() {
             case 'Close All': closeImage(); break
             case 'Undo': undo(); break
             case 'Redo': redo(); break
+            case 'Free Transform': onToolSelect?.('transform'); break
             case 'All': selectAll(); break
             case 'None': selectNone(); break
             case 'Invert': invertSelection(); break
@@ -177,6 +181,38 @@ export default function Header() {
             case 'Duplicate Layer': activeLayerId && duplicateLayer(activeLayerId); break
             case 'Delete Layer': activeLayerId && deleteLayer(activeLayerId); break
             case 'Keyboard Shortcuts': setShowShortcuts(true); break
+            case 'Brightness-Contrast...':
+                setInitialFilterType('brightness')
+                setShowFilters(true)
+                break
+            case 'Hue-Saturation...':
+                setInitialFilterType('hue-saturation')
+                setShowFilters(true)
+                break
+            case 'Desaturate...':
+                // Could be a one-click action or open Hue-Sat with sat=-100
+                setInitialFilterType('hue-saturation')
+                setShowFilters(true)
+                break
+            case 'Invert Colors':
+                // No direct filter for this yet, maybe color matrix?
+                // For now, let's use color-matrix as a placeholder or skip
+                break
+            case 'Blur':
+                setInitialFilterType('blur')
+                setShowFilters(true)
+                break
+            case 'Sharpen':
+                // Sharpen is usually a convolution matrix. 
+                // We'll map it to 'color-matrix' for now or 'custom' if we had it.
+                // Let's just open 'color-matrix' as it's the closest "advanced" filter
+                setInitialFilterType('color-matrix')
+                setShowFilters(true)
+                break
+            case 'Noise':
+                setInitialFilterType('noise')
+                setShowFilters(true)
+                break
             case 'About': setShowAbout(true); break
             case 'Github Source':
                 window.open('https://github.com/vnt87/shrimp', '_blank')
@@ -330,6 +366,7 @@ export default function Header() {
             {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
             {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
             {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
+            {showFilters && <FiltersDialog initialFilterType={initialFilterType} onClose={() => setShowFilters(false)} />}
         </>
     )
 }
