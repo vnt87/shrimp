@@ -668,30 +668,6 @@ body,
   padding-top: 6px;
   overflow-y: auto;
   overflow-x: hidden;
-  transition: width var(--transition);
-}
-
-/* Responsive Toolbox: 2 columns on short screens */
-@media (max-height: 850px) {
-  :root {
-    --toolbox-w: 78px;
-  }
-
-  .toolbox-group {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    width: 100%;
-    padding: 0 4px;
-  }
-
-  .toolbox-item {
-    margin: 2px;
-  }
-
-  .toolbox-divider {
-    width: 90%;
-  }
 }
 
 .toolbox::-webkit-scrollbar {
@@ -718,22 +694,21 @@ body,
   margin: 2px 0;
   position: relative;
   flex-shrink: 0;
-  transition: background var(--transition);
+  /* transition: background var(--transition); Removed for instant hover */
 }
 
-/* ===== Tooltip ===== */
 .custom-tooltip {
   position: fixed;
-  z-index: 10000;
   background: var(--bg-panel);
   color: var(--text-primary);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-dropdown);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   white-space: nowrap;
   pointer-events: none;
+  z-index: 9999;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-dropdown);
   transform: translateY(-50%);
 }
 

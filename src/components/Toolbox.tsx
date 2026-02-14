@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { useEditor } from './EditorContext'
 import ColorPicker from './ColorPicker'
+import Tooltip from './Tooltip'
 
 // Shortcut map
 const shortcuts: Record<string, string> = {
@@ -89,44 +90,31 @@ interface ToolboxProps {
 export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxProps) {
     const { foregroundColor, backgroundColor, setForegroundColor, setBackgroundColor, swapColors, resetColors } = useEditor()
     const [colorPickerTarget, setColorPickerTarget] = useState<'fg' | 'bg' | null>(null)
-    const [hoveredTool, setHoveredTool] = useState<{ id: string; label: string; x: number; y: number } | null>(null)
-
-    const handleMouseEnter = (
-        e: React.MouseEvent<HTMLDivElement>,
-        toolId: string,
-        label: string,
-        shortcut?: string
-    ) => {
-        const rect = e.currentTarget.getBoundingClientRect()
-        setHoveredTool({
-            id: toolId,
-            label: `${label}${shortcut ? ` (${shortcut})` : ''}`,
-            x: rect.right + 5, // 5px gap from the tool item
-            y: rect.top + rect.height / 2,
-        })
-    }
-
-    const handleMouseLeave = () => {
-        setHoveredTool(null)
-    }
+    const [hoveredToolId, setHoveredToolId] = useState<string | null>(null)
+    const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null)
 
     return (
         <div className="toolbox">
             <div className="toolbox-handle" />
 
             {toolGroups.map((group, gi) => (
-                <div key={gi} className="toolbox-group">
+                <div key={gi}>
                     {group.map((tool, ti) => {
                         const Icon = tool.icon
                         const isActive = activeTool === tool.id
-                        const shortcut = shortcuts[tool.id]
                         return (
                             <div
                                 key={ti}
                                 className={`toolbox-item${isActive ? ' active' : ''}`}
-                                onMouseEnter={(e) => handleMouseEnter(e, tool.id, tool.label, shortcut)}
-                                onMouseLeave={handleMouseLeave}
                                 onClick={() => onToolSelect?.(tool.id)}
+                                onMouseEnter={(e) => {
+                                    setHoveredToolId(tool.id)
+                                    setHoveredRect(e.currentTarget.getBoundingClientRect())
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredToolId(null)
+                                    setHoveredRect(null)
+                                }}
                             >
                                 <Icon size={20} />
                             </div>
@@ -172,18 +160,22 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                 )}
             </div>
 
-            {/* Custom Tooltip */}
-            {hoveredTool && (
-                <div
-                    className="custom-tooltip"
-                    style={{
-                        top: hoveredTool.y,
-                        left: hoveredTool.x,
-                    }}
-                >
-                    {hoveredTool.label}
-                </div>
-            )}
+            <Tooltip
+                text={hoveredToolId ? `${getToolLabel(hoveredToolId)}` : ''}
+                visible={!!hoveredToolId}
+                targetRect={hoveredRect}
+                offset={10}
+            />
         </div>
     )
+}
+
+function getToolLabel(toolId: string): string {
+    const flatTools = toolGroups.flat()
+    const tool = flatTools.find(t => t.id === toolId)
+    if (!tool) return ''
+
+    const label = tool.label
+    const shortcut = shortcuts[toolId]
+    return shortcut ? `${label} (${shortcut})` : label
 }
