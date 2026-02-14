@@ -52,8 +52,32 @@ export default function StatusBar({
                 </span>
             </div>
             <div className="status-group">
-                <span className="status-text">Width: {typeof width === 'number' ? `${width}px` : width}</span>
-                <span className="status-text" style={{ marginLeft: 26 }}>Height: {typeof height === 'number' ? `${height}px` : height}</span>
+                <span className="status-text">Width:</span>
+                <span
+                    className="status-text"
+                    style={{
+                        width: 60,
+                        display: 'inline-block',
+                        textAlign: 'left',
+                        fontVariantNumeric: 'tabular-nums',
+                        marginLeft: 8,
+                    }}
+                >
+                    {typeof width === 'number' ? `${width}px` : width}
+                </span>
+                <span className="status-text" style={{ marginLeft: 26 }}>Height:</span>
+                <span
+                    className="status-text"
+                    style={{
+                        width: 60,
+                        display: 'inline-block',
+                        textAlign: 'left',
+                        fontVariantNumeric: 'tabular-nums',
+                        marginLeft: 8,
+                    }}
+                >
+                    {typeof height === 'number' ? `${height}px` : height}
+                </span>
             </div>
             <div className="status-group">
                 <span className="status-text">Position Change x: ---</span>
