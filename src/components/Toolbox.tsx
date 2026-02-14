@@ -89,13 +89,33 @@ interface ToolboxProps {
 export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxProps) {
     const { foregroundColor, backgroundColor, setForegroundColor, setBackgroundColor, swapColors, resetColors } = useEditor()
     const [colorPickerTarget, setColorPickerTarget] = useState<'fg' | 'bg' | null>(null)
+    const [hoveredTool, setHoveredTool] = useState<{ id: string; label: string; x: number; y: number } | null>(null)
+
+    const handleMouseEnter = (
+        e: React.MouseEvent<HTMLDivElement>,
+        toolId: string,
+        label: string,
+        shortcut?: string
+    ) => {
+        const rect = e.currentTarget.getBoundingClientRect()
+        setHoveredTool({
+            id: toolId,
+            label: `${label}${shortcut ? ` (${shortcut})` : ''}`,
+            x: rect.right + 5, // 5px gap from the tool item
+            y: rect.top + rect.height / 2,
+        })
+    }
+
+    const handleMouseLeave = () => {
+        setHoveredTool(null)
+    }
 
     return (
         <div className="toolbox">
             <div className="toolbox-handle" />
 
             {toolGroups.map((group, gi) => (
-                <div key={gi}>
+                <div key={gi} className="toolbox-group">
                     {group.map((tool, ti) => {
                         const Icon = tool.icon
                         const isActive = activeTool === tool.id
@@ -104,7 +124,8 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                             <div
                                 key={ti}
                                 className={`toolbox-item${isActive ? ' active' : ''}`}
-                                title={`${tool.label}${shortcut ? ` (${shortcut})` : ''}`}
+                                onMouseEnter={(e) => handleMouseEnter(e, tool.id, tool.label, shortcut)}
+                                onMouseLeave={handleMouseLeave}
                                 onClick={() => onToolSelect?.(tool.id)}
                             >
                                 <Icon size={20} />
@@ -150,6 +171,19 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                     />
                 )}
             </div>
+
+            {/* Custom Tooltip */}
+            {hoveredTool && (
+                <div
+                    className="custom-tooltip"
+                    style={{
+                        top: hoveredTool.y,
+                        left: hoveredTool.x,
+                    }}
+                >
+                    {hoveredTool.label}
+                </div>
+            )}
         </div>
     )
 }
