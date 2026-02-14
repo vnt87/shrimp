@@ -2238,28 +2238,73 @@ body,
   background: var(--pref-btn-secondary-hover);
   border-color: var(--text-muted);
 }
+
 /* Crop Overlay */
 .crop-overlay {
-    position: absolute;
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-    pointer-events: none; /* Let clicks pass through for dragging underneath if needed, but handles catch events */
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  /* Let clicks pass through for dragging underneath if needed, but handles catch events */
 }
 
 .crop-handle {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    background: white;
-    border: 1px solid #333;
-    pointer-events: auto;
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 1px solid #333;
+  pointer-events: auto;
 }
 
-.crop-handle.nw { top: -4px; left: -4px; cursor: nw-resize; }
-.crop-handle.ne { top: -4px; right: -4px; cursor: ne-resize; }
-.crop-handle.sw { bottom: -4px; left: -4px; cursor: sw-resize; }
-.crop-handle.se { bottom: -4px; right: -4px; cursor: se-resize; }
+.crop-handle.nw {
+  top: -4px;
+  left: -4px;
+  cursor: nw-resize;
+}
+
+.crop-handle.ne {
+  top: -4px;
+  right: -4px;
+  cursor: ne-resize;
+}
+
+.crop-handle.sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: sw-resize;
+}
+
+.crop-handle.se {
+  bottom: -4px;
+  right: -4px;
+  cursor: se-resize;
+}
 
 .canvas-viewport.crosshair {
-    cursor: crosshair;
+  cursor: crosshair;
+}
+
+@keyframes marching-ants {
+  0% {
+    background-position: 0 0, 0 100%, 0 0, 100% 0;
+  }
+
+  100% {
+    background-position: 16px 0, -16px 100%, 0 -16px, 100% 16px;
+  }
+}
+
+.selection-overlay {
+  background-image: linear-gradient(90deg, #fff 50%, transparent 50%),
+    linear-gradient(90deg, #fff 50%, transparent 50%),
+    linear-gradient(0deg, #fff 50%, transparent 50%),
+    linear-gradient(0deg, #fff 50%, transparent 50%);
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  background-size: 8px 1px, 8px 1px, 1px 8px, 1px 8px;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  animation: marching-ants 0.5s linear infinite;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  pointer-events: none;
 }

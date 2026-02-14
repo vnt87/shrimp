@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ThemeProvider } from './components/ThemeContext'
+import { EditorProvider } from './components/EditorContext'
 import Header from './components/Header'
 import ToolOptionsBar from './components/ToolOptionsBar'
 import Toolbox from './components/Toolbox'
@@ -35,16 +36,18 @@ export default function App() {
 
     return (
         <ThemeProvider>
-            <div className="app">
-                <Header />
-                <ToolOptionsBar />
-                <div className="main-content">
-                    <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
-                    <Canvas onCursorMove={setCursorPos} activeTool={activeTool} />
-                    <RightPanel />
+            <EditorProvider>
+                <div className="app">
+                    <Header />
+                    <ToolOptionsBar />
+                    <div className="main-content">
+                        <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
+                        <Canvas onCursorMove={setCursorPos} activeTool={activeTool} />
+                        <RightPanel />
+                    </div>
+                    <StatusBar cursorPos={cursorPos} />
                 </div>
-                <StatusBar cursorPos={cursorPos} />
-            </div>
+            </EditorProvider>
         </ThemeProvider>
     )
 }
