@@ -1,8 +1,27 @@
+import { useEditor, Layer } from './EditorContext'
+
 export default function StatusBar({
     cursorPos,
 }: {
     cursorPos: { x: number; y: number } | null
 }) {
+    const { activeLayerId, layers } = useEditor()
+
+    const findLayerById = (layers: Layer[], id: string): Layer | null => {
+        for (const layer of layers) {
+            if (layer.id === id) return layer
+            if (layer.children) {
+                const found = findLayerById(layer.children, id)
+                if (found) return found
+            }
+        }
+        return null
+    }
+
+    const activeLayer = activeLayerId ? findLayerById(layers, activeLayerId) : null
+    const width = activeLayer?.data ? activeLayer.data.width : '---'
+    const height = activeLayer?.data ? activeLayer.data.height : '---'
+
     return (
         <footer className="status-bar">
             <div className="status-group">
@@ -33,8 +52,8 @@ export default function StatusBar({
                 </span>
             </div>
             <div className="status-group">
-                <span className="status-text">Width: 1920px</span>
-                <span className="status-text" style={{ marginLeft: 26 }}>Height: 1080px</span>
+                <span className="status-text">Width: {typeof width === 'number' ? `${width}px` : width}</span>
+                <span className="status-text" style={{ marginLeft: 26 }}>Height: {typeof height === 'number' ? `${height}px` : height}</span>
             </div>
             <div className="status-group">
                 <span className="status-text">Position Change x: ---</span>

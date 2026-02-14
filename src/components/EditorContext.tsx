@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useHistory } from '../hooks/useHistory'
 
 export interface LayerFilter {
@@ -20,6 +20,7 @@ export interface Layer {
     y: number
     type: 'layer' | 'group'
     children?: Layer[] // For groups
+    expanded?: boolean
 }
 
 export interface Selection {
@@ -59,6 +60,15 @@ interface EditorContextType {
     addToHistory: () => void
     cropCanvas: (x: number, y: number, width: number, height: number) => void
     closeImage: () => void
+
+    // New actions
+    selectedLayerIds: string[]
+    setSelectedLayerIds: (ids: string[]) => void
+    duplicateLayer: (id: string) => void
+    createGroup: (layerIds?: string[]) => void
+    moveLayer: (dragId: string, targetId: string | null, position: 'before' | 'after' | 'inside') => void
+    renameLayer: (id: string, name: string) => void
+    toggleGroupExpanded?: (id: string) => void
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
@@ -92,22 +102,17 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     // Derived state for easier usage
     const { layers, activeLayerId, canvasSize, selection } = historyState
+    const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([])
 
-    // Helper to commit current state changes to history.
-    // Call this BEFORE making a "new" move if you want to snapshot the previous state?
-    // Actually, useHistory's `set` PUSHES to history effectively.
-    // So simply calling setHistoryState with new data creates a new history point.
-
-    // However, some actions (like dragging) update state frequently but should only create ONE history entry (on drag end).
-    // For those, we might need a "draft" state or just use `setHistoryState` only on drag end.
-    // BUT our context exposes `setLayers` etc which are used by components directly.
-    // We need to wrap those sets.
-
-    // Strategy: 
-    // All "setter" functions below will now call `setHistoryState`.
-    // This implies EVERY action is an undoable step.
-    // For dragging, components should probably manage local state and only commit to context on MouseUp.
-    // Let's assume components do that for now (Canvas.tsx does for Move tool).
+    // Update selectedLayerIds when activeLayerId changes to ensure sync if needed
+    // But usually activeLayerId is just the "primary" selected layer.
+    // For now, let's keep them somewhat separate or sync them.
+    // If activeLayerId changes, it should probably be in selectedLayerIds.
+    useEffect(() => {
+        if (activeLayerId && !selectedLayerIds.includes(activeLayerId)) {
+            setSelectedLayerIds([activeLayerId])
+        }
+    }, [activeLayerId])
 
     const updateState = useCallback((updates: Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>)) => {
         setHistoryState(prevFullState => {
@@ -119,7 +124,74 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
     }, [setHistoryState])
 
-    // Helper to create a new layer
+    // --- Helpers for recursive layer operations ---
+
+    const findLayerById = (layers: Layer[], id: string): Layer | null => {
+        for (const layer of layers) {
+            if (layer.id === id) return layer
+            if (layer.children) {
+                const found = findLayerById(layer.children, id)
+                if (found) return found
+            }
+        }
+        return null
+    }
+
+    const updateLayerInTree = (layers: Layer[], id: string, updates: Partial<Layer>): Layer[] => {
+        return layers.map(layer => {
+            if (layer.id === id) {
+                return { ...layer, ...updates }
+            }
+            if (layer.children) {
+                return { ...layer, children: updateLayerInTree(layer.children, id, updates) }
+            }
+            return layer
+        })
+    }
+
+    const removeLayerFromTree = (layers: Layer[], id: string): { layers: Layer[], removed: Layer | null } => {
+        let removed: Layer | null = null
+        const filter = (list: Layer[]): Layer[] => {
+            const result: Layer[] = []
+            for (const layer of list) {
+                if (layer.id === id) {
+                    removed = layer
+                    continue
+                }
+                if (layer.children) {
+                    layer.children = filter(layer.children)
+                }
+                result.push(layer)
+            }
+            return result
+        }
+        const newLayers = filter(layers)
+        return { layers: newLayers, removed }
+    }
+
+    // Deep clone a layer (for duplication)
+    const cloneLayer = (layer: Layer): Layer => {
+        let newData: HTMLCanvasElement | null = null
+        if (layer.data) {
+            newData = document.createElement('canvas')
+            newData.width = layer.data.width
+            newData.height = layer.data.height
+            newData.getContext('2d')?.drawImage(layer.data, 0, 0)
+        }
+
+        return {
+            ...layer,
+            id: Math.random().toString(36).substr(2, 9),
+            name: layer.name + ' Copy',
+            data: newData,
+            children: layer.children ? layer.children.map(cloneLayer) : undefined,
+            expanded: layer.expanded
+        }
+    }
+
+
+    // --- Actions ---
+
     const createLayer = (name: string, size: { width: number, height: number }, initialData?: HTMLCanvasElement): Layer => {
         const canvas = initialData || document.createElement('canvas')
         if (!initialData) {
@@ -143,20 +215,27 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     const setCanvasSizeWrapper = useCallback((size: { width: number; height: number }) => {
         updateState((prevState) => {
-            const newLayers = prevState.layers.map(layer => {
-                if (layer.data) {
-                    const newCanvas = document.createElement('canvas')
-                    newCanvas.width = size.width
-                    newCanvas.height = size.height
-                    const ctx = newCanvas.getContext('2d')
-                    if (ctx) {
-                        ctx.drawImage(layer.data, 0, 0)
+            // This only handles top-level layers for resizing?
+            // Should probably recurse.
+            const resizeLayers = (list: Layer[]): Layer[] => {
+                return list.map(layer => {
+                    if (layer.data) {
+                        const newCanvas = document.createElement('canvas')
+                        newCanvas.width = size.width
+                        newCanvas.height = size.height
+                        const ctx = newCanvas.getContext('2d')
+                        if (ctx) {
+                            ctx.drawImage(layer.data, 0, 0)
+                        }
+                        return { ...layer, data: newCanvas }
                     }
-                    return { ...layer, data: newCanvas }
-                }
-                return layer
-            })
-            return { canvasSize: size, layers: newLayers }
+                    if (layer.children) {
+                        return { ...layer, children: resizeLayers(layer.children) }
+                    }
+                    return layer
+                })
+            }
+            return { canvasSize: size, layers: resizeLayers(prevState.layers) }
         })
     }, [updateState])
 
@@ -175,15 +254,17 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     const updateLayerPosition = useCallback((id: string, x: number, y: number) => {
         updateState(prevState => ({
-            layers: prevState.layers.map(l => l.id === id ? { ...l, x, y } : l)
+            layers: updateLayerInTree(prevState.layers, id, { x, y })
         }))
     }, [updateState])
 
     const deleteLayer = useCallback((id: string) => {
         updateState(prevState => {
-            const newLayers = prevState.layers.filter(l => l.id !== id)
+            const { layers: newLayers } = removeLayerFromTree(prevState.layers, id)
+            // If active layer was deleted, reset active ID
             let newActiveId = prevState.activeLayerId
             if (prevState.activeLayerId === id) {
+                // Simplification: just unset or pick first
                 newActiveId = newLayers.length > 0 ? newLayers[0].id : null
             }
             return {
@@ -198,73 +279,236 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }, [updateState])
 
     const toggleLayerVisibility = useCallback((id: string) => {
-        updateState(prevState => ({
-            layers: prevState.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l)
-        }))
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, id)
+            return {
+                layers: updateLayerInTree(prevState.layers, id, { visible: !layer?.visible })
+            }
+        })
     }, [updateState])
 
+    // Added: Toggle Group Expansion
+    const toggleGroupExpanded = useCallback((id: string) => {
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, id)
+            return {
+                layers: updateLayerInTree(prevState.layers, id, { expanded: !layer?.expanded })
+            }
+        })
+    }, [updateState])
+
+
     const toggleLayerLock = useCallback((id: string) => {
-        updateState(prevState => ({
-            layers: prevState.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l)
-        }))
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, id)
+            return {
+                layers: updateLayerInTree(prevState.layers, id, { locked: !layer?.locked })
+            }
+        })
     }, [updateState])
 
     const setLayerOpacity = useCallback((id: string, opacity: number) => {
         updateState(prevState => ({
-            layers: prevState.layers.map(l => l.id === id ? { ...l, opacity } : l)
+            layers: updateLayerInTree(prevState.layers, id, { opacity })
         }))
     }, [updateState])
 
     const updateLayerData = useCallback((id: string, canvas: HTMLCanvasElement) => {
         updateState(prevState => ({
-            layers: prevState.layers.map(l => {
-                if (l.id === id) {
-                    return { ...l, data: canvas }
-                }
-                return l
-            })
+            layers: updateLayerInTree(prevState.layers, id, { data: canvas })
         }))
     }, [updateState])
 
     const addFilter = useCallback((layerId: string, filter: LayerFilter) => {
-        updateState(prevState => ({
-            layers: prevState.layers.map(l =>
-                l.id === layerId ? { ...l, filters: [...l.filters, filter] } : l
-            )
-        }))
-    }, [updateState])
-
-    const removeFilter = useCallback((layerId: string, filterIndex: number) => {
-        updateState(prevState => ({
-            layers: prevState.layers.map(l =>
-                l.id === layerId ? { ...l, filters: l.filters.filter((_, i) => i !== filterIndex) } : l
-            )
-        }))
-    }, [updateState])
-
-    const reorderLayers = useCallback((startIndex: number, endIndex: number) => {
         updateState(prevState => {
-            const result = Array.from(prevState.layers)
-            const [removed] = result.splice(startIndex, 1)
-            result.splice(endIndex, 0, removed)
-            return { layers: result }
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer) return {}
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { filters: [...layer.filters, filter] })
+            }
         })
     }, [updateState])
 
+    const removeFilter = useCallback((layerId: string, filterIndex: number) => {
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer) return {}
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { filters: layer.filters.filter((_, i) => i !== filterIndex) })
+            }
+        })
+    }, [updateState])
+
+    const reorderLayers = useCallback((_startIndex: number, _endIndex: number) => {
+        // This was the old flat reorder.
+        // We need a robust "moveLayer" that handles nesting.
+        // Keeping this for backward compatibility if needed, but 'moveLayer' is better.
+    }, [])
+
+    const duplicateLayer = useCallback((id: string) => {
+        updateState(prevState => {
+            const layerToDup = findLayerById(prevState.layers, id)
+            if (!layerToDup) return {}
+
+            const newLayer = cloneLayer(layerToDup)
+
+            // Insert after the original
+            const insertAfter = (list: Layer[]): Layer[] => {
+                const newList: Layer[] = []
+                for (const l of list) {
+                    newList.push(l)
+                    if (l.id === id) {
+                        newList.push(newLayer)
+                    } else if (l.children) {
+                        l.children = insertAfter(l.children)
+                    }
+                }
+                return newList
+            }
+
+            return { layers: insertAfter(prevState.layers) }
+        })
+    }, [updateState])
+
+    const createGroup = useCallback((layerIds?: string[]) => {
+        updateState(prevState => {
+            const idsToGroup = layerIds || (prevState.activeLayerId ? [prevState.activeLayerId] : [])
+            if (idsToGroup.length === 0) return {}
+
+            const groupLayer: Layer = {
+                id: Math.random().toString(36).substr(2, 9),
+                name: 'Group',
+                visible: true,
+                locked: false,
+                opacity: 100,
+                blendMode: 'normal',
+                data: null,
+                filters: [],
+                x: 0,
+                y: 0,
+                type: 'group',
+                children: [],
+                expanded: true
+            }
+
+            // We need to:
+            // 1. Remove selected layers from their current positions
+            // 2. Add them to the group
+            // 3. Insert the group at the position of the first selected layer (or top)
+
+            // New approach: Filter out selected layers, then insert group at "top-most" selected index?
+            // Or simpler: Just add group at top, put layers in it.
+            // Better UX: Replace the selected layers with the group in the list.
+
+            // 1. Find the layers to move
+            const movingLayers: Layer[] = []
+
+            // Helper to collect and remove
+            const collectAndRemove = (list: Layer[]): Layer[] => {
+                const retained: Layer[] = []
+                for (const l of list) {
+                    if (idsToGroup.includes(l.id)) {
+                        movingLayers.push(l)
+                    } else {
+                        if (l.children) {
+                            l.children = collectAndRemove(l.children)
+                        }
+                        retained.push(l)
+                    }
+                }
+                return retained
+            }
+
+            const layersWithoutMoved = collectAndRemove(prevState.layers)
+
+            // 2. Add them to group
+            // Sort movingLayers by original order? Complexity. Just push for now.
+            // Ideally we preserve the relative order.
+            // Since we implemented collectAndRemove recursively/sequentially, `movingLayers` should be in DFS order.
+            groupLayer.children = movingLayers
+
+            // 3. Where to put the group?
+            // Put it at the top of the root list for now, or at index 0 of the first removed layer's parent?
+            // Simplest valid MVP: Add group to top of list.
+
+            return {
+                layers: [groupLayer, ...layersWithoutMoved],
+                activeLayerId: groupLayer.id
+            }
+        })
+    }, [updateState])
+
+    const moveLayer = useCallback((dragId: string, targetId: string | null, position: 'before' | 'after' | 'inside') => {
+        updateState(prevState => {
+            // 1. Find and remove dragged layer
+            const { layers: layersWithoutDrag, removed: draggedLayer } = removeLayerFromTree(prevState.layers, dragId)
+            if (!draggedLayer) return {}
+
+            // 2. Insert at target
+            if (!targetId) {
+                // If no target, maybe append to root?
+                return { layers: [...layersWithoutDrag, draggedLayer] }
+            }
+
+            const insert = (list: Layer[]): Layer[] => {
+                const newList: Layer[] = []
+                for (const l of list) {
+                    if (l.id === targetId) {
+                        if (position === 'before') {
+                            newList.push(draggedLayer)
+                            newList.push(l)
+                        } else if (position === 'after') {
+                            newList.push(l)
+                            newList.push(draggedLayer)
+                        } else if (position === 'inside') {
+                            // Add to children
+                            const newChildren = l.children ? [...l.children, draggedLayer] : [draggedLayer]
+                            newList.push({ ...l, children: newChildren, expanded: true })
+                        }
+                    } else {
+                        if (l.children) {
+                            l.children = insert(l.children)
+                        }
+                        newList.push(l)
+                    }
+                }
+                return newList
+            }
+
+            return { layers: insert(layersWithoutDrag) }
+        })
+    }, [updateState])
+
+    const renameLayer = useCallback((id: string, newName: string) => {
+        updateState(prevState => ({
+            layers: updateLayerInTree(prevState.layers, id, { name: newName })
+        }))
+    }, [updateState])
+
+
     const cropCanvas = useCallback((x: number, y: number, width: number, height: number) => {
         updateState(prevState => {
-            const newLayers = prevState.layers.map(layer => {
-                if (!layer.data) return layer
-                const newCanvas = document.createElement('canvas')
-                newCanvas.width = width
-                newCanvas.height = height
-                const ctx = newCanvas.getContext('2d')
-                if (ctx) {
-                    ctx.drawImage(layer.data, -x, -y)
-                }
-                return { ...layer, data: newCanvas }
-            })
-            return { canvasSize: { width, height }, layers: newLayers }
+            const cropRecursive = (list: Layer[]): Layer[] => {
+                return list.map(layer => {
+                    let newData = layer.data
+                    if (layer.data) {
+                        const newCanvas = document.createElement('canvas')
+                        newCanvas.width = width
+                        newCanvas.height = height
+                        const ctx = newCanvas.getContext('2d')
+                        if (ctx) {
+                            ctx.drawImage(layer.data, -x, -y)
+                        }
+                        newData = newCanvas
+                    }
+                    if (layer.children) {
+                        return { ...layer, data: newData, children: cropRecursive(layer.children) }
+                    }
+                    return { ...layer, data: newData }
+                })
+            }
+
+            return { canvasSize: { width, height }, layers: cropRecursive(prevState.layers) }
         })
     }, [updateState])
 
@@ -312,7 +556,15 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             canUndo,
             canRedo,
             addToHistory,
-            cropCanvas
+            cropCanvas,
+            // New exports
+            selectedLayerIds,
+            setSelectedLayerIds,
+            duplicateLayer,
+            createGroup,
+            moveLayer,
+            renameLayer,
+            toggleGroupExpanded
         }}>
             {children}
         </EditorContext.Provider>

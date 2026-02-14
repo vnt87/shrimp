@@ -111,11 +111,7 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY 
     const screenW = rect.width * scale
     const screenH = rect.height * scale
 
-    // Canvas boundary in screen coords
-    const canvasScreenX = offsetX
-    const canvasScreenY = offsetY
-    const canvasScreenW = canvasSize.width * scale
-    const canvasScreenH = canvasSize.height * scale
+
 
     return (
         <div

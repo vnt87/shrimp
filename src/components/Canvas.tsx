@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Application, extend, useApplication } from '@pixi/react'
 import { Container, Sprite, Graphics } from 'pixi.js'
 import EmptyState from './EmptyState'
@@ -10,6 +10,31 @@ import CropOverlay from './CropOverlay'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics })
+
+interface LayerOutlineProps {
+    layer: import('./EditorContext').Layer
+}
+
+function LayerOutline({ layer }: LayerOutlineProps) {
+    const draw = useCallback((g: import('pixi.js').Graphics) => {
+        g.clear()
+        if (!layer.data) return
+
+        console.log('Drawing outline for layer', layer.id)
+
+        // Draw black border for contrast
+        g.lineStyle(4, 0x000000, 1) // thick black outline
+        g.drawRect(layer.x, layer.y, layer.data.width, layer.data.height)
+
+        // Draw cyan border
+        g.lineStyle(2, 0x00ffff, 1) // cyan inner outline
+        g.drawRect(layer.x, layer.y, layer.data.width, layer.data.height)
+
+        // Optional: Corner handles could be added here
+    }, [layer.x, layer.y, layer.data])
+
+    return <graphics draw={draw} />
+}
 
 interface CanvasTransform {
     offsetX: number
@@ -127,6 +152,40 @@ function Ruler({
 }
 
 /**
+ * Recursive component to render layers and groups.
+ */
+function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer }) {
+    const { activeLayerId } = useEditor()
+
+    if (!layer.visible) return null
+
+    // For groups, render a Container and recurse
+    if (layer.type === 'group') {
+        return (
+            <pixiContainer
+                x={layer.x}
+                y={layer.y}
+                alpha={layer.opacity / 100}
+            >
+                {layer.children?.slice().reverse().map(child => (
+                    <PixiLayerRecursive key={child.id} layer={child} />
+                ))}
+            </pixiContainer>
+        )
+    }
+
+    // For regular layers, render the sprite and optional outline
+    return (
+        <React.Fragment>
+            <PixiLayerSprite layer={layer} />
+            {layer.id === activeLayerId && (
+                <LayerOutline layer={layer} />
+            )}
+        </React.Fragment>
+    )
+}
+
+/**
  * Inner Pixi scene that renders layers and selection overlay.
  * Must be a child of <Application> to use useApplication().
  */
@@ -154,9 +213,9 @@ function PixiScene({
             y={transform.offsetY}
             scale={transform.scale}
         >
-            {/* GPU-rendered layers */}
+            {/* GPU-rendered layers (recursive) */}
             {layers.slice().reverse().map(layer => (
-                <PixiLayerSprite key={layer.id} layer={layer} />
+                <PixiLayerRecursive key={layer.id} layer={layer} />
             ))}
 
             {/* GPU-rendered selection overlay */}
@@ -173,18 +232,18 @@ function PixiScene({
 export default function Canvas({
     onCursorMove,
     activeTool = 'move',
+    onToolChange,
 }: {
     onCursorMove?: (pos: { x: number; y: number } | null) => void
     activeTool?: string
+    onToolChange?: (tool: string) => void
 }) {
     const {
         layers,
         activeLayerId,
-        canvasSize,
         setCanvasSize,
         addLayer,
         updateLayerPosition,
-        selection,
         setSelection,
         closeImage,
         undo,
@@ -536,9 +595,12 @@ export default function Canvas({
                                 <CropOverlay
                                     onCrop={(rect) => {
                                         cropCanvas(rect.x, rect.y, rect.width, rect.height)
+                                        // Reset to move tool after crop
+                                        onToolChange?.('move')
                                     }}
                                     onCancel={() => {
-                                        // Optional: switch tool or just do nothing
+                                        // Reset to move tool on cancel
+                                        onToolChange?.('move')
                                     }}
                                     scale={transform.scale}
                                     offsetX={transform.offsetX}

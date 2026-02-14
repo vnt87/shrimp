@@ -42,7 +42,11 @@ export default function App() {
                     <ToolOptionsBar />
                     <div className="main-content">
                         <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
-                        <Canvas onCursorMove={setCursorPos} activeTool={activeTool} />
+                        <Canvas
+                            onCursorMove={setCursorPos}
+                            activeTool={activeTool}
+                            onToolChange={setActiveTool}
+                        />
                         <RightPanel />
                     </div>
                     <StatusBar cursorPos={cursorPos} />
