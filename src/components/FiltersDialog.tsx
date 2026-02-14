@@ -221,8 +221,8 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                 </div>
 
                 <div className="dialogue-footer">
-                    <button className="btn-secondary" onClick={onClose}>Close</button>
-                    <button className="btn-primary" onClick={handleApply}>
+                    <button className="pref-btn pref-btn-secondary" onClick={onClose}>Close</button>
+                    <button className="pref-btn pref-btn-primary" onClick={handleApply}>
                         <Check size={14} style={{ marginRight: 4 }} />
                         Add Filter
                     </button>

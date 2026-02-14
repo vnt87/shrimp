@@ -21,17 +21,21 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY 
         setRect({ x: 0, y: 0, width: canvasSize.width, height: canvasSize.height })
     }, [canvasSize])
 
-    // Keyboard support
+    // Keyboard support - ensure we capture events
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Enter') {
+                e.preventDefault()
+                e.stopPropagation()
                 onCrop(rect)
             } else if (e.key === 'Escape') {
+                e.preventDefault()
+                e.stopPropagation()
                 onCancel()
             }
         }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
+        window.addEventListener('keydown', handleKeyDown, { capture: true })
+        return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
     }, [rect, onCrop, onCancel])
 
     const getClientPos = (e: React.MouseEvent) => {
@@ -111,8 +115,6 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY 
     const screenW = rect.width * scale
     const screenH = rect.height * scale
 
-
-
     return (
         <div
             className="crop-overlay-container"
@@ -184,13 +186,13 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY 
             }}>
                 <button
                     onClick={() => onCrop(rect)}
-                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded shadow hover:bg-blue-500"
+                    className="pref-btn pref-btn-primary"
                 >
                     Crop (Enter)
                 </button>
                 <button
                     onClick={onCancel}
-                    className="px-3 py-1 bg-zinc-700 text-white text-xs rounded shadow hover:bg-zinc-600"
+                    className="pref-btn pref-btn-secondary"
                 >
                     Cancel (Esc)
                 </button>
