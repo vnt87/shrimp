@@ -2943,3 +2943,30 @@ body,
   background: rgba(255, 80, 80, 0.1);
   color: #ff5050;
 }
+/* Font Selector Styles */
+.font-option {
+    color: var(--text-primary);
+}
+
+.font-option:hover {
+    background: var(--bg-hover);
+}
+
+.font-option.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.font-dropdown {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-main) transparent;
+}
+
+.font-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.font-dropdown::-webkit-scrollbar-thumb {
+    background: var(--border-main);
+    border-radius: 3px;
+}

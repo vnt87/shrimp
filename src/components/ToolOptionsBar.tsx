@@ -1,5 +1,6 @@
 import type { ToolOptions } from '../App'
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Italic } from 'lucide-react'
+import FontSelector from './FontSelector'
 
 interface ToolOptionsBarProps {
     activeTool: string
@@ -211,26 +212,10 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             <div className="tool-options-divider" />
             <div className="tool-options-slider-group">
                 <span className="slider-label">Font</span>
-                <select
-                    className="tool-options-select"
-                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                <FontSelector
                     value={toolOptions.fontFamily}
-                    onChange={(e) => onToolOptionChange('fontFamily', e.target.value)}
-                >
-                    <option value="Arial">Arial</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Courier New">Courier New</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Palatino">Palatino</option>
-                    <option value="Garamond">Garamond</option>
-                    <option value="Bookman">Bookman</option>
-                    <option value="Comic Sans MS">Comic Sans MS</option>
-                    <option value="Trebuchet MS">Trebuchet MS</option>
-                    <option value="Arial Black">Arial Black</option>
-                    <option value="Impact">Impact</option>
-                </select>
+                    onChange={(font) => onToolOptionChange('fontFamily', font)}
+                />
             </div>
             <div className="tool-options-divider" />
 

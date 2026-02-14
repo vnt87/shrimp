@@ -9,6 +9,7 @@ import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
 import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
+import { useGoogleFont } from '../hooks/useGoogleFont'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics, Text })
@@ -208,6 +209,8 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
     }
 
     if (layer.type === 'text') {
+        const fontStatus = useGoogleFont(layer.textStyle?.fontFamily || 'Arial');
+
         return (
             <React.Fragment>
                 <pixiText
@@ -229,6 +232,7 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
                         letterSpacing: layer.textStyle.letterSpacing,
                     } : { fontFamily: 'Arial', fontSize: 24, fill: '#000000' }}
                 />
+                {/* Font status: {fontStatus} - triggering re-render on load */}
                 {layer.id === activeLayerId && (
                     // Simple outline for text? Or just bounding box?
                     // Text metrics are hard to get synchronously in React render without ref.
@@ -391,6 +395,37 @@ export default function Canvas({
         offsetY: 0,
         scale: 1,
     })
+
+    const { updateLayerTextStyle } = useEditor()
+
+    useEffect(() => {
+        if (activeTool === 'text' && activeLayerId) {
+            const activeLayer = layers.find(l => l.id === activeLayerId)
+            if (activeLayer?.type === 'text') {
+                const style = activeLayer.textStyle;
+                const hasChanged = !style ||
+                    style.fontFamily !== toolOptions?.fontFamily ||
+                    style.fontSize !== toolOptions?.fontSize ||
+                    style.fill !== toolOptions?.textColor ||
+                    style.fontWeight !== (toolOptions?.textBold ? 'bold' : 'normal') ||
+                    style.fontStyle !== (toolOptions?.textItalic ? 'italic' : 'normal') ||
+                    style.letterSpacing !== toolOptions?.textLetterSpacing ||
+                    style.align !== toolOptions?.textAlign;
+
+                if (hasChanged) {
+                    updateLayerTextStyle(activeLayerId, {
+                        fontFamily: toolOptions?.fontFamily,
+                        fontSize: toolOptions?.fontSize,
+                        fill: toolOptions?.textColor,
+                        fontWeight: toolOptions?.textBold ? 'bold' : 'normal',
+                        fontStyle: toolOptions?.textItalic ? 'italic' : 'normal',
+                        letterSpacing: toolOptions?.textLetterSpacing,
+                        align: toolOptions?.textAlign
+                    })
+                }
+            }
+        }
+    }, [activeTool, activeLayerId, toolOptions, updateLayerTextStyle, layers])
 
     // Viewport state
     const [isPanning, setIsPanning] = useState(false)

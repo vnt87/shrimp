@@ -89,6 +89,7 @@ interface EditorContextType {
     updateLayerData: (id: string, canvas: HTMLCanvasElement) => void
     updateLayerPosition: (id: string, x: number, y: number) => void
     updateLayerText: (id: string, text: string) => void
+    updateLayerTextStyle: (id: string, style: Partial<NonNullable<Layer['textStyle']>>) => void
     addFilter: (layerId: string, filter: LayerFilter) => void
     removeFilter: (layerId: string, filterIndex: number) => void
     updateFilter: (layerId: string, filterIndex: number, params: Record<string, number>) => void
@@ -453,6 +454,17 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         updateState(prevState => ({
             layers: updateLayerInTree(prevState.layers, id, { text, name: text.substring(0, 20) })
         }))
+    }, [updateState])
+
+    const updateLayerTextStyle = useCallback((id: string, style: Partial<NonNullable<Layer['textStyle']>>) => {
+        updateState(prevState => {
+            const layer = findLayerById(prevState.layers, id)
+            if (!layer || layer.type !== 'text') return {}
+            const newStyle = { ...layer.textStyle, ...style } as any
+            return {
+                layers: updateLayerInTree(prevState.layers, id, { textStyle: newStyle })
+            }
+        })
     }, [updateState])
 
     const addFilter = useCallback((layerId: string, filter: LayerFilter) => {
@@ -1237,7 +1249,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             commitTransform,
             // Phase 1
             updateFilter,
-            toggleFilter
+            toggleFilter,
+            updateLayerTextStyle
         }}>
             {children}
         </EditorContext.Provider>

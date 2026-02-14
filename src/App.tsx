@@ -42,7 +42,7 @@ const defaultToolOptions: ToolOptions = {
     fillThreshold: 15,
     antialiasing: true,
     fontSize: 24,
-    fontFamily: 'Arial',
+    fontFamily: 'Inter',
     textColor: '#000000',
     textAlign: 'left',
     textBold: false,
