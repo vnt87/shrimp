@@ -40,6 +40,12 @@ export default function App() {
                 return
             }
 
+
+            const isCmd = e.metaKey || e.ctrlKey
+
+            // Ignore shortcuts if Cmd/Ctrl is pressed (handled by global shortcuts or browser)
+            if (isCmd) return
+
             switch (e.key.toLowerCase()) {
                 case 'c': setActiveTool('crop'); break
                 case 'v': setActiveTool('move'); break
@@ -54,6 +60,18 @@ export default function App() {
                 case 'o': setActiveTool('picker'); break
                 case 't': setActiveTool('text'); break
                 case 'z': setActiveTool('zoom'); break
+                case '[':
+                    setToolOptions(prev => ({
+                        ...prev,
+                        brushSize: Math.max(1, prev.brushSize - 2)
+                    }))
+                    break
+                case ']':
+                    setToolOptions(prev => ({
+                        ...prev,
+                        brushSize: Math.min(500, prev.brushSize + 2)
+                    }))
+                    break
                 case 'x': {
                     // Swap colors - handled by EditorContext but needs dispatch
                     // We'll let the keyboard event bubble to the toolbox

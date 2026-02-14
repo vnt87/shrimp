@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Application, extend, useApplication } from '@pixi/react'
+import { Application, extend, useApplication, useTick } from '@pixi/react'
 import { Container, Sprite, Graphics } from 'pixi.js'
 import EmptyState from './EmptyState'
 import { useEditor, type Layer } from './EditorContext'
@@ -195,13 +195,56 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
 }
 
 /**
+ * Brush cursor that follows mouse position smoothly using useTick
+ */
+function BrushCursor({
+    cursorRef,
+    toolOptions,
+    activeTool
+}: {
+    cursorRef: React.MutableRefObject<{ x: number, y: number }>
+    toolOptions?: ToolOptions
+    activeTool: string
+}) {
+    const graphicsRef = useRef<import('pixi.js').Graphics>(null)
+    const { brushSize } = toolOptions || { brushSize: 10 }
+
+    useTick(() => {
+        if (graphicsRef.current) {
+            const { x, y } = cursorRef.current
+
+            // Only show for drawing tools
+            const visible = ['brush', 'pencil', 'eraser'].includes(activeTool)
+            graphicsRef.current.visible = visible
+
+            if (visible) {
+                graphicsRef.current.position.set(x, y)
+                graphicsRef.current.clear()
+                graphicsRef.current.lineStyle(1, 0xFFFFFF, 0.8) // White outer
+                graphicsRef.current.drawCircle(0, 0, brushSize / 2)
+                graphicsRef.current.lineStyle(1, 0x000000, 0.5) // Black inner for contrast
+                graphicsRef.current.drawCircle(0, 0, (brushSize / 2) - 1)
+            }
+        }
+    })
+
+    return <graphics ref={graphicsRef} draw={() => { }} />
+}
+
+/**
  * Inner Pixi scene that renders layers and selection overlay.
  * Must be a child of <Application> to use useApplication().
  */
 function PixiScene({
     transform,
+    cursorRef,
+    toolOptions,
+    activeTool
 }: {
     transform: CanvasTransform
+    cursorRef: React.MutableRefObject<{ x: number, y: number }>
+    toolOptions?: ToolOptions
+    activeTool: string
 }) {
     const { layers, canvasSize, selection } = useEditor()
     const { app } = useApplication()
@@ -231,6 +274,9 @@ function PixiScene({
             {selection && selection.width > 0 && selection.height > 0 && (
                 <SelectionOverlay selection={selection} />
             )}
+
+            {/* Brush Cursor Overlay */}
+            <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} />
         </pixiContainer>
     )
 }
@@ -279,6 +325,7 @@ export default function Canvas({
     const [isSpaceHeld, setIsSpaceHeld] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
     const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0, layerX: 0, layerY: 0 })
+    const cursorRef = useRef({ x: 0, y: 0 })
 
     // Guide dragging state
     const [draggingGuideId, setDraggingGuideId] = useState<string | null>(null)
@@ -668,6 +715,9 @@ export default function Canvas({
         const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
         const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
 
+        // Update ref for PixiCursor
+        cursorRef.current = { x: canvasX, y: canvasY }
+
         if (onCursorMove) onCursorMove({ x: Math.round(canvasX), y: Math.round(canvasY) })
 
         if (isPanning && isDragging) {
@@ -899,7 +949,12 @@ export default function Canvas({
                                 autoDensity
                                 resolution={window.devicePixelRatio || 1}
                             >
-                                <PixiScene transform={transform} />
+                                <PixiScene
+                                    transform={transform}
+                                    cursorRef={cursorRef}
+                                    toolOptions={toolOptions}
+                                    activeTool={activeTool}
+                                />
                             </Application>
 
                             {/* Crop Overlay */}

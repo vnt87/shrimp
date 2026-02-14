@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import PreferencesDialog from './PreferencesDialog'
 import AboutDialog from './AboutDialog'
+import KeyboardShortcutsDialog from './KeyboardShortcutsDialog'
 import NewImageDialog from './NewImageDialog'
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
@@ -29,7 +30,7 @@ const menuData: Record<string, string[]> = {
     Colors: ['Brightness-Contrast...', 'Hue-Saturation...', 'Desaturate...', 'Invert Colors'],
     Filters: ['Blur', 'Sharpen', 'Noise'],
     Windows: ['Toolbox', 'Layers', 'Brushes'],
-    Help: ['About', 'Github Source'],
+    Help: ['Keyboard Shortcuts', 'About', 'Github Source'],
 }
 
 const themeOptions = [
@@ -44,6 +45,7 @@ export default function Header() {
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [showPreferences, setShowPreferences] = useState(false)
     const [showAbout, setShowAbout] = useState(false)
+    const [showShortcuts, setShowShortcuts] = useState(false)
     const [showNewImage, setShowNewImage] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
@@ -174,6 +176,7 @@ export default function Header() {
             case 'New Layer': addLayer('New Layer'); break
             case 'Duplicate Layer': activeLayerId && duplicateLayer(activeLayerId); break
             case 'Delete Layer': activeLayerId && deleteLayer(activeLayerId); break
+            case 'Keyboard Shortcuts': setShowShortcuts(true); break
             case 'About': setShowAbout(true); break
             case 'Github Source':
                 window.open('https://github.com/vnt87/shrimp', '_blank')
@@ -325,6 +328,7 @@ export default function Header() {
 
             {showPreferences && <PreferencesDialog onClose={() => setShowPreferences(false)} />}
             {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+            {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
             {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
         </>
     )
