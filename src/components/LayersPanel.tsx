@@ -236,7 +236,7 @@ function LayerItem({ layer, depth, onDragStart, onDrop }: LayerItemProps) {
 
             {layer.type === 'group' && layer.expanded && layer.children && (
                 <div className="layer-children">
-                    {[...layer.children].reverse().map(child => (
+                    {[...layer.children].map(child => (
                         <LayerItem
                             key={child.id}
                             layer={child}
@@ -377,7 +377,7 @@ export default function LayersPanel() {
                         No layers
                     </div>
                 )}
-                {[...layers].reverse().map(layer => (
+                {[...layers].map(layer => (
                     <LayerItem
                         key={layer.id}
                         layer={layer}
