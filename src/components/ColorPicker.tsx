@@ -7,48 +7,60 @@ interface ColorPickerProps {
     style?: React.CSSProperties
 }
 
-// Convert hex to HSL
-function hexToHsl(hex: string): [number, number, number] {
+// Convert hex to HSV
+function hexToHsv(hex: string): [number, number, number] {
     const r = parseInt(hex.slice(1, 3), 16) / 255
     const g = parseInt(hex.slice(3, 5), 16) / 255
     const b = parseInt(hex.slice(5, 7), 16) / 255
 
     const max = Math.max(r, g, b), min = Math.min(r, g, b)
-    let h = 0, s = 0
-    const l = (max + min) / 2
+    const v = max
+    const d = max - min
+    const s = max === 0 ? 0 : d / max
+    let h = 0
 
     if (max !== min) {
-        const d = max - min
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
         switch (max) {
-            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break
-            case g: h = ((b - r) / d + 2) / 6; break
-            case b: h = ((r - g) / d + 4) / 6; break
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break
+            case g: h = (b - r) / d + 2; break
+            case b: h = (r - g) / d + 4; break
         }
+        h /= 6
     }
 
-    return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)]
+    return [Math.round(h * 360), Math.round(s * 100), Math.round(v * 100)]
 }
 
-// Convert HSL to hex
-function hslToHex(h: number, s: number, l: number): string {
+// Convert HSV to hex
+function hsvToHex(h: number, s: number, v: number): string {
     s /= 100
-    l /= 100
-    const a = s * Math.min(l, 1 - l)
-    const f = (n: number) => {
-        const k = (n + h / 30) % 12
-        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
-        return Math.round(255 * color).toString(16).padStart(2, '0')
+    v /= 100
+    const i = Math.floor(h / 60)
+    const f = h / 60 - i
+    const p = v * (1 - s)
+    const q = v * (1 - f * s)
+    const t = v * (1 - (1 - f) * s)
+    let r = 0, g = 0, b = 0
+
+    switch (i % 6) {
+        case 0: r = v; g = t; b = p; break
+        case 1: r = q; g = v; b = p; break
+        case 2: r = p; g = v; b = t; break
+        case 3: r = p; g = q; b = v; break
+        case 4: r = t; g = p; b = v; break
+        case 5: r = v; g = p; b = q; break
     }
-    return `#${f(0)}${f(8)}${f(4)}`
+
+    const toHex = (n: number) => Math.round(n * 255).toString(16).padStart(2, '0')
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
 export default function ColorPicker({ color, onChange, onClose, style }: ColorPickerProps) {
-    const [hsl, setHsl] = useState<[number, number, number]>(() => hexToHsl(color))
+    const [hsv, setHsv] = useState<[number, number, number]>(() => hexToHsv(color))
     const [hexInput, setHexInput] = useState(color)
-    const satLightRef = useRef<HTMLDivElement>(null)
+    const satValueRef = useRef<HTMLDivElement>(null)
     const hueRef = useRef<HTMLDivElement>(null)
-    const [dragging, setDragging] = useState<'sl' | 'hue' | null>(null)
+    const [dragging, setDragging] = useState<'sv' | 'hue' | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
     const [recentColors] = useState<string[]>([
@@ -67,35 +79,35 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
         return () => document.removeEventListener('mousedown', handleClick)
     }, [onClose])
 
-    const updateColor = useCallback((h: number, s: number, l: number) => {
-        setHsl([h, s, l])
-        const hex = hslToHex(h, s, l)
+    const updateColor = useCallback((h: number, s: number, v: number) => {
+        setHsv([h, s, v])
+        const hex = hsvToHex(h, s, v)
         setHexInput(hex)
         onChange(hex)
     }, [onChange])
 
-    const handleSatLightMouse = useCallback((e: React.MouseEvent | MouseEvent) => {
-        if (!satLightRef.current) return
-        const rect = satLightRef.current.getBoundingClientRect()
+    const handleSatValueMouse = useCallback((e: React.MouseEvent | MouseEvent) => {
+        if (!satValueRef.current) return
+        const rect = satValueRef.current.getBoundingClientRect()
         const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
         const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
         const s = Math.round(x * 100)
-        const l = Math.round((1 - y) * 100)
-        updateColor(hsl[0], s, l)
-    }, [hsl, updateColor])
+        const v = Math.round((1 - y) * 100)
+        updateColor(hsv[0], s, v)
+    }, [hsv, updateColor])
 
     const handleHueMouse = useCallback((e: React.MouseEvent | MouseEvent) => {
         if (!hueRef.current) return
         const rect = hueRef.current.getBoundingClientRect()
         const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
         const h = Math.round(x * 360)
-        updateColor(h, hsl[1], hsl[2])
-    }, [hsl, updateColor])
+        updateColor(h, hsv[1], hsv[2])
+    }, [hsv, updateColor])
 
     useEffect(() => {
         if (!dragging) return
         const handleMove = (e: MouseEvent) => {
-            if (dragging === 'sl') handleSatLightMouse(e)
+            if (dragging === 'sv') handleSatValueMouse(e)
             else if (dragging === 'hue') handleHueMouse(e)
         }
         const handleUp = () => setDragging(null)
@@ -105,13 +117,13 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
             document.removeEventListener('mousemove', handleMove)
             document.removeEventListener('mouseup', handleUp)
         }
-    }, [dragging, handleSatLightMouse, handleHueMouse])
+    }, [dragging, handleSatValueMouse, handleHueMouse])
 
     const handleHexChange = (val: string) => {
         setHexInput(val)
         if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-            const [h, s, l] = hexToHsl(val)
-            setHsl([h, s, l])
+            const [h, s, v] = hexToHsv(val)
+            setHsv([h, s, v])
             onChange(val)
         }
     }
@@ -131,10 +143,10 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
                 ...style
             }}
         >
-            {/* Saturation/Lightness Area */}
+            {/* Saturation/Value Area */}
             <div
-                ref={satLightRef}
-                onMouseDown={e => { setDragging('sl'); handleSatLightMouse(e) }}
+                ref={satValueRef}
+                onMouseDown={e => { setDragging('sv'); handleSatValueMouse(e) }}
                 style={{
                     width: '100%',
                     height: 140,
@@ -143,15 +155,15 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
                     cursor: 'crosshair',
                     background: `
                         linear-gradient(to top, #000, transparent),
-                        linear-gradient(to right, #808080, hsl(${hsl[0]}, 100%, 50%))
+                        linear-gradient(to right, #fff, hsl(${hsv[0]}, 100%, 50%))
                     `,
                     marginBottom: 8
                 }}
             >
                 <div style={{
                     position: 'absolute',
-                    left: `${hsl[1]}%`,
-                    top: `${100 - hsl[2]}%`,
+                    left: `${hsv[1]}%`,
+                    top: `${100 - hsv[2]}%`,
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
@@ -178,7 +190,7 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
             >
                 <div style={{
                     position: 'absolute',
-                    left: `${(hsl[0] / 360) * 100}%`,
+                    left: `${(hsv[0] / 360) * 100}%`,
                     top: '50%',
                     width: 10,
                     height: 16,
@@ -187,7 +199,7 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
                     boxShadow: '0 0 2px rgba(0,0,0,0.5)',
                     transform: 'translate(-50%, -50%)',
                     pointerEvents: 'none',
-                    background: `hsl(${hsl[0]}, 100%, 50%)`
+                    background: `hsl(${hsv[0]}, 100%, 50%)`
                 }} />
             </div>
 
@@ -217,8 +229,8 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
                     <div
                         key={i}
                         onClick={() => {
-                            const [h, s, l] = hexToHsl(c)
-                            updateColor(h, s, l)
+                            const [h, s, v] = hexToHsv(c)
+                            updateColor(h, s, v)
                         }}
                         style={{
                             width: 18, height: 18, borderRadius: 3,
