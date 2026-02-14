@@ -33,7 +33,7 @@ import Tooltip from './Tooltip'
 const shortcuts: Record<string, string> = {
     'rect-select': 'R', 'ellipse-select': 'E', 'move': 'V', 'crop': 'C',
     'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
-    'picker': 'O', 'text': 'T', 'zoom': 'Z',
+    'picker': 'I', 'text': 'T', 'zoom': 'Z',
 }
 
 // Tool groups with dividers between them

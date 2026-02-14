@@ -364,12 +364,14 @@ export default function Canvas({
     const {
         layers,
         activeLayerId,
+        canvasSize,
         setCanvasSize,
         addLayer,
         addTextLayer,
         updateLayerPosition,
         updateLayerData,
         updateLayerText,
+        selection,
         setSelection,
         closeImage,
         undo,
@@ -380,6 +382,8 @@ export default function Canvas({
         updateGuide,
         removeGuide,
         foregroundColor,
+        backgroundColor,
+        setForegroundColor,
     } = useEditor()
 
     const [transform, setTransform] = useState<CanvasTransform>({
@@ -479,6 +483,74 @@ export default function Canvas({
         updateLayerData(activeLayerId, newCanvas)
     }, [activeLayerId, layers, activeTool, toolOptions, foregroundColor, updateLayerData])
 
+    const isPointInSelection = useCallback((x: number, y: number) => {
+        if (!selection) return false
+        if (selection.type === 'rect') {
+            return x >= selection.x && x <= selection.x + selection.width &&
+                y >= selection.y && y <= selection.y + selection.height
+        }
+        if (selection.type === 'ellipse') {
+            const rx = selection.width / 2
+            const ry = selection.height / 2
+            const cx = selection.x + rx
+            const cy = selection.y + ry
+            if (rx === 0 || ry === 0) return false
+            return (Math.pow(x - cx, 2) / Math.pow(rx, 2) + Math.pow(y - cy, 2) / Math.pow(ry, 2)) <= 1
+        }
+        if (selection.type === 'path' && selection.path) {
+            let inside = false
+            for (let i = 0, j = selection.path.length - 1; i < selection.path.length; j = i++) {
+                const xi = selection.path[i].x, yi = selection.path[i].y
+                const xj = selection.path[j].x, yj = selection.path[j].y
+                const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+                if (intersect) inside = !inside
+            }
+            return inside
+        }
+        return false
+    }, [selection])
+
+    const getMergedImageData = useCallback(() => {
+        if (!canvasSize) return null
+        const tempCanvas = document.createElement('canvas')
+        tempCanvas.width = canvasSize.width
+        tempCanvas.height = canvasSize.height
+        const tempCtx = tempCanvas.getContext('2d')
+        if (!tempCtx) return null
+
+        const drawLayerRecursive = (layer: any) => {
+            if (!layer.visible) return
+            if (layer.type === 'group' && layer.children) {
+                [...layer.children].reverse().forEach(drawLayerRecursive)
+            } else if (layer.data) {
+                tempCtx.globalAlpha = (layer.opacity ?? 100) / 100
+                tempCtx.globalCompositeOperation = (layer.blendMode as any) || 'source-over'
+                tempCtx.drawImage(layer.data, layer.x, layer.y)
+            }
+        }
+
+        [...layers].reverse().forEach(drawLayerRecursive)
+        return tempCtx.getImageData(0, 0, canvasSize.width, canvasSize.height)
+    }, [layers, canvasSize])
+
+    const pickColor = useCallback((canvasX: number, canvasY: number) => {
+        const mergedImageData = getMergedImageData()
+        if (!mergedImageData) return
+
+        const x = Math.round(canvasX)
+        const y = Math.round(canvasY)
+
+        if (x < 0 || y < 0 || x >= mergedImageData.width || y >= mergedImageData.height) return
+
+        const idx = (y * mergedImageData.width + x) * 4
+        const r = mergedImageData.data[idx]
+        const g = mergedImageData.data[idx + 1]
+        const b = mergedImageData.data[idx + 2]
+
+        const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
+        setForegroundColor(hex)
+    }, [getMergedImageData, setForegroundColor])
+
     // --- Flood fill (bucket tool) ---
     const floodFill = useCallback((canvasX: number, canvasY: number) => {
         if (!activeLayerId) return
@@ -487,15 +559,15 @@ export default function Canvas({
 
         const lx = Math.round(canvasX - layer.x)
         const ly = Math.round(canvasY - layer.y)
-        if (lx < 0 || ly < 0 || lx >= layer.data.width || ly >= layer.data.height) return
+
+        const w = layer.data.width
+        const h = layer.data.height
 
         const ctx = layer.data.getContext('2d')
         if (!ctx) return
 
-        const imageData = ctx.getImageData(0, 0, layer.data.width, layer.data.height)
+        const imageData = ctx.getImageData(0, 0, w, h)
         const data = imageData.data
-        const w = imageData.width
-        const h = imageData.height
         const threshold = toolOptions?.fillThreshold ?? 15
 
         // Parse fill color
@@ -503,30 +575,87 @@ export default function Canvas({
             const r = parseInt(hex.slice(1, 3), 16)
             const g = parseInt(hex.slice(3, 5), 16)
             const b = parseInt(hex.slice(5, 7), 16)
-            return [r, g, b, 255]
+            const a = Math.round((toolOptions?.bucketOpacity ?? 100) * 2.55)
+            return [r, g, b, a]
         }
-        const fillColor = hexToRgb(foregroundColor)
+        const colorToUse = toolOptions?.bucketFillType === 'bg' ? backgroundColor : foregroundColor
+        const fillColor = hexToRgb(colorToUse)
 
-        // Get target color
-        const idx = (ly * w + lx) * 4
-        const targetColor = [data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]
+        // Handle "Fill Whole Selection"
+        if (toolOptions?.bucketAffectedArea === 'selection' && selection) {
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const canvasX_abs = x + layer.x
+                    const canvasY_abs = y + layer.y
+                    if (isPointInSelection(canvasX_abs, canvasY_abs)) {
+                        const pi = (y * w + x) * 4
+                        data[pi] = fillColor[0]
+                        data[pi + 1] = fillColor[1]
+                        data[pi + 2] = fillColor[2]
+                        data[pi + 3] = fillColor[3]
+                    }
+                }
+            }
+            ctx.putImageData(imageData, 0, 0)
+
+            // Clone canvas to trigger update
+            const newCanvas = document.createElement('canvas')
+            newCanvas.width = w
+            newCanvas.height = h
+            const newCtx = newCanvas.getContext('2d')
+            newCtx?.drawImage(layer.data, 0, 0)
+            updateLayerData(activeLayerId, newCanvas)
+            return
+        }
+
+        // Standard Flood Fill or Sample Merged
+        if (lx < 0 || ly < 0 || lx >= w || ly >= h) return
+
+        let sampleData = data
+        let sampleW = w
+        if (toolOptions?.bucketSampleMerged) {
+            const merged = getMergedImageData()
+            if (merged) {
+                sampleData = merged.data as any
+                sampleW = merged.width
+            }
+        }
+
+        // Get target color index
+        const getIdx = (x: number, y: number, sw: number, srw: number, l: any) => {
+            if (toolOptions?.bucketSampleMerged) {
+                // Merged sampling uses absolute canvas coords
+                const absX = Math.round(x + l.x)
+                const absY = Math.round(y + l.y)
+                if (absX < 0 || absY < 0 || absX >= srw || absY >= (sampleData.length / (srw * 4))) return -1
+                return (absY * srw + absX) * 4
+            }
+            return (y * sw + x) * 4
+        }
+
+        const startIdx = getIdx(lx, ly, w, sampleW, layer)
+        if (startIdx === -1) return
+        const targetColor = [sampleData[startIdx], sampleData[startIdx + 1], sampleData[startIdx + 2], sampleData[startIdx + 3]]
 
         // Check if colors match (within threshold)
-        const colorMatch = (i: number) => {
+        const colorMatch = (x: number, y: number) => {
+            const i = getIdx(x, y, w, sampleW, layer)
+            if (i === -1) return false
             return (
-                Math.abs(data[i] - targetColor[0]) <= threshold &&
-                Math.abs(data[i + 1] - targetColor[1]) <= threshold &&
-                Math.abs(data[i + 2] - targetColor[2]) <= threshold &&
-                Math.abs(data[i + 3] - targetColor[3]) <= threshold
+                Math.abs(sampleData[i] - targetColor[0]) <= threshold &&
+                Math.abs(sampleData[i + 1] - targetColor[1]) <= threshold &&
+                Math.abs(sampleData[i + 2] - targetColor[2]) <= threshold &&
+                Math.abs(sampleData[i + 3] - targetColor[3]) <= threshold
             )
         }
 
-        // Don't fill if target is already fill color
+        // Don't fill if target is already fill color (approximate)
         if (
             targetColor[0] === fillColor[0] &&
             targetColor[1] === fillColor[1] &&
             targetColor[2] === fillColor[2] &&
-            targetColor[3] === fillColor[3]
+            Math.abs(targetColor[3] - fillColor[3]) < 2 &&
+            !toolOptions?.bucketSampleMerged
         ) return
 
         // Scanline flood fill
@@ -537,15 +666,14 @@ export default function Canvas({
             const [sx, sy] = stack.pop()!
             let x = sx
 
-            // Move to leftmost matching pixel
-            while (x > 0 && colorMatch((sy * w + x - 1) * 4) && !visited[sy * w + x - 1]) {
+            while (x > 0 && colorMatch(x - 1, sy) && !visited[sy * w + x - 1]) {
                 x--
             }
 
             let spanAbove = false
             let spanBelow = false
 
-            while (x < w && colorMatch((sy * w + x) * 4) && !visited[sy * w + x]) {
+            while (x < w && colorMatch(x, sy) && !visited[sy * w + x]) {
                 const pi = (sy * w + x) * 4
                 data[pi] = fillColor[0]
                 data[pi + 1] = fillColor[1]
@@ -554,7 +682,7 @@ export default function Canvas({
                 visited[sy * w + x] = 1
 
                 if (sy > 0) {
-                    if (colorMatch(((sy - 1) * w + x) * 4) && !visited[(sy - 1) * w + x]) {
+                    if (colorMatch(x, sy - 1) && !visited[(sy - 1) * w + x]) {
                         if (!spanAbove) {
                             stack.push([x, sy - 1])
                             spanAbove = true
@@ -565,7 +693,7 @@ export default function Canvas({
                 }
 
                 if (sy < h - 1) {
-                    if (colorMatch(((sy + 1) * w + x) * 4) && !visited[(sy + 1) * w + x]) {
+                    if (colorMatch(x, sy + 1) && !visited[(sy + 1) * w + x]) {
                         if (!spanBelow) {
                             stack.push([x, sy + 1])
                             spanBelow = true
@@ -578,17 +706,16 @@ export default function Canvas({
                 x++
             }
         }
-
         ctx.putImageData(imageData, 0, 0)
 
         // Clone canvas to trigger update
         const newCanvas = document.createElement('canvas')
-        newCanvas.width = layer.data.width
-        newCanvas.height = layer.data.height
+        newCanvas.width = w
+        newCanvas.height = h
         const newCtx = newCanvas.getContext('2d')
         newCtx?.drawImage(layer.data, 0, 0)
         updateLayerData(activeLayerId, newCanvas)
-    }, [activeLayerId, layers, foregroundColor, toolOptions, updateLayerData])
+    }, [activeLayerId, layers, foregroundColor, backgroundColor, toolOptions, updateLayerData, isPointInSelection, getMergedImageData, selection])
 
     // Fit image/canvas to viewport
     const fitToView = useCallback((w: number, h: number) => {
@@ -728,563 +855,565 @@ export default function Canvas({
         })
     }, [activeLayerId, layers, toolOptions, setSelection])
 
-const loadImage = useCallback((src: string, name: string) => {
-    const img = new window.Image()
-    img.onload = () => {
-        // Create canvas and draw image
-        const canvas = document.createElement('canvas')
-        canvas.width = img.naturalWidth
-        canvas.height = img.naturalHeight
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-            ctx.drawImage(img, 0, 0)
+    const loadImage = useCallback((src: string, name: string) => {
+        const img = new window.Image()
+        img.onload = () => {
+            // Create canvas and draw image
+            const canvas = document.createElement('canvas')
+            canvas.width = img.naturalWidth
+            canvas.height = img.naturalHeight
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+                ctx.drawImage(img, 0, 0)
+            }
+
+            // If it's the first layer, set canvas size
+            if (layers.length === 0) {
+                setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight })
+                fitToView(img.naturalWidth, img.naturalHeight)
+            }
+
+            // Create new layer WITH data atomically
+            addLayer(name, canvas)
         }
+        img.src = src
+    }, [layers.length, addLayer, setCanvasSize, fitToView])
 
-        // If it's the first layer, set canvas size
-        if (layers.length === 0) {
-            setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight })
-            fitToView(img.naturalWidth, img.naturalHeight)
+    const handleLoadSample = useCallback(() => {
+        loadImage('/cathedral.jpg', 'cathedral.jpg')
+    }, [loadImage])
+
+    const handleOpenFile = useCallback(() => {
+        fileInputRef.current?.click()
+    }, [])
+
+    const handleFileChange = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            const url = URL.createObjectURL(file)
+            loadImage(url, file.name)
+        },
+        [loadImage]
+    )
+
+    const handlePasteClipboard = useCallback(async () => {
+        try {
+            const items = await navigator.clipboard.read()
+            for (const item of items) {
+                const imageType = item.types.find((t) => t.startsWith('image/'))
+                if (imageType) {
+                    const blob = await item.getType(imageType)
+                    const url = URL.createObjectURL(blob)
+                    loadImage(url, 'Clipboard Image')
+                    return
+                }
+            }
+            alert('No image found in clipboard')
+        } catch {
+            alert('Could not read clipboard.')
         }
+    }, [loadImage])
 
-        // Create new layer WITH data atomically
-        addLayer(name, canvas)
-    }
-    img.src = src
-}, [layers.length, addLayer, setCanvasSize, fitToView])
+    // Keyboard handling
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.repeat) return
 
-const handleLoadSample = useCallback(() => {
-    loadImage('/cathedral.jpg', 'cathedral.jpg')
-}, [loadImage])
-
-const handleOpenFile = useCallback(() => {
-    fileInputRef.current?.click()
-}, [])
-
-const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        const url = URL.createObjectURL(file)
-        loadImage(url, file.name)
-    },
-    [loadImage]
-)
-
-const handlePasteClipboard = useCallback(async () => {
-    try {
-        const items = await navigator.clipboard.read()
-        for (const item of items) {
-            const imageType = item.types.find((t) => t.startsWith('image/'))
-            if (imageType) {
-                const blob = await item.getType(imageType)
-                const url = URL.createObjectURL(blob)
-                loadImage(url, 'Clipboard Image')
+            // Undo/Redo
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault()
+                if (e.shiftKey) {
+                    redo()
+                } else {
+                    undo()
+                }
                 return
             }
-        }
-        alert('No image found in clipboard')
-    } catch {
-        alert('Could not read clipboard.')
-    }
-}, [loadImage])
 
-// Keyboard handling
-useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.repeat) return
-
-        // Undo/Redo
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-            e.preventDefault()
-            if (e.shiftKey) {
-                redo()
-            } else {
-                undo()
+            if (e.code === 'Space') {
+                e.preventDefault()
+                setIsSpaceHeld(true)
             }
+            if (e.key === 'Escape') {
+                // Clear selection
+                setSelection(null)
+            }
+        }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.code === 'Space') {
+                setIsSpaceHeld(false)
+                setIsDragging(false)
+                setIsPanning(false)
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+        }
+    }, [setSelection, undo, redo])
+
+    // Mouse handlers
+    const handleGuideDragStart = (orientation: 'horizontal' | 'vertical') => (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setTempGuide({ orientation, pos: orientation === 'horizontal' ? e.clientY : e.clientX })
+    }
+
+    const handleExistingGuideDragStart = (id: string) => (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDraggingGuideId(id)
+    }
+
+    const handleDoubleClick = useCallback(() => {
+        if (!activeLayerId) return
+        const layer = layers.find(l => l.id === activeLayerId)
+        if (layer && layer.type === 'text') {
+            const newText = prompt('Edit text:', layer.text)
+            if (newText !== null && newText !== layer.text) {
+                updateLayerText(activeLayerId, newText)
+            }
+        }
+    }, [activeLayerId, layers, updateLayerText])
+
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        if (e.detail === 2) {
+            handleDoubleClick()
             return
         }
+        if (!viewportRef.current) return
 
-        if (e.code === 'Space') {
+        // Panning (Space held or Middle click)
+        if (isSpaceHeld || e.button === 1) {
             e.preventDefault()
-            setIsSpaceHeld(true)
-        }
-        if (e.key === 'Escape') {
-            // Clear selection
-            setSelection(null)
-        }
-    }
-    const handleKeyUp = (e: KeyboardEvent) => {
-        if (e.code === 'Space') {
-            setIsSpaceHeld(false)
-            setIsDragging(false)
-            setIsPanning(false)
-        }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
-    return () => {
-        window.removeEventListener('keydown', handleKeyDown)
-        window.removeEventListener('keyup', handleKeyUp)
-    }
-}, [setSelection, undo, redo])
-
-// Mouse handlers
-const handleGuideDragStart = (orientation: 'horizontal' | 'vertical') => (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setTempGuide({ orientation, pos: orientation === 'horizontal' ? e.clientY : e.clientX })
-}
-
-const handleExistingGuideDragStart = (id: string) => (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDraggingGuideId(id)
-}
-
-const handleDoubleClick = useCallback(() => {
-    if (!activeLayerId) return
-    const layer = layers.find(l => l.id === activeLayerId)
-    if (layer && layer.type === 'text') {
-        const newText = prompt('Edit text:', layer.text)
-        if (newText !== null && newText !== layer.text) {
-            updateLayerText(activeLayerId, newText)
-        }
-    }
-}, [activeLayerId, layers, updateLayerText])
-
-const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.detail === 2) {
-        handleDoubleClick()
-        return
-    }
-    if (!viewportRef.current) return
-
-    // Panning (Space held or Middle click)
-    if (isSpaceHeld || e.button === 1) {
-        e.preventDefault()
-        setIsPanning(true)
-        setIsDragging(true)
-        dragStart.current = {
-            x: e.clientX,
-            y: e.clientY,
-            offsetX: transform.offsetX,
-            offsetY: transform.offsetY,
-            layerX: 0,
-            layerY: 0
-        }
-        return
-    }
-
-    const rect = viewportRef.current.getBoundingClientRect()
-    // Coordinates in canvas space
-    const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
-    const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
-
-    if (activeTool === 'move' && activeLayerId) {
-        const layer = layers.find(l => l.id === activeLayerId)
-        if (layer) {
+            setIsPanning(true)
             setIsDragging(true)
             dragStart.current = {
                 x: e.clientX,
                 y: e.clientY,
-                offsetX: 0,
-                offsetY: 0,
-                layerX: layer.x,
-                layerY: layer.y
+                offsetX: transform.offsetX,
+                offsetY: transform.offsetY,
+                layerX: 0,
+                layerY: 0
             }
+            return
         }
-    } else if (activeTool === 'rect-select' || activeTool === 'ellipse-select') {
-        setIsDragging(true)
-        isSelecting.current = true
-        selectionStart.current = { x: canvasX, y: canvasY }
-        setSelection({
-            type: activeTool === 'rect-select' ? 'rect' : 'ellipse',
-            x: canvasX,
-            y: canvasY,
-            width: 0,
-            height: 0
-        })
-    } else if (activeTool === 'lasso-select') {
-        isLassoing.current = true
-        currentLassoPath.current = [{ x: canvasX, y: canvasY }]
-        setSelection({
-            type: 'path',
-            x: canvasX,
-            y: canvasY,
-            width: 0,
-            height: 0,
-            path: [{ x: canvasX, y: canvasY }]
-        })
-    } else if (activeTool === 'wand-select') {
-        magicWandSelect(canvasX, canvasY)
-    } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser') {
-        isDrawing.current = true
-        lastDrawPoint.current = null
-        drawStrokeTo(canvasX, canvasY, true)
-    } else if (activeTool === 'bucket') {
-        floodFill(canvasX, canvasY)
-    } else if (activeTool === 'text') {
-        const defaultText = prompt('Enter text:', 'New Text Layer')
-        if (defaultText) {
-            const style = {
-                fontFamily: toolOptions?.fontFamily || 'Arial',
-                fontSize: toolOptions?.fontSize || 24,
-                fill: toolOptions?.textColor || '#000000',
-                align: toolOptions?.textAlign || 'left',
-                fontWeight: toolOptions?.textBold ? 'bold' : 'normal',
-                fontStyle: toolOptions?.textItalic ? 'italic' : 'normal',
-                letterSpacing: toolOptions?.textLetterSpacing || 0
-            }
-            addTextLayer(defaultText, style, canvasX, canvasY)
-        }
-    }
 
-}, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, magicWandSelect, toolOptions, addTextLayer])
-
-const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
-    if (!viewportRef.current) return
-
-    // Cursor tracking
-    const rect = viewportRef.current.getBoundingClientRect()
-    const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
-    const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
-
-    // Update ref for PixiCursor
-    cursorRef.current = { x: canvasX, y: canvasY }
-
-    if (onCursorMove) onCursorMove({ x: Math.round(canvasX), y: Math.round(canvasY) })
-
-    if (isPanning && isDragging) {
-        const dx = e.clientX - dragStart.current.x
-        const dy = e.clientY - dragStart.current.y
-        setTransform(prev => ({
-            ...prev,
-            offsetX: dragStart.current.offsetX + dx,
-            offsetY: dragStart.current.offsetY + dy
-        }))
-        return
-    }
-
-    // Handle Guide Dragging (New or Existing)
-    if (tempGuide || draggingGuideId) {
         const rect = viewportRef.current.getBoundingClientRect()
+        // Coordinates in canvas space
+        const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
+        const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
 
-        if (tempGuide) {
-            // We are dragging a NEW guide from the ruler
-            const pos = tempGuide.orientation === 'horizontal' ? e.clientY : e.clientX
-            setTempGuide({ ...tempGuide, pos })
-        }
-
-        if (draggingGuideId) {
-            // We are moving an EXISTING guide
-            const guide = guides.find(g => g.id === draggingGuideId)
-            if (guide) {
-                const clientPos = guide.orientation === 'horizontal' ? e.clientY : e.clientX
-                // Convert client pos back to canvas coordinates
-                const canvasPos = (clientPos - (guide.orientation === 'horizontal' ? rect.top : rect.left) - (guide.orientation === 'horizontal' ? transform.offsetY : transform.offsetX)) / transform.scale
-                updateGuide(draggingGuideId, canvasPos)
+        if (activeTool === 'move' && activeLayerId) {
+            const layer = layers.find(l => l.id === activeLayerId)
+            if (layer) {
+                setIsDragging(true)
+                dragStart.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    offsetX: 0,
+                    offsetY: 0,
+                    layerX: layer.x,
+                    layerY: layer.y
+                }
+            }
+        } else if (activeTool === 'rect-select' || activeTool === 'ellipse-select') {
+            setIsDragging(true)
+            isSelecting.current = true
+            selectionStart.current = { x: canvasX, y: canvasY }
+            setSelection({
+                type: activeTool === 'rect-select' ? 'rect' : 'ellipse',
+                x: canvasX,
+                y: canvasY,
+                width: 0,
+                height: 0
+            })
+        } else if (activeTool === 'lasso-select') {
+            isLassoing.current = true
+            currentLassoPath.current = [{ x: canvasX, y: canvasY }]
+            setSelection({
+                type: 'path',
+                x: canvasX,
+                y: canvasY,
+                width: 0,
+                height: 0,
+                path: [{ x: canvasX, y: canvasY }]
+            })
+        } else if (activeTool === 'wand-select') {
+            magicWandSelect(canvasX, canvasY)
+        } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser') {
+            isDrawing.current = true
+            lastDrawPoint.current = null
+            drawStrokeTo(canvasX, canvasY, true)
+        } else if (activeTool === 'bucket') {
+            floodFill(canvasX, canvasY)
+        } else if (activeTool === 'picker') {
+            pickColor(canvasX, canvasY)
+        } else if (activeTool === 'text') {
+            const defaultText = prompt('Enter text:', 'New Text Layer')
+            if (defaultText) {
+                const style = {
+                    fontFamily: toolOptions?.fontFamily || 'Arial',
+                    fontSize: toolOptions?.fontSize || 24,
+                    fill: toolOptions?.textColor || '#000000',
+                    align: toolOptions?.textAlign || 'left',
+                    fontWeight: toolOptions?.textBold ? 'bold' : 'normal',
+                    fontStyle: toolOptions?.textItalic ? 'italic' : 'normal',
+                    letterSpacing: toolOptions?.textLetterSpacing || 0
+                }
+                addTextLayer(defaultText, style, canvasX, canvasY)
             }
         }
-        return
-    }
 
-    if (activeTool === 'move' && isDragging && activeLayerId) {
-        const dx = (e.clientX - dragStart.current.x) / transform.scale
-        const dy = (e.clientY - dragStart.current.y) / transform.scale
-        updateLayerPosition(
-            activeLayerId,
-            dragStart.current.layerX + dx,
-            dragStart.current.layerY + dy
-        )
-    } else if (activeTool === 'lasso-select' && isLassoing.current) {
-        currentLassoPath.current.push({ x: canvasX, y: canvasY })
+    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer])
 
-        const xs = currentLassoPath.current.map(p => p.x)
-        const ys = currentLassoPath.current.map(p => p.y)
-        const minX = Math.min(...xs)
-        const maxX = Math.max(...xs)
-        const minY = Math.min(...ys)
-        const maxY = Math.max(...ys)
+    const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
+        if (!viewportRef.current) return
 
-        setSelection({
-            type: 'path',
-            x: minX,
-            y: minY,
-            width: maxX - minX,
-            height: maxY - minY,
-            path: [...currentLassoPath.current]
-        })
-    } else if (isSelecting.current) {
-        const startX = selectionStart.current.x
-        const startY = selectionStart.current.y
-
-        const w = canvasX - startX
-        const h = canvasY - startY
-
-        // Normalize to positive width/height
-        const x = w < 0 ? canvasX : startX
-        const y = h < 0 ? canvasY : startY
-        const width = Math.abs(w)
-        const height = Math.abs(h)
-
-        setSelection({
-            type: activeTool === 'rect-select' ? 'rect' : 'ellipse',
-            x,
-            y,
-            width,
-            height
-        })
-    } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser')) {
-        drawStrokeTo(canvasX, canvasY, false)
-    }
-
-}, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo])
-
-const handleMouseUp = useCallback((e: React.MouseEvent | MouseEvent) => {
-    setIsDragging(false)
-    setIsPanning(false)
-    isSelecting.current = false
-    isLassoing.current = false
-
-    // Finish drawing stroke
-    if (isDrawing.current) {
-        isDrawing.current = false
-        lastDrawPoint.current = null
-    }
-
-    // Finish guide dragging
-    if (tempGuide && viewportRef.current) {
+        // Cursor tracking
         const rect = viewportRef.current.getBoundingClientRect()
-        // Check if we dropped within the viewport
-        if (
-            e.clientX >= rect.left &&
-            e.clientX <= rect.right &&
-            e.clientY >= rect.top &&
-            e.clientY <= rect.bottom
-        ) {
-            // Convert to canvas coords
-            const clientPos = tempGuide.orientation === 'horizontal' ? e.clientY : e.clientX
-            const offset = tempGuide.orientation === 'horizontal' ? transform.offsetY : transform.offsetX
-            const viewportStart = tempGuide.orientation === 'horizontal' ? rect.top : rect.left
+        const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
+        const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
 
-            const canvasPos = (clientPos - viewportStart - offset) / transform.scale
-            addGuide({
-                orientation: tempGuide.orientation,
-                position: canvasPos
+        // Update ref for PixiCursor
+        cursorRef.current = { x: canvasX, y: canvasY }
+
+        if (onCursorMove) onCursorMove({ x: Math.round(canvasX), y: Math.round(canvasY) })
+
+        if (isPanning && isDragging) {
+            const dx = e.clientX - dragStart.current.x
+            const dy = e.clientY - dragStart.current.y
+            setTransform(prev => ({
+                ...prev,
+                offsetX: dragStart.current.offsetX + dx,
+                offsetY: dragStart.current.offsetY + dy
+            }))
+            return
+        }
+
+        // Handle Guide Dragging (New or Existing)
+        if (tempGuide || draggingGuideId) {
+            const rect = viewportRef.current.getBoundingClientRect()
+
+            if (tempGuide) {
+                // We are dragging a NEW guide from the ruler
+                const pos = tempGuide.orientation === 'horizontal' ? e.clientY : e.clientX
+                setTempGuide({ ...tempGuide, pos })
+            }
+
+            if (draggingGuideId) {
+                // We are moving an EXISTING guide
+                const guide = guides.find(g => g.id === draggingGuideId)
+                if (guide) {
+                    const clientPos = guide.orientation === 'horizontal' ? e.clientY : e.clientX
+                    // Convert client pos back to canvas coordinates
+                    const canvasPos = (clientPos - (guide.orientation === 'horizontal' ? rect.top : rect.left) - (guide.orientation === 'horizontal' ? transform.offsetY : transform.offsetX)) / transform.scale
+                    updateGuide(draggingGuideId, canvasPos)
+                }
+            }
+            return
+        }
+
+        if (activeTool === 'move' && isDragging && activeLayerId) {
+            const dx = (e.clientX - dragStart.current.x) / transform.scale
+            const dy = (e.clientY - dragStart.current.y) / transform.scale
+            updateLayerPosition(
+                activeLayerId,
+                dragStart.current.layerX + dx,
+                dragStart.current.layerY + dy
+            )
+        } else if (activeTool === 'lasso-select' && isLassoing.current) {
+            currentLassoPath.current.push({ x: canvasX, y: canvasY })
+
+            const xs = currentLassoPath.current.map(p => p.x)
+            const ys = currentLassoPath.current.map(p => p.y)
+            const minX = Math.min(...xs)
+            const maxX = Math.max(...xs)
+            const minY = Math.min(...ys)
+            const maxY = Math.max(...ys)
+
+            setSelection({
+                type: 'path',
+                x: minX,
+                y: minY,
+                width: maxX - minX,
+                height: maxY - minY,
+                path: [...currentLassoPath.current]
+            })
+        } else if (isSelecting.current) {
+            const startX = selectionStart.current.x
+            const startY = selectionStart.current.y
+
+            const w = canvasX - startX
+            const h = canvasY - startY
+
+            // Normalize to positive width/height
+            const x = w < 0 ? canvasX : startX
+            const y = h < 0 ? canvasY : startY
+            const width = Math.abs(w)
+            const height = Math.abs(h)
+
+            setSelection({
+                type: activeTool === 'rect-select' ? 'rect' : 'ellipse',
+                x,
+                y,
+                width,
+                height
+            })
+        } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser')) {
+            drawStrokeTo(canvasX, canvasY, false)
+        }
+
+    }, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo])
+
+    const handleMouseUp = useCallback((e: React.MouseEvent | MouseEvent) => {
+        setIsDragging(false)
+        setIsPanning(false)
+        isSelecting.current = false
+        isLassoing.current = false
+
+        // Finish drawing stroke
+        if (isDrawing.current) {
+            isDrawing.current = false
+            lastDrawPoint.current = null
+        }
+
+        // Finish guide dragging
+        if (tempGuide && viewportRef.current) {
+            const rect = viewportRef.current.getBoundingClientRect()
+            // Check if we dropped within the viewport
+            if (
+                e.clientX >= rect.left &&
+                e.clientX <= rect.right &&
+                e.clientY >= rect.top &&
+                e.clientY <= rect.bottom
+            ) {
+                // Convert to canvas coords
+                const clientPos = tempGuide.orientation === 'horizontal' ? e.clientY : e.clientX
+                const offset = tempGuide.orientation === 'horizontal' ? transform.offsetY : transform.offsetX
+                const viewportStart = tempGuide.orientation === 'horizontal' ? rect.top : rect.left
+
+                const canvasPos = (clientPos - viewportStart - offset) / transform.scale
+                addGuide({
+                    orientation: tempGuide.orientation,
+                    position: canvasPos
+                })
+            }
+            setTempGuide(null)
+        }
+
+        if (draggingGuideId && viewportRef.current) {
+            const rect = viewportRef.current.getBoundingClientRect()
+            // If dropped outside viewport (back to ruler roughly), remove it
+            if (
+                e.clientX < rect.left ||
+                e.clientX > rect.right ||
+                e.clientY < rect.top ||
+                e.clientY > rect.bottom
+            ) {
+                removeGuide(draggingGuideId)
+            }
+            setDraggingGuideId(null)
+        }
+
+    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide])
+
+    // Global event listeners for dragging
+    useEffect(() => {
+        if (isDragging || tempGuide || draggingGuideId) {
+            const onMove = (e: MouseEvent) => handleMouseMove(e)
+            const onUp = (e: MouseEvent) => handleMouseUp(e)
+
+            window.addEventListener('mousemove', onMove)
+            window.addEventListener('mouseup', onUp)
+            return () => {
+                window.removeEventListener('mousemove', onMove)
+                window.removeEventListener('mouseup', onUp)
+            }
+        }
+    }, [isDragging, tempGuide, draggingGuideId, handleMouseMove, handleMouseUp])
+
+    const handleWheel = useCallback((e: React.WheelEvent) => {
+        if (layers.length === 0) return
+        e.preventDefault()
+
+        const viewport = viewportRef.current
+        if (!viewport) return
+
+        const rect = viewport.getBoundingClientRect()
+        const mouseX = e.clientX - rect.left
+        const mouseY = e.clientY - rect.top
+
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9
+
+        setTransform((prev) => {
+            const newScale = Math.min(Math.max(prev.scale * zoomFactor, 0.05), 20)
+            const newOffsetX = mouseX - (mouseX - prev.offsetX) * (newScale / prev.scale)
+            const newOffsetY = mouseY - (mouseY - prev.offsetY) * (newScale / prev.scale)
+            return { offsetX: newOffsetX, offsetY: newOffsetY, scale: newScale }
+        })
+    }, [layers.length])
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+    }, [])
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        if (e.dataTransfer.files) {
+            Array.from(e.dataTransfer.files).forEach((file) => {
+                if (file.type.startsWith('image/')) {
+                    const url = URL.createObjectURL(file)
+                    loadImage(url, file.name)
+                }
             })
         }
-        setTempGuide(null)
-    }
+    }, [loadImage])
 
-    if (draggingGuideId && viewportRef.current) {
-        const rect = viewportRef.current.getBoundingClientRect()
-        // If dropped outside viewport (back to ruler roughly), remove it
-        if (
-            e.clientX < rect.left ||
-            e.clientX > rect.right ||
-            e.clientY < rect.top ||
-            e.clientY > rect.bottom
-        ) {
-            removeGuide(draggingGuideId)
-        }
-        setDraggingGuideId(null)
-    }
+    return (
+        <div
+            className="canvas-area"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        >
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+            />
 
-}, [tempGuide, draggingGuideId, transform, addGuide, removeGuide])
-
-// Global event listeners for dragging
-useEffect(() => {
-    if (isDragging || tempGuide || draggingGuideId) {
-        const onMove = (e: MouseEvent) => handleMouseMove(e)
-        const onUp = (e: MouseEvent) => handleMouseUp(e)
-
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
-        return () => {
-            window.removeEventListener('mousemove', onMove)
-            window.removeEventListener('mouseup', onUp)
-        }
-    }
-}, [isDragging, tempGuide, draggingGuideId, handleMouseMove, handleMouseUp])
-
-const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (layers.length === 0) return
-    e.preventDefault()
-
-    const viewport = viewportRef.current
-    if (!viewport) return
-
-    const rect = viewport.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9
-
-    setTransform((prev) => {
-        const newScale = Math.min(Math.max(prev.scale * zoomFactor, 0.05), 20)
-        const newOffsetX = mouseX - (mouseX - prev.offsetX) * (newScale / prev.scale)
-        const newOffsetY = mouseY - (mouseY - prev.offsetY) * (newScale / prev.scale)
-        return { offsetX: newOffsetX, offsetY: newOffsetY, scale: newScale }
-    })
-}, [layers.length])
-
-const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-}, [])
-
-const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    if (e.dataTransfer.files) {
-        Array.from(e.dataTransfer.files).forEach((file) => {
-            if (file.type.startsWith('image/')) {
-                const url = URL.createObjectURL(file)
-                loadImage(url, file.name)
-            }
-        })
-    }
-}, [loadImage])
-
-return (
-    <div
-        className="canvas-area"
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-    >
-        <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-        />
-
-        {layers.length > 0 ? (
-            <>
-                <div className="canvas-tabs">
-                    <div className="canvas-tab active">
-                        <span>Image</span>
-                        <div className="tab-close" onClick={closeImage} style={{ cursor: 'pointer' }}>
-                            <X size={10} />
+            {layers.length > 0 ? (
+                <>
+                    <div className="canvas-tabs">
+                        <div className="canvas-tab active">
+                            <span>Image</span>
+                            <div className="tab-close" onClick={closeImage} style={{ cursor: 'pointer' }}>
+                                <X size={10} />
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div className="canvas-separator" />
-                <div className="canvas-with-rulers">
-                    <div className="ruler-corner" />
-                    <div className="ruler-horizontal">
-                        <Ruler
-                            orientation="horizontal"
-                            transform={transform}
-                            onDragStart={handleGuideDragStart('horizontal')}
-                        />
-                    </div>
-                    <div className="ruler-vertical">
-                        <Ruler
-                            orientation="vertical"
-                            transform={transform}
-                            onDragStart={handleGuideDragStart('vertical')}
-                        />
-                    </div>
-
-                    <div
-                        ref={viewportRef}
-                        className={`canvas-viewport ${isPanning ? 'panning-active' : isSpaceHeld ? 'panning-ready' : ''} ${activeTool === 'move' ? 'cursor-move' : ''} ${activeTool.includes('select') ? 'crosshair' : ''}`}
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onWheel={handleWheel}
-                    >
-                        {/* GPU-accelerated Pixi.js Application */}
-                        <Application
-                            resizeTo={viewportRef as any}
-                            backgroundAlpha={0}
-                            antialias
-                            autoDensity
-                            resolution={window.devicePixelRatio || 1}
-                        >
-                            <PixiScene
+                    <div className="canvas-separator" />
+                    <div className="canvas-with-rulers">
+                        <div className="ruler-corner" />
+                        <div className="ruler-horizontal">
+                            <Ruler
+                                orientation="horizontal"
                                 transform={transform}
-                                cursorRef={cursorRef}
-                                toolOptions={toolOptions}
-                                activeTool={activeTool}
+                                onDragStart={handleGuideDragStart('horizontal')}
                             />
-                            { /* Transform Overlay (must be inside Application for Pixi context) */}
-                            {activeTool === 'transform' && activeLayerId && (
-                                <TransformOverlay layerId={activeLayerId} />
+                        </div>
+                        <div className="ruler-vertical">
+                            <Ruler
+                                orientation="vertical"
+                                transform={transform}
+                                onDragStart={handleGuideDragStart('vertical')}
+                            />
+                        </div>
+
+                        <div
+                            ref={viewportRef}
+                            className={`canvas-viewport ${isPanning ? 'panning-active' : isSpaceHeld ? 'panning-ready' : ''} ${activeTool === 'move' ? 'cursor-move' : ''} ${activeTool.includes('select') ? 'crosshair' : ''} ${activeTool === 'picker' ? 'cursor-picker' : ''}`}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onWheel={handleWheel}
+                        >
+                            {/* GPU-accelerated Pixi.js Application */}
+                            <Application
+                                resizeTo={viewportRef as any}
+                                backgroundAlpha={0}
+                                antialias
+                                autoDensity
+                                resolution={window.devicePixelRatio || 1}
+                            >
+                                <PixiScene
+                                    transform={transform}
+                                    cursorRef={cursorRef}
+                                    toolOptions={toolOptions}
+                                    activeTool={activeTool}
+                                />
+                                { /* Transform Overlay (must be inside Application for Pixi context) */}
+                                {activeTool === 'transform' && activeLayerId && (
+                                    <TransformOverlay layerId={activeLayerId} />
+                                )}
+                            </Application>
+
+                            {/* Crop Overlay */}
+                            {activeTool === 'crop' && (
+                                <CropOverlay
+                                    onCrop={(rect) => {
+                                        cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
+                                        // Reset to move tool after crop
+                                        onToolChange?.('move')
+                                    }}
+                                    onCancel={() => {
+                                        // Reset to move tool on cancel
+                                        onToolChange?.('move')
+                                    }}
+                                    scale={transform.scale}
+                                    offsetX={transform.offsetX}
+                                    offsetY={transform.offsetY}
+                                    toolOptions={toolOptions}
+                                />
                             )}
-                        </Application>
 
-                        {/* Crop Overlay */}
-                        {activeTool === 'crop' && (
-                            <CropOverlay
-                                onCrop={(rect) => {
-                                    cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
-                                    // Reset to move tool after crop
-                                    onToolChange?.('move')
-                                }}
-                                onCancel={() => {
-                                    // Reset to move tool on cancel
-                                    onToolChange?.('move')
-                                }}
-                                scale={transform.scale}
-                                offsetX={transform.offsetX}
-                                offsetY={transform.offsetY}
-                                toolOptions={toolOptions}
-                            />
-                        )}
+                            {/* Render Guides */}
+                            {guides.map(guide => {
+                                const isHorizontal = guide.orientation === 'horizontal'
+                                const screenPos = guide.position * transform.scale + (isHorizontal ? transform.offsetY : transform.offsetX)
 
-                        {/* Render Guides */}
-                        {guides.map(guide => {
-                            const isHorizontal = guide.orientation === 'horizontal'
-                            const screenPos = guide.position * transform.scale + (isHorizontal ? transform.offsetY : transform.offsetX)
+                                return (
+                                    <div
+                                        key={guide.id}
+                                        className="guide-line"
+                                        style={{
+                                            position: 'absolute',
+                                            left: isHorizontal ? 0 : screenPos,
+                                            top: isHorizontal ? screenPos : 0,
+                                            width: isHorizontal ? '100%' : '1px',
+                                            height: isHorizontal ? '1px' : '100%',
+                                            backgroundColor: '#00ffff',
+                                            cursor: isHorizontal ? 'ns-resize' : 'ew-resize',
+                                            zIndex: 1000,
+                                            pointerEvents: 'auto'
+                                        }}
+                                        onMouseDown={handleExistingGuideDragStart(guide.id)}
+                                    />
+                                )
+                            })}
 
-                            return (
+                            {/* Render Temp Guide being dragged from ruler */}
+                            {tempGuide && (
                                 <div
-                                    key={guide.id}
-                                    className="guide-line"
+                                    className="guide-line-temp"
                                     style={{
                                         position: 'absolute',
-                                        left: isHorizontal ? 0 : screenPos,
-                                        top: isHorizontal ? screenPos : 0,
-                                        width: isHorizontal ? '100%' : '1px',
-                                        height: isHorizontal ? '1px' : '100%',
+                                        left: tempGuide.orientation === 'vertical' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().left || 0)) : 0,
+                                        top: tempGuide.orientation === 'horizontal' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().top || 0)) : 0,
+                                        width: tempGuide.orientation === 'horizontal' ? '100%' : '1px',
+                                        height: tempGuide.orientation === 'horizontal' ? '1px' : '100%',
                                         backgroundColor: '#00ffff',
-                                        cursor: isHorizontal ? 'ns-resize' : 'ew-resize',
-                                        zIndex: 1000,
-                                        pointerEvents: 'auto'
+                                        opacity: 0.5,
+                                        zIndex: 1001,
+                                        pointerEvents: 'none'
                                     }}
-                                    onMouseDown={handleExistingGuideDragStart(guide.id)}
                                 />
-                            )
-                        })}
-
-                        {/* Render Temp Guide being dragged from ruler */}
-                        {tempGuide && (
-                            <div
-                                className="guide-line-temp"
-                                style={{
-                                    position: 'absolute',
-                                    left: tempGuide.orientation === 'vertical' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().left || 0)) : 0,
-                                    top: tempGuide.orientation === 'horizontal' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().top || 0)) : 0,
-                                    width: tempGuide.orientation === 'horizontal' ? '100%' : '1px',
-                                    height: tempGuide.orientation === 'horizontal' ? '1px' : '100%',
-                                    backgroundColor: '#00ffff',
-                                    opacity: 0.5,
-                                    zIndex: 1001,
-                                    pointerEvents: 'none'
-                                }}
-                            />
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
-            </>
-        ) : (
-            <EmptyState
-                onLoadSample={handleLoadSample}
-                onOpenFile={handleOpenFile}
-                onPasteClipboard={handlePasteClipboard}
-            />
-        )}
-    </div>
-)
+                </>
+            ) : (
+                <EmptyState
+                    onLoadSample={handleLoadSample}
+                    onOpenFile={handleOpenFile}
+                    onPasteClipboard={handlePasteClipboard}
+                />
+            )}
+        </div>
+    )
 }

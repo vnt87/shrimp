@@ -28,6 +28,11 @@ export interface ToolOptions {
     cropAspectRatio: number
     cropHighlightOpacity: number
     cropGuides: 'none' | 'center' | 'thirds' | 'fifth'
+    // Bucket options
+    bucketFillType: 'fg' | 'bg'
+    bucketAffectedArea: 'similar' | 'selection'
+    bucketSampleMerged: boolean
+    bucketOpacity: number
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -48,6 +53,10 @@ const defaultToolOptions: ToolOptions = {
     cropAspectRatio: 1,
     cropHighlightOpacity: 50,
     cropGuides: 'thirds',
+    bucketFillType: 'fg',
+    bucketAffectedArea: 'similar',
+    bucketSampleMerged: false,
+    bucketOpacity: 100,
 }
 
 export default function App() {
@@ -83,7 +92,7 @@ export default function App() {
                     break
                 case 'g': setActiveTool('bucket'); break
                 case 'r': setActiveTool('rect-select'); break
-                case 'o': setActiveTool('picker'); break
+                case 'i': setActiveTool('picker'); break
                 case 't': setActiveTool('text'); break
                 case 'z': setActiveTool('zoom'); break
                 case '[':

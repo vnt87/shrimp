@@ -72,6 +72,64 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
     const renderBucketOptions = () => (
         <>
             {renderSlider('fillThreshold', 'Threshold', 0, 255, 1, '')}
+            <div className="tool-options-divider" />
+            <div className="tool-options-slider-group">
+                <span className="slider-label">Opacity</span>
+                <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={toolOptions.bucketOpacity}
+                    onChange={(e) => onToolOptionChange('bucketOpacity', parseInt(e.target.value))}
+                    className="tool-options-slider"
+                />
+                <span className="slider-value">{toolOptions.bucketOpacity}%</span>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">Fill</span>
+                <div style={{ display: 'flex', gap: 2 }}>
+                    <button
+                        className={`pref-btn ${toolOptions.bucketFillType === 'fg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                        style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                        onClick={() => onToolOptionChange('bucketFillType', 'fg')}
+                        title="FG Color Fill"
+                    >
+                        FG
+                    </button>
+                    <button
+                        className={`pref-btn ${toolOptions.bucketFillType === 'bg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                        style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                        onClick={() => onToolOptionChange('bucketFillType', 'bg')}
+                        title="BG Color Fill"
+                    >
+                        BG
+                    </button>
+                </div>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">Area</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.bucketAffectedArea}
+                    onChange={(e) => onToolOptionChange('bucketAffectedArea', e.target.value as any)}
+                >
+                    <option value="similar">Similar Colors</option>
+                    <option value="selection">Whole Selection</option>
+                </select>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-checkbox-group">
+                <input
+                    type="checkbox"
+                    id="bucketSampleMerged"
+                    checked={toolOptions.bucketSampleMerged}
+                    onChange={(e) => onToolOptionChange('bucketSampleMerged', e.target.checked)}
+                />
+                <label htmlFor="bucketSampleMerged">Sample Merged</label>
+            </div>
         </>
     )
 
