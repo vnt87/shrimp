@@ -944,8 +944,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    repeating-conic-gradient(var(--canvas-check-1) 0% 25%, var(--canvas-check-2) 0% 50%) 0 0 / 20px 20px;
+  background: var(--bg-app);
 }
 
 .empty-state-card {

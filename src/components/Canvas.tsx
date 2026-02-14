@@ -6,6 +6,7 @@ import EmptyState from './EmptyState'
 import { useEditor } from './EditorContext'
 import PixiLayerSprite from './PixiLayerSprite'
 import SelectionOverlay from './SelectionOverlay'
+import CropOverlay from './CropOverlay'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics })
@@ -137,26 +138,6 @@ function PixiScene({
     const { layers, canvasSize, selection } = useEditor()
     const { app } = useApplication()
 
-    // Draw the checkerboard background pattern via <pixiGraphics>
-    const drawBackground = useCallback(
-        (g: Graphics) => {
-            g.clear()
-            const checkSize = 10
-            const cols = Math.ceil(canvasSize.width / checkSize)
-            const rows = Math.ceil(canvasSize.height / checkSize)
-
-            for (let row = 0; row < rows; row++) {
-                for (let col = 0; col < cols; col++) {
-                    const isLight = (row + col) % 2 === 0
-                    g.setFillStyle({ color: isLight ? 0xe0e0e0 : 0xcccccc })
-                    g.rect(col * checkSize, row * checkSize, checkSize, checkSize)
-                    g.fill()
-                }
-            }
-        },
-        [canvasSize]
-    )
-
     // Resize the renderer when the app's canvas parent changes
     useEffect(() => {
         if (app?.renderer) {
@@ -173,9 +154,6 @@ function PixiScene({
             y={transform.offsetY}
             scale={transform.scale}
         >
-            {/* Checkerboard background */}
-            <pixiGraphics draw={drawBackground} />
-
             {/* GPU-rendered layers */}
             {layers.slice().reverse().map(layer => (
                 <PixiLayerSprite key={layer.id} layer={layer} />
@@ -188,6 +166,8 @@ function PixiScene({
         </pixiContainer>
     )
 }
+
+
 
 
 export default function Canvas({
@@ -203,11 +183,13 @@ export default function Canvas({
         canvasSize,
         setCanvasSize,
         addLayer,
-        updateLayerData,
         updateLayerPosition,
         selection,
         setSelection,
-        closeImage
+        closeImage,
+        undo,
+        redo,
+        cropCanvas
     } = useEditor()
 
     const [transform, setTransform] = useState<CanvasTransform>({
@@ -250,27 +232,26 @@ export default function Canvas({
     const loadImage = useCallback((src: string, name: string) => {
         const img = new window.Image()
         img.onload = () => {
-            // If it's the first layer, set canvas size
-            if (layers.length === 0) {
-                setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight })
-                fitToView(img.naturalWidth, img.naturalHeight)
-            }
-
-            // Create new layer
-            const id = addLayer(name)
-
-            // Draw image to layer's offscreen canvas (CPU side)
+            // Create canvas and draw image
             const canvas = document.createElement('canvas')
             canvas.width = img.naturalWidth
             canvas.height = img.naturalHeight
             const ctx = canvas.getContext('2d')
             if (ctx) {
                 ctx.drawImage(img, 0, 0)
-                updateLayerData(id, canvas)
             }
+
+            // If it's the first layer, set canvas size
+            if (layers.length === 0) {
+                setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight })
+                fitToView(img.naturalWidth, img.naturalHeight)
+            }
+
+            // Create new layer WITH data atomically
+            addLayer(name, canvas)
         }
         img.src = src
-    }, [layers.length, addLayer, setCanvasSize, updateLayerData, fitToView])
+    }, [layers.length, addLayer, setCanvasSize, fitToView])
 
     const handleLoadSample = useCallback(() => {
         loadImage('/cathedral.jpg', 'cathedral.jpg')
@@ -312,6 +293,18 @@ export default function Canvas({
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.repeat) return
+
+            // Undo/Redo
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault()
+                if (e.shiftKey) {
+                    redo()
+                } else {
+                    undo()
+                }
+                return
+            }
+
             if (e.code === 'Space') {
                 e.preventDefault()
                 setIsSpaceHeld(true)
@@ -334,7 +327,7 @@ export default function Canvas({
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [setSelection])
+    }, [setSelection, undo, redo])
 
     // Mouse handlers
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -510,13 +503,28 @@ export default function Canvas({
                             {/* GPU-accelerated Pixi.js Application */}
                             <Application
                                 resizeTo={viewportRef as any}
-                                background={'#3a3a3a'}
+                                backgroundAlpha={0}
                                 antialias
                                 autoDensity
                                 resolution={window.devicePixelRatio || 1}
                             >
                                 <PixiScene transform={transform} />
                             </Application>
+
+                            {/* Crop Overlay */}
+                            {activeTool === 'crop' && (
+                                <CropOverlay
+                                    onCrop={(rect) => {
+                                        cropCanvas(rect.x, rect.y, rect.width, rect.height)
+                                    }}
+                                    onCancel={() => {
+                                        // Optional: switch tool or just do nothing
+                                    }}
+                                    scale={transform.scale}
+                                    offsetX={transform.offsetX}
+                                    offsetY={transform.offsetY}
+                                />
+                            )}
                         </div>
                     </div>
                 </>
