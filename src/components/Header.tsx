@@ -14,22 +14,22 @@ import {
 } from 'lucide-react'
 import PreferencesDialog from './PreferencesDialog'
 import AboutDialog from './AboutDialog'
+import NewImageDialog from './NewImageDialog'
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
+import { useEditor } from './EditorContext'
 
 const menuData: Record<string, string[]> = {
-    File: ['New...', 'Create', 'Open...', 'Open as Layers...', 'Open Location...', 'Save', 'Save As...', 'Export As...', 'Print...', 'Close View', 'Close All', 'Quit'],
-    Edit: ['Undo', 'Redo', 'Fade...', 'Cut', 'Copy', 'Copy Visible', 'Paste', 'Paste Into', 'Paste as', 'Buffer', 'Clear', 'Fill with FG Color', 'Fill with BG Color', 'Fill with Pattern'],
-    Select: ['All', 'None', 'Invert', 'Float', 'By Color', 'From Path', 'Editor', 'Feather...', 'Sharpen', 'Shrink...', 'Grow...', 'Border...', 'Distort...', 'Toggle Quick Mask'],
-    View: ['New View', 'Display Filters...', 'Zoom', 'Shrink Wrap', 'Fullscreen', 'Navigation Window', 'Display Navigation Guide', 'Snap to Grid', 'Snap to Guides', 'Snap to Canvas Edges', 'Snap to Active Path', 'Padding Color', 'Show Menubar', 'Show Rulers', 'Show Scrollbars', 'Show Statusbar'],
-    Image: ['Duplicate', 'Mode', 'Transform', 'Canvas Size...', 'Fit Canvas to Layers', 'Fit Canvas to Selection', 'Print Size...', 'Scale Image...', 'Crop to Selection', 'Autocrop Image', 'Zealous Crop', 'Merge Visible Layers...', 'Flatten Image', 'Align Visible Layers...', 'Guides', 'Grid', 'Properties', 'Metadata'],
-    Layer: ['New Layer...', 'New from Visible', 'Duplicate Layer', 'Anchor Layer', 'Merge Down', 'Delete Layer', 'Text to Path', 'Discard Text Information', 'Stack', 'Mask', 'Transparency', 'Transform', 'Layer Boundary Size...', 'Layer to Image Size', 'Scale Layer...', 'Crop to Selection'],
-    Colors: ['Color Balance...', 'Color Temperature...', 'Hue-Chroma...', 'Hue-Saturation...', 'Saturation...', 'Exposure...', 'Shadows-Highlights...', 'Brightness-Contrast...', 'Levels...', 'Curves...', 'Invert', 'Linear Invert', 'Value Invert', 'Auto', 'Components', 'Desaturate', 'Map', 'Tone Mapping', 'Info'],
-    Tools: ['Selection Tools', 'Paint Tools', 'Transform Tools', 'Paths', 'Color Picker', 'Measure', 'Text', 'GeGL Operation...', 'Toolbox', 'Default Colors', 'Swap Colors'],
-    Filters: ['Repeat Last', 'Re-Show Last', 'Reset All Filters', 'Blur', 'Enhance', 'Distorts', 'Light and Shadow', 'Noise', 'Edge-Detect', 'Generic', 'Combine', 'Artistic', 'Decor', 'Map', 'Render', 'Web', 'Animation'],
-    'Python-Fu': ['Console', 'Selection', 'Sketch', 'Sphere'],
-    Windows: ['Recently Closed Docks', 'Dockable Dialogs', 'Toolbox', 'Hide Docks', 'Single-Window Mode'],
-    Help: ['Help', 'Context Help', 'Tip of the Day', 'About', 'Action Search', 'Github Source', 'User Manual'],
+    File: ['New...', 'Open...', 'Open as Layers...', 'Export As PNG', 'Export As JPEG', 'Export As WebP', 'Close', 'Close All'],
+    Edit: ['Undo', 'Redo', '---', 'Cut', 'Copy', 'Paste', 'Clear'],
+    Select: ['All', 'None', 'Invert'],
+    View: ['Fit Image in Window', 'Zoom In', 'Zoom Out'],
+    Image: ['Flatten Image', 'Merge Visible Layers', '---', 'Canvas Size...'],
+    Layer: ['New Layer', 'Duplicate Layer', 'Delete Layer', '---', 'Merge Down'],
+    Colors: ['Brightness-Contrast...', 'Hue-Saturation...', 'Desaturate...', 'Invert Colors'],
+    Filters: ['Blur', 'Sharpen', 'Noise'],
+    Windows: ['Toolbox', 'Layers', 'Brushes'],
+    Help: ['About', 'Github Source'],
 }
 
 const themeOptions = [
@@ -44,9 +44,20 @@ export default function Header() {
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [showPreferences, setShowPreferences] = useState(false)
     const [showAbout, setShowAbout] = useState(false)
+    const [showNewImage, setShowNewImage] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const { theme, setTheme } = useTheme()
+    const {
+        undo, redo, canUndo, canRedo,
+        selectAll, selectNone, invertSelection,
+        flattenImage, mergeDown,
+        exportImage,
+        closeImage,
+        addLayer, deleteLayer, duplicateLayer,
+        activeLayerId, layers
+    } = useEditor()
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -63,6 +74,80 @@ export default function Header() {
 
     const toggleMenu = (item: string) => {
         setActiveMenu(activeMenu === item ? null : item)
+    }
+
+    // Handle file open
+    const handleFileOpen = () => {
+        fileInputRef.current?.click()
+    }
+
+    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = () => {
+            const img = new Image()
+            img.onload = () => {
+                const canvas = document.createElement('canvas')
+                canvas.width = img.width
+                canvas.height = img.height
+                const ctx = canvas.getContext('2d')
+                ctx?.drawImage(img, 0, 0)
+                addLayer(file.name, canvas)
+            }
+            img.src = reader.result as string
+        }
+        reader.readAsDataURL(file)
+        e.target.value = '' // Reset input
+    }
+
+    const handleMenuAction = (option: string) => {
+        setActiveMenu(null)
+
+        switch (option) {
+            case 'New...': setShowNewImage(true); break
+            case 'Open...': handleFileOpen(); break
+            case 'Export As PNG': exportImage('png'); break
+            case 'Export As JPEG': exportImage('jpeg', 0.92); break
+            case 'Export As WebP': exportImage('webp', 0.9); break
+            case 'Close': closeImage(); break
+            case 'Close All': closeImage(); break
+            case 'Undo': undo(); break
+            case 'Redo': redo(); break
+            case 'All': selectAll(); break
+            case 'None': selectNone(); break
+            case 'Invert': invertSelection(); break
+            case 'Flatten Image': flattenImage(); break
+            case 'Merge Visible Layers': flattenImage(); break
+            case 'Merge Down': mergeDown(); break
+            case 'New Layer': addLayer('New Layer'); break
+            case 'Duplicate Layer': activeLayerId && duplicateLayer(activeLayerId); break
+            case 'Delete Layer': activeLayerId && deleteLayer(activeLayerId); break
+            case 'About': setShowAbout(true); break
+            case 'Github Source':
+                window.open('https://github.com/vnt87/shrimp', '_blank')
+                break
+            default: break
+        }
+    }
+
+    const isDisabled = (option: string): boolean => {
+        switch (option) {
+            case 'Undo': return !canUndo
+            case 'Redo': return !canRedo
+            case 'Export As PNG':
+            case 'Export As JPEG':
+            case 'Export As WebP':
+            case 'Close':
+            case 'Flatten Image':
+            case 'Merge Visible Layers':
+                return layers.length === 0
+            case 'Duplicate Layer':
+            case 'Delete Layer':
+            case 'Merge Down':
+                return !activeLayerId
+            default: return false
+        }
     }
 
     return (
@@ -84,31 +169,29 @@ export default function Header() {
                                 {item}
                                 {activeMenu === item && (
                                     <div className="header-menu-dropdown">
-                                        {menuData[item].map((option, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="header-menu-dropdown-item"
-                                                onClick={(e) => {
-                                                    if (option === 'Github Source') {
+                                        {menuData[item].map((option, idx) => {
+                                            if (option === '---') {
+                                                return <div key={idx} className="header-menu-dropdown-divider" style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
+                                            }
+                                            const disabled = isDisabled(option)
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`header-menu-dropdown-item${disabled ? ' disabled' : ''}`}
+                                                    style={disabled ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+                                                    onClick={(e) => {
                                                         e.stopPropagation()
-                                                        window.open('https://github.com/vnt87/shrimp', '_blank')
-                                                        setActiveMenu(null)
-                                                    } else if (option === 'About') {
-                                                        e.stopPropagation()
-                                                        setShowAbout(true)
-                                                        setActiveMenu(null)
-                                                    }
-                                                }}
-                                            >
-                                                {option}
-                                                {['New...', 'Open...', 'Save', 'Undo', 'Cut', 'Copy', 'Paste'].includes(
-                                                    option
-                                                ) && <span className="shortcut">{getShortcut(option)}</span>}
-                                                {['Open as Layers...', 'Mode', 'Transform', 'Blur', 'Enhance'].includes(
-                                                    option
-                                                ) && <ChevronRight size={12} className="submenu-arrow" />}
-                                            </div>
-                                        ))}
+                                                        handleMenuAction(option)
+                                                    }}
+                                                >
+                                                    {option}
+                                                    {getShortcut(option) && <span className="shortcut">{getShortcut(option)}</span>}
+                                                    {['Open as Layers...', 'Blur', 'Sharpen', 'Noise'].includes(option) && (
+                                                        <ChevronRight size={12} className="submenu-arrow" />
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -129,10 +212,10 @@ export default function Header() {
                         <div className={`toggle ${autosave ? 'on' : 'off'}`} />
                     </div>
 
-                    <div className="header-icon-btn">
+                    <div className="header-icon-btn" onClick={() => exportImage('png')} title="Save">
                         <Save size={16} />
                     </div>
-                    <div className="header-icon-btn">
+                    <div className="header-icon-btn" onClick={handleFileOpen} title="Open">
                         <Upload size={16} />
                     </div>
 
@@ -180,29 +263,33 @@ export default function Header() {
                 </div>
             </header>
 
+            {/* Hidden file input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFileSelected}
+            />
+
             {showPreferences && <PreferencesDialog onClose={() => setShowPreferences(false)} />}
             {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+            {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
         </>
     )
 }
 
 function getShortcut(option: string): string {
     switch (option) {
-        case 'New...':
-            return '⌘N'
-        case 'Open...':
-            return '⌘O'
-        case 'Save':
-            return '⌘S'
-        case 'Undo':
-            return '⌘Z'
-        case 'Cut':
-            return '⌘X'
-        case 'Copy':
-            return '⌘C'
-        case 'Paste':
-            return '⌘V'
-        default:
-            return ''
+        case 'New...': return '⌘N'
+        case 'Open...': return '⌘O'
+        case 'Undo': return '⌘Z'
+        case 'Redo': return '⇧⌘Z'
+        case 'Cut': return '⌘X'
+        case 'Copy': return '⌘C'
+        case 'Paste': return '⌘V'
+        case 'All': return '⌘A'
+        case 'None': return '⇧⌘A'
+        default: return ''
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { ThemeProvider } from './components/ThemeContext'
 import { EditorProvider } from './components/EditorContext'
 import Header from './components/Header'
@@ -8,25 +8,61 @@ import Canvas from './components/Canvas'
 import RightPanel from './components/RightPanel'
 import StatusBar from './components/StatusBar'
 
+export interface ToolOptions {
+    brushSize: number
+    brushOpacity: number
+    brushHardness: number
+    fillThreshold: number
+    antialiasing: boolean
+}
+
+const defaultToolOptions: ToolOptions = {
+    brushSize: 10,
+    brushOpacity: 100,
+    brushHardness: 100,
+    fillThreshold: 15,
+    antialiasing: true,
+}
+
 export default function App() {
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
     const [activeTool, setActiveTool] = useState<string>('move')
+    const [toolOptions, setToolOptions] = useState<ToolOptions>(defaultToolOptions)
+
+    const updateToolOption = useCallback(<K extends keyof ToolOptions>(key: K, value: ToolOptions[K]) => {
+        setToolOptions(prev => ({ ...prev, [key]: value }))
+    }, [])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Ignore if typing in an input
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
                 return
             }
 
             switch (e.key.toLowerCase()) {
-                case 'c':
-                    setActiveTool('crop')
+                case 'c': setActiveTool('crop'); break
+                case 'v': setActiveTool('move'); break
+                case 'b': setActiveTool('brush'); break
+                case 'n': setActiveTool('pencil'); break
+                case 'e':
+                    if (e.shiftKey) setActiveTool('eraser')
+                    else setActiveTool('ellipse-select')
                     break
-                case 'v':
-                    setActiveTool('move')
+                case 'g': setActiveTool('bucket'); break
+                case 'r': setActiveTool('rect-select'); break
+                case 'o': setActiveTool('picker'); break
+                case 't': setActiveTool('text'); break
+                case 'z': setActiveTool('zoom'); break
+                case 'x': {
+                    // Swap colors - handled by EditorContext but needs dispatch
+                    // We'll let the keyboard event bubble to the toolbox
                     break
-                // Add more shortcuts here
+                }
+                case 'd': {
+                    // Reset colors - similarly
+                    break
+                }
             }
         }
 
@@ -39,13 +75,14 @@ export default function App() {
             <EditorProvider>
                 <div className="app">
                     <Header />
-                    <ToolOptionsBar />
+                    <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
                     <div className="main-content">
                         <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
                         <Canvas
                             onCursorMove={setCursorPos}
                             activeTool={activeTool}
                             onToolChange={setActiveTool}
+                            toolOptions={toolOptions}
                         />
                         <RightPanel />
                     </div>

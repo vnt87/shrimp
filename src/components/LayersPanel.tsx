@@ -258,6 +258,7 @@ export default function LayersPanel() {
         activeLayerId,
         toggleLayerLock,
         setLayerOpacity,
+        setLayerBlendMode,
         addLayer,
         deleteLayer,
         duplicateLayer,
@@ -319,10 +320,30 @@ export default function LayersPanel() {
 
             <div className="layers-blend-row">
                 <span className="dialogue-bar-label">Mode</span>
-                <div className="layers-dropdown" style={{ width: 161 }}>
-                    <span>{activeLayer?.blendMode || 'Normal'}</span>
-                    <ChevronDown size={16} />
-                </div>
+                <select
+                    className="layers-dropdown"
+                    style={{ width: 161, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '2px 4px', fontSize: 12, cursor: 'pointer' }}
+                    value={activeLayer?.blendMode || 'normal'}
+                    onChange={(e) => activeLayerId && setLayerBlendMode(activeLayerId, e.target.value)}
+                    disabled={!activeLayerId}
+                >
+                    <option value="normal">Normal</option>
+                    <option value="multiply">Multiply</option>
+                    <option value="screen">Screen</option>
+                    <option value="overlay">Overlay</option>
+                    <option value="darken">Darken</option>
+                    <option value="lighten">Lighten</option>
+                    <option value="color-dodge">Color Dodge</option>
+                    <option value="color-burn">Color Burn</option>
+                    <option value="hard-light">Hard Light</option>
+                    <option value="soft-light">Soft Light</option>
+                    <option value="difference">Difference</option>
+                    <option value="exclusion">Exclusion</option>
+                    <option value="hue">Hue</option>
+                    <option value="saturation">Saturation</option>
+                    <option value="color">Color</option>
+                    <option value="luminosity">Luminosity</option>
+                </select>
             </div>
 
             <div className="dialogue-divider" />

@@ -1,91 +1,102 @@
-import { useState } from 'react'
-import {
-    ChevronDown,
-    FlipVertical,
-    Layers,
-    FlipHorizontal,
-    CheckSquare,
-    Square,
-} from 'lucide-react'
+import type { ToolOptions } from '../App'
 
-function Checkbox({
-    checked: initialChecked,
-    label,
-}: {
-    checked: boolean
-    label: string
-}) {
-    const [checked, setChecked] = useState(initialChecked)
-    return (
-        <div
-            className="tool-options-checkbox"
-            onClick={() => setChecked(!checked)}
-        >
-            <div className={`checkbox-box ${checked ? 'checked' : 'unchecked'}`}>
-                {checked ? <CheckSquare size={16} /> : <Square size={16} />}
-            </div>
-            <span>{label}</span>
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => { }}
-                style={{ display: 'none' }}
-            />
-        </div>
-    )
+interface ToolOptionsBarProps {
+    activeTool: string
+    toolOptions: ToolOptions
+    onToolOptionChange: <K extends keyof ToolOptions>(key: K, value: ToolOptions[K]) => void
 }
 
-export default function ToolOptionsBar() {
+const toolLabels: Record<string, string> = {
+    'move': 'Move',
+    'crop': 'Crop',
+    'rect-select': 'Rectangle Select',
+    'ellipse-select': 'Ellipse Select',
+    'brush': 'Paintbrush',
+    'pencil': 'Pencil',
+    'eraser': 'Eraser',
+    'bucket': 'Bucket Fill',
+    'picker': 'Color Picker',
+    'text': 'Text',
+    'zoom': 'Zoom',
+}
+
+export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionChange }: ToolOptionsBarProps) {
+    const label = toolLabels[activeTool] || activeTool
+
+    const renderSlider = (
+        key: keyof ToolOptions,
+        labelText: string,
+        min: number,
+        max: number,
+        step: number = 1,
+        unit: string = ''
+    ) => (
+        <div className="tool-options-slider-group" key={key}>
+            <span className="slider-label">{labelText}</span>
+            <input
+                type="range"
+                className="tool-options-slider"
+                min={min}
+                max={max}
+                step={step}
+                value={toolOptions[key] as number}
+                onChange={(e) => onToolOptionChange(key, Number(e.target.value) as ToolOptions[typeof key])}
+            />
+            <span className="slider-value" style={{ minWidth: 36, textAlign: 'right', fontSize: 11, color: 'var(--text-secondary)' }}>
+                {toolOptions[key]}{unit}
+            </span>
+        </div>
+    )
+
+    const renderBrushOptions = () => (
+        <>
+            {renderSlider('brushSize', 'Size', 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('brushOpacity', 'Opacity', 1, 100, 1, '%')}
+            <div className="tool-options-divider" />
+            {renderSlider('brushHardness', 'Hardness', 0, 100, 1, '%')}
+        </>
+    )
+
+    const renderEraserOptions = () => (
+        <>
+            {renderSlider('brushSize', 'Size', 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('brushOpacity', 'Opacity', 1, 100, 1, '%')}
+        </>
+    )
+
+    const renderBucketOptions = () => (
+        <>
+            {renderSlider('fillThreshold', 'Threshold', 0, 255, 1, '')}
+        </>
+    )
+
+    const renderToolSpecificOptions = () => {
+        switch (activeTool) {
+            case 'brush':
+            case 'pencil':
+                return renderBrushOptions()
+            case 'eraser':
+                return renderEraserOptions()
+            case 'bucket':
+                return renderBucketOptions()
+            default:
+                return (
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        No options for this tool
+                    </span>
+                )
+        }
+    }
+
     return (
         <div className="tool-options">
-            {/* Mode group */}
             <div className="tool-options-group">
-                <span className="tool-options-label">Mode</span>
-                <div className="tool-options-icon-btn"><FlipVertical size={16} /></div>
-                <div className="tool-options-icon-btn"><Square size={16} /></div>
-                <div className="tool-options-icon-btn"><Layers size={16} /></div>
-                <div className="tool-options-icon-btn"><FlipHorizontal size={16} /></div>
+                <span className="tool-options-label" style={{ fontWeight: 600 }}>{label}</span>
             </div>
-
             <div className="tool-options-divider" />
-
-            {/* Checkboxes */}
-            <Checkbox checked={true} label="Antialiasing" />
-            <Checkbox checked={false} label="Feather edges" />
-            <Checkbox checked={true} label="Select transparent areas" />
-            <Checkbox checked={false} label="Sample merged" />
-            <Checkbox checked={false} label="Diagonal neighbors" />
-
-            <div className="tool-options-divider" />
-
-            {/* Threshold slider */}
-            <div className="tool-options-slider-group">
-                <span className="slider-label">Threshold</span>
-                <input
-                    type="range"
-                    className="tool-options-slider"
-                    min={0}
-                    max={255}
-                    defaultValue={15}
-                />
-                <div className="tool-options-dropdown" style={{ width: 61 }}>
-                    <span>15.0</span>
-                    <ChevronDown size={16} />
-                </div>
-            </div>
-
-            <div className="tool-options-divider" />
-
-            {/* Select by */}
-            <div className="tool-options-group">
-                <span className="tool-options-label">Select by</span>
-                <div className="tool-options-dropdown" style={{ width: 94 }}>
-                    <span>Composite</span>
-                    <ChevronDown size={16} />
-                </div>
-            </div>
-
-            <Checkbox checked={false} label="Draw mask" />
+            {renderToolSpecificOptions()}
         </div>
     )
 }

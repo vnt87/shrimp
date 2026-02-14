@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
     MousePointer,
     Hand,
@@ -24,13 +25,21 @@ import {
     RotateCcw,
     ArrowUpDown,
 } from 'lucide-react'
+import { useEditor } from './EditorContext'
+import ColorPicker from './ColorPicker'
+
+// Shortcut map
+const shortcuts: Record<string, string> = {
+    'rect-select': 'R', 'ellipse-select': 'E', 'move': 'V', 'crop': 'C',
+    'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
+    'picker': 'O', 'text': 'T', 'zoom': 'Z',
+}
 
 // Tool groups with dividers between them
-// Each tool now has an id
 const toolGroups = [
     [
         { id: 'rect-select', icon: MousePointer, label: 'Rectangle Select' },
-        { id: 'lasso-select', icon: Lasso, label: 'Free Select' },
+        { id: 'ellipse-select', icon: Lasso, label: 'Ellipse Select' },
         { id: 'wand-select', icon: Wand2, label: 'Fuzzy Select' },
     ],
     [
@@ -78,6 +87,9 @@ interface ToolboxProps {
 }
 
 export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxProps) {
+    const { foregroundColor, backgroundColor, setForegroundColor, setBackgroundColor, swapColors, resetColors } = useEditor()
+    const [colorPickerTarget, setColorPickerTarget] = useState<'fg' | 'bg' | null>(null)
+
     return (
         <div className="toolbox">
             <div className="toolbox-handle" />
@@ -87,11 +99,12 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                     {group.map((tool, ti) => {
                         const Icon = tool.icon
                         const isActive = activeTool === tool.id
+                        const shortcut = shortcuts[tool.id]
                         return (
                             <div
                                 key={ti}
                                 className={`toolbox-item${isActive ? ' active' : ''}`}
-                                title={`${tool.label} ${tool.id === 'crop' ? '(C)' : tool.id === 'move' ? '(V)' : ''}`}
+                                title={`${tool.label}${shortcut ? ` (${shortcut})` : ''}`}
                                 onClick={() => onToolSelect?.(tool.id)}
                             >
                                 <Icon size={20} />
@@ -103,15 +116,39 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
             ))}
 
             {/* Foreground/Background color swatches */}
-            <div className="toolbox-colors">
+            <div className="toolbox-colors" style={{ position: 'relative' }}>
                 <div className="toolbox-color-swatches">
-                    <div className="toolbox-color-fg" />
-                    <div className="toolbox-color-bg" />
+                    <div
+                        className="toolbox-color-fg"
+                        style={{ backgroundColor: foregroundColor, cursor: 'pointer' }}
+                        onClick={() => setColorPickerTarget(colorPickerTarget === 'fg' ? null : 'fg')}
+                        title="Foreground Color"
+                    />
+                    <div
+                        className="toolbox-color-bg"
+                        style={{ backgroundColor: backgroundColor, cursor: 'pointer' }}
+                        onClick={() => setColorPickerTarget(colorPickerTarget === 'bg' ? null : 'bg')}
+                        title="Background Color"
+                    />
                 </div>
                 <div className="toolbox-color-actions">
-                    <RotateCcw size={12} />
-                    <ArrowUpDown size={12} />
+                    <span style={{ cursor: 'pointer' }} onClick={resetColors} title="Reset to Default Colors (D)">
+                        <RotateCcw size={12} />
+                    </span>
+                    <span style={{ cursor: 'pointer' }} onClick={swapColors} title="Swap Colors (X)">
+                        <ArrowUpDown size={12} />
+                    </span>
                 </div>
+
+                {/* Color Picker Popover */}
+                {colorPickerTarget && (
+                    <ColorPicker
+                        color={colorPickerTarget === 'fg' ? foregroundColor : backgroundColor}
+                        onChange={(c) => colorPickerTarget === 'fg' ? setForegroundColor(c) : setBackgroundColor(c)}
+                        onClose={() => setColorPickerTarget(null)}
+                        style={{ bottom: '100%', left: 0, marginBottom: 8 }}
+                    />
+                )}
             </div>
         </div>
     )
