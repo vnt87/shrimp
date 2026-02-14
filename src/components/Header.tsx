@@ -61,7 +61,8 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         exportImage,
         closeImage,
         addLayer, deleteLayer, duplicateLayer,
-        activeLayerId, layers
+        activeLayerId, layers,
+        swapColors
     } = useEditor()
 
     // Key handlers
@@ -103,17 +104,33 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                         break
                     case 'd':
                         // Common for "Deselect" in standard image editors
-                        e.preventDefault()
-                        selectNone()
+                        if (isCmd) {
+                            e.preventDefault()
+                            selectNone()
+                        }
+                        break
+                    case 'x':
+                        if (!isCmd) {
+                            e.preventDefault()
+                            swapColors()
+                        }
                         break
                     // 'w' is risky to override (Close Tab), skipping
+                }
+            } else {
+                // Non-cmd shortcuts
+                switch (e.key.toLowerCase()) {
+                    case 'x':
+                        e.preventDefault()
+                        swapColors()
+                        break
                 }
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [undo, redo, canUndo, canRedo, selectAll, selectNone, layers, exportImage]) // Dependencies
+    }, [undo, redo, canUndo, canRedo, selectAll, selectNone, layers, exportImage, swapColors]) // Dependencies
 
     // Click outside handlers
     useEffect(() => {

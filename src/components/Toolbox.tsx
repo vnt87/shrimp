@@ -26,7 +26,7 @@ import {
     ArrowUpDown,
 } from 'lucide-react'
 import { useEditor } from './EditorContext'
-import ColorPicker from './ColorPicker'
+import ColorPickerDialog from './ColorPickerDialog'
 import Tooltip from './Tooltip'
 
 // Shortcut map
@@ -150,13 +150,13 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                     </span>
                 </div>
 
-                {/* Color Picker Popover */}
+                {/* Color Picker Dialog */}
                 {colorPickerTarget && (
-                    <ColorPicker
+                    <ColorPickerDialog
+                        title={colorPickerTarget === 'fg' ? 'Foreground Color' : 'Background Color'}
                         color={colorPickerTarget === 'fg' ? foregroundColor : backgroundColor}
                         onChange={(c) => colorPickerTarget === 'fg' ? setForegroundColor(c) : setBackgroundColor(c)}
                         onClose={() => setColorPickerTarget(null)}
-                        style={{ bottom: '100%', left: 0, marginBottom: 8 }}
                     />
                 )}
             </div>
@@ -167,7 +167,7 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                 targetRect={hoveredRect}
                 offset={10}
             />
-        </div>
+        </div >
     )
 }
 

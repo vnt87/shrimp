@@ -2688,10 +2688,8 @@ body,
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: transparent;
-  /* Or var(--overlay-bg) if we want a dimmer */
-  pointer-events: none;
-  /* Let clicks pass through to canvas if not on dialog? No, usually overlays block. */
+  background: var(--overlay-bg);
+  pointer-events: auto;
   z-index: 9000;
   display: flex;
   align-items: center;
