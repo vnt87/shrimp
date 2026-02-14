@@ -14,6 +14,20 @@ export interface ToolOptions {
     brushHardness: number
     fillThreshold: number
     antialiasing: boolean
+    // Text tools
+    fontSize: number
+    fontFamily: string
+    textColor: string
+    textAlign: 'left' | 'center' | 'right' | 'justify'
+    textBold: boolean
+    textItalic: boolean
+    textLetterSpacing: number
+    // Crop tools
+    cropDeletePixels: boolean
+    cropFixedRatio: boolean
+    cropAspectRatio: number
+    cropHighlightOpacity: number
+    cropGuides: 'none' | 'center' | 'thirds' | 'fifth'
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -22,6 +36,18 @@ const defaultToolOptions: ToolOptions = {
     brushHardness: 100,
     fillThreshold: 15,
     antialiasing: true,
+    fontSize: 24,
+    fontFamily: 'Arial',
+    textColor: '#000000',
+    textAlign: 'left',
+    textBold: false,
+    textItalic: false,
+    textLetterSpacing: 0,
+    cropDeletePixels: true,
+    cropFixedRatio: false,
+    cropAspectRatio: 1,
+    cropHighlightOpacity: 50,
+    cropGuides: 'thirds',
 }
 
 export default function App() {

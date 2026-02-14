@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { extend, useTick } from '@pixi/react'
 import { Graphics } from 'pixi.js'
 import type { Selection } from './EditorContext'
@@ -11,35 +11,44 @@ interface SelectionOverlayProps {
 
 /**
  * GPU-rendered marching ants selection overlay using Pixi.js Graphics.
- * Animates the dash offset every frame for the classic "marching ants" effect.
+ * Uses useState for dashOffset so the component re-renders every frame,
+ * producing a smooth "marching ants" animation even when the cursor is still.
  */
 export default function SelectionOverlay({ selection }: SelectionOverlayProps) {
-    const dashOffset = useRef(0)
+    const [dashOffset, setDashOffset] = useState(0)
 
-    // Animate the dash offset for the marching ants effect
-    useTick(useCallback(() => {
-        dashOffset.current = (dashOffset.current + 0.5) % 16
-    }, []))
+    // Animate the dash offset every render frame
+    useTick(() => {
+        setDashOffset(prev => (prev + 0.5) % 16)
+    })
 
     const draw = useCallback(
         (g: Graphics) => {
             g.clear()
 
             const { x, y, width, height, type } = selection
-            if (width === 0 && height === 0) return
+            if (width === 0 && height === 0 && type !== 'path') return
 
-            const offset = dashOffset.current
+            const offset = dashOffset
 
             // Draw black solid outline (background)
             if (type === 'ellipse') {
                 g.ellipse(x + width / 2, y + height / 2, Math.abs(width / 2), Math.abs(height / 2))
+            } else if (type === 'path' && selection.path) {
+                const points = selection.path
+                if (points.length > 1) {
+                    g.moveTo(points[0].x, points[0].y)
+                    for (let i = 1; i < points.length; i++) {
+                        g.lineTo(points[i].x, points[i].y)
+                    }
+                    g.closePath()
+                }
             } else {
                 g.rect(x, y, width, height)
             }
             g.stroke({ width: 1, color: 0x000000, alpha: 0.7 })
 
             // Draw white dashed outline (foreground, animated)
-            // We simulate dashes by drawing small line segments
             const dashLength = 4
             const gapLength = 4
             const strokeStyle = { width: 1, color: 0xffffff, alpha: 1 }
@@ -79,13 +88,43 @@ export default function SelectionOverlay({ selection }: SelectionOverlayProps) {
                     }
                 }
                 g.stroke(strokeStyle)
+            } else if (type === 'path' && selection.path) {
+                // Path selection (Lasso / Magic Wand)
+                const points = selection.path
+                if (points.length < 2) return
+
+                for (let i = 0; i < points.length; i++) {
+                    const p1 = points[i]
+                    const p2 = points[(i + 1) % points.length]
+
+                    const dx = p2.x - p1.x
+                    const dy = p2.y - p1.y
+                    const edgeLen = Math.sqrt(dx * dx + dy * dy)
+                    if (edgeLen === 0) continue
+
+                    const ux = dx / edgeLen
+                    const uy = dy / edgeLen
+
+                    let pos = -offset % (dashLength + gapLength)
+                    while (pos < edgeLen) {
+                        const start = Math.max(0, pos)
+                        const end = Math.min(edgeLen, pos + dashLength)
+                        if (end > start && start < edgeLen) {
+                            g.moveTo(p1.x + ux * start, p1.y + uy * start)
+                            g.lineTo(p1.x + ux * end, p1.y + uy * end)
+                        }
+                        pos += dashLength + gapLength
+                    }
+                }
+                g.stroke(strokeStyle)
+
             } else {
                 // Rectangle: draw four edges with dashes
                 const edges = [
-                    [x, y, x + width, y],           // top
-                    [x + width, y, x + width, y + height], // right
-                    [x + width, y + height, x, y + height], // bottom
-                    [x, y + height, x, y],           // left
+                    [x, y, x + width, y],
+                    [x + width, y, x + width, y + height],
+                    [x + width, y + height, x, y + height],
+                    [x, y + height, x, y],
                 ]
 
                 for (const [x1, y1, x2, y2] of edges) {
@@ -111,7 +150,7 @@ export default function SelectionOverlay({ selection }: SelectionOverlayProps) {
                 g.stroke(strokeStyle)
             }
         },
-        [selection, dashOffset.current]
+        [selection, dashOffset]
     )
 
     return <pixiGraphics draw={draw} />

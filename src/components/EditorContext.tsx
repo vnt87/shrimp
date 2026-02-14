@@ -18,9 +18,20 @@ export interface Layer {
     filters: LayerFilter[]         // Non-destructive GPU filter stack
     x: number
     y: number
-    type: 'layer' | 'group'
+    type: 'layer' | 'group' | 'text'
     children?: Layer[] // For groups
     expanded?: boolean
+    // Text specific
+    text?: string
+    textStyle?: {
+        fontFamily: string
+        fontSize: number
+        fill: string
+        align?: 'left' | 'center' | 'right' | 'justify'
+        fontWeight?: string
+        fontStyle?: string
+        letterSpacing?: number
+    }
 }
 
 export interface Selection {
@@ -68,6 +79,7 @@ interface EditorContextType {
     // Actions
     setCanvasSize: (size: { width: number; height: number }) => void
     addLayer: (name?: string, initialData?: HTMLCanvasElement) => string
+    addTextLayer: (text: string, style: { fontFamily: string, fontSize: number, fill: string, align?: 'left' | 'center' | 'right' | 'justify', fontWeight?: string, fontStyle?: string, letterSpacing?: number }, x: number, y: number) => string
     deleteLayer: (id: string) => void
     setActiveLayer: (id: string) => void
     toggleLayerVisibility: (id: string) => void
@@ -76,6 +88,7 @@ interface EditorContextType {
     setLayerBlendMode: (id: string, mode: string) => void
     updateLayerData: (id: string, canvas: HTMLCanvasElement) => void
     updateLayerPosition: (id: string, x: number, y: number) => void
+    updateLayerText: (id: string, text: string) => void
     addFilter: (layerId: string, filter: LayerFilter) => void
     removeFilter: (layerId: string, filterIndex: number) => void
     updateFilter: (layerId: string, filterIndex: number, params: Record<string, number>) => void
@@ -100,7 +113,7 @@ interface EditorContextType {
     canUndo: boolean
     canRedo: boolean
     addToHistory: () => void
-    cropCanvas: (x: number, y: number, width: number, height: number) => void
+    cropCanvas: (x: number, y: number, width: number, height: number, deletePixels?: boolean) => void
     closeImage: () => void
 
     // Layer management
@@ -336,6 +349,33 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         return newLayerId
     }, [updateState])
 
+    const addTextLayer = useCallback((text: string, style: { fontFamily: string; fontSize: number; fill: string; align?: 'left' | 'center' | 'right' | 'justify', fontWeight?: string, fontStyle?: string, letterSpacing?: number }, x: number, y: number) => {
+        let newLayerId = ''
+        updateState((prevState) => {
+            const newLayer: Layer = {
+                id: Math.random().toString(36).substr(2, 9),
+                name: text.substring(0, 20) || 'Text Layer',
+                visible: true,
+                locked: false,
+                opacity: 100,
+                blendMode: 'normal',
+                data: null,
+                filters: [],
+                x: x,
+                y: y,
+                type: 'text',
+                text,
+                textStyle: style
+            }
+            newLayerId = newLayer.id
+            return {
+                layers: [newLayer, ...prevState.layers],
+                activeLayerId: newLayer.id
+            }
+        })
+        return newLayerId
+    }, [updateState])
+
     const updateLayerPosition = useCallback((id: string, x: number, y: number) => {
         updateState(prevState => ({
             layers: updateLayerInTree(prevState.layers, id, { x, y })
@@ -406,6 +446,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const updateLayerData = useCallback((id: string, canvas: HTMLCanvasElement) => {
         updateState(prevState => ({
             layers: updateLayerInTree(prevState.layers, id, { data: canvas })
+        }))
+    }, [updateState])
+
+    const updateLayerText = useCallback((id: string, text: string) => {
+        updateState(prevState => ({
+            layers: updateLayerInTree(prevState.layers, id, { text, name: text.substring(0, 20) })
         }))
     }, [updateState])
 
@@ -810,29 +856,71 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }, [updateState])
 
 
-    const cropCanvas = useCallback((x: number, y: number, width: number, height: number) => {
+    const cropCanvas = useCallback((x: number, y: number, width: number, height: number, deletePixels: boolean = true) => {
         updateState(prevState => {
-            const cropRecursive = (list: Layer[]): Layer[] => {
-                return list.map(layer => {
-                    let newData = layer.data
-                    if (layer.data) {
-                        const newCanvas = document.createElement('canvas')
-                        newCanvas.width = width
-                        newCanvas.height = height
-                        const ctx = newCanvas.getContext('2d')
-                        if (ctx) {
-                            ctx.drawImage(layer.data, -x, -y)
+            if (deletePixels) {
+                // Destructive crop (original behavior)
+                const cropRecursive = (list: Layer[]): Layer[] => {
+                    return list.map(layer => {
+                        let newData = layer.data
+                        if (layer.data) {
+                            const newCanvas = document.createElement('canvas')
+                            newCanvas.width = width
+                            newCanvas.height = height
+                            const ctx = newCanvas.getContext('2d')
+                            if (ctx) {
+                                // Draw the portion of the layer that intersects with the crop area
+                                // Layer is at layer.x, layer.y
+                                // Crop area is at x, y
+                                // We want to draw layer at (layer.x - x, layer.y - y)
+                                ctx.drawImage(layer.data, layer.x - x, layer.y - y)
+                            }
+                            newData = newCanvas
                         }
-                        newData = newCanvas
-                    }
-                    if (layer.children) {
-                        return { ...layer, data: newData, children: cropRecursive(layer.children) }
-                    }
-                    return { ...layer, data: newData }
-                })
-            }
+                        const newChildren = layer.children ? cropRecursive(layer.children) : undefined
 
-            return { canvasSize: { width, height }, layers: cropRecursive(prevState.layers) }
+                        // Update position: layer is now relative to new 0,0 (which was x,y)
+                        // But since we redrew the data into a new canvas at 0,0, the layer position should be 0,0?
+                        // Wait, if we redraw, we lose the original layer bounds if we just draw at 0,0.
+                        // Actually, GIMP crop usually resets layer positions or crops them.
+                        // In our previous implementation: `ctx.drawImage(layer.data, -x, -y)`
+                        // This assumed layer was at 0,0? No, `layer.data` is the canvas.
+                        // The previous implementation was likely buggy if layers were moved.
+
+                        // Correct logic for destructive crop:
+                        // 1. Create new canvas of crop size.
+                        // 2. Draw existing layer onto it, offset by (layer.x - cropX, layer.y - cropY).
+                        // 3. Set layer.x, layer.y to 0? Or keep them relative?
+                        // If we draw exactly what's visible in the crop rect, the new layer data represents the cropped view.
+                        // So layer.x/y should become 0 (relative to the new canvas origin).
+                        // However, if the layer was smaller and inside the crop, we might want to keep it minimal?
+                        // GIMP standard crop: Layers are clipped to the selection.
+
+                        return {
+                            ...layer,
+                            data: newData,
+                            x: 0,
+                            y: 0,
+                            children: newChildren
+                        }
+                    })
+                }
+                return { canvasSize: { width, height }, layers: cropRecursive(prevState.layers) }
+            } else {
+                // Non-destructive crop: Just change canvas size and shift layers
+                const shiftRecursive = (list: Layer[]): Layer[] => {
+                    return list.map(layer => {
+                        const newChildren = layer.children ? shiftRecursive(layer.children) : undefined
+                        return {
+                            ...layer,
+                            x: layer.x - x,
+                            y: layer.y - y,
+                            children: newChildren
+                        }
+                    })
+                }
+                return { canvasSize: { width, height }, layers: shiftRecursive(prevState.layers) }
+            }
         })
     }, [updateState])
 
@@ -1099,6 +1187,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             // Canvas actions
             setCanvasSize: setCanvasSizeWrapper,
             addLayer,
+            addTextLayer,
             deleteLayer,
             setActiveLayer,
             toggleLayerVisibility,
@@ -1107,6 +1196,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setLayerBlendMode,
             updateLayerData,
             updateLayerPosition,
+            updateLayerText,
             addFilter,
             removeFilter,
             setSelection: setSelectionWrapper,

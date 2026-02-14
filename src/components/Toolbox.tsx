@@ -39,9 +39,10 @@ const shortcuts: Record<string, string> = {
 // Tool groups with dividers between them
 const toolGroups = [
     [
-        { id: 'rect-select', icon: MousePointer, label: 'Rectangle Select' },
-        { id: 'ellipse-select', icon: Lasso, label: 'Ellipse Select' },
-        { id: 'wand-select', icon: Wand2, label: 'Fuzzy Select' },
+        { id: 'rect-select', icon: MousePointer, label: 'Rect Select' },
+        { id: 'ellipse-select', icon: CircleDot, label: 'Ellipse Select' }, // Use CircleDot for Ellipse
+        { id: 'lasso-select', icon: Lasso, label: 'Lasso Select' },       // Add proper Lasso
+        { id: 'wand-select', icon: Wand2, label: 'Magic Wand' },
     ],
     [
         { id: 'scissors', icon: Scissors, label: 'Scissors' },
