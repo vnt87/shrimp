@@ -22,7 +22,53 @@ import {
     CircleDot,
     Anchor,
 } from 'lucide-react'
-import { useEditor } from './EditorContext'
+import { useEffect, useRef } from 'react'
+import { useEditor, Layer } from './EditorContext'
+
+function LayerThumbnail({ layer }: { layer: Layer }) {
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+
+    useEffect(() => {
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        // Set thumbnail resolution
+        canvas.width = 64
+        canvas.height = 64
+
+        // Clear
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+        if (layer.data) {
+            // Draw image "contain" style
+            const hRatio = canvas.width / layer.data.width
+            const vRatio = canvas.height / layer.data.height
+            const ratio = Math.min(hRatio, vRatio)
+
+            const w = layer.data.width * ratio
+            const h = layer.data.height * ratio
+            const x = (canvas.width - w) / 2
+            const y = (canvas.height - h) / 2
+
+            ctx.drawImage(
+                layer.data,
+                0,
+                0,
+                layer.data.width,
+                layer.data.height,
+                x,
+                y,
+                w,
+                h
+            )
+        }
+    }, [layer.data])
+
+    return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+}
 
 export default function LayersPanel() {
     const {
@@ -129,8 +175,7 @@ export default function LayersPanel() {
                                 </div>
                             ) : (
                                 <div className="layer-thumb">
-                                    {/* Show actual thumbnail later */}
-                                    <div style={{ width: '100%', height: '100%', background: '#444' }} />
+                                    <LayerThumbnail layer={layer} />
                                 </div>
                             )}
                             <span className={`layer-name${!layer.visible ? ' muted' : ''}`}>

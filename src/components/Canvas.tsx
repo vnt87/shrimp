@@ -461,8 +461,28 @@ export default function Canvas({
         })
     }, [layers.length])
 
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+    }, [])
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        if (e.dataTransfer.files) {
+            Array.from(e.dataTransfer.files).forEach((file) => {
+                if (file.type.startsWith('image/')) {
+                    const url = URL.createObjectURL(file)
+                    loadImage(url, file.name)
+                }
+            })
+        }
+    }, [loadImage])
+
     return (
-        <div className="canvas-area">
+        <div
+            className="canvas-area"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        >
             <input
                 ref={fileInputRef}
                 type="file"

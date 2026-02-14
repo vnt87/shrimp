@@ -13,6 +13,7 @@ import {
     Monitor,
 } from 'lucide-react'
 import PreferencesDialog from './PreferencesDialog'
+import AboutDialog from './AboutDialog'
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
 
@@ -28,7 +29,7 @@ const menuData: Record<string, string[]> = {
     Filters: ['Repeat Last', 'Re-Show Last', 'Reset All Filters', 'Blur', 'Enhance', 'Distorts', 'Light and Shadow', 'Noise', 'Edge-Detect', 'Generic', 'Combine', 'Artistic', 'Decor', 'Map', 'Render', 'Web', 'Animation'],
     'Python-Fu': ['Console', 'Selection', 'Sketch', 'Sphere'],
     Windows: ['Recently Closed Docks', 'Dockable Dialogs', 'Toolbox', 'Hide Docks', 'Single-Window Mode'],
-    Help: ['Help', 'Context Help', 'Tip of the Day', 'About', 'Action Search', 'SHRIMP Online', 'User Manual'],
+    Help: ['Help', 'Context Help', 'Tip of the Day', 'About', 'Action Search', 'Github Source', 'User Manual'],
 }
 
 const themeOptions = [
@@ -42,6 +43,7 @@ export default function Header() {
     const [autosave, setAutosave] = useState(true)
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [showPreferences, setShowPreferences] = useState(false)
+    const [showAbout, setShowAbout] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
     const { theme, setTheme } = useTheme()
@@ -83,7 +85,21 @@ export default function Header() {
                                 {activeMenu === item && (
                                     <div className="header-menu-dropdown">
                                         {menuData[item].map((option, idx) => (
-                                            <div key={idx} className="header-menu-dropdown-item">
+                                            <div
+                                                key={idx}
+                                                className="header-menu-dropdown-item"
+                                                onClick={(e) => {
+                                                    if (option === 'Github Source') {
+                                                        e.stopPropagation()
+                                                        window.open('https://github.com/vnt87/shrimp', '_blank')
+                                                        setActiveMenu(null)
+                                                    } else if (option === 'About') {
+                                                        e.stopPropagation()
+                                                        setShowAbout(true)
+                                                        setActiveMenu(null)
+                                                    }
+                                                }}
+                                            >
                                                 {option}
                                                 {['New...', 'Open...', 'Save', 'Undo', 'Cut', 'Copy', 'Paste'].includes(
                                                     option
@@ -165,6 +181,7 @@ export default function Header() {
             </header>
 
             {showPreferences && <PreferencesDialog onClose={() => setShowPreferences(false)} />}
+            {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
         </>
     )
 }
