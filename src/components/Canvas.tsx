@@ -155,6 +155,10 @@ export default function Canvas({
     const [resizingCheck, setResizingCheck] = useState<'nw' | 'ne' | 'sw' | 'se' | null>(null)
     const resizeStart = useRef<{ x: number; y: number; rect: CropRect } | null>(null)
 
+    // History State
+    const [history, setHistory] = useState<string[]>([])
+    const [historyIndex, setHistoryIndex] = useState(-1)
+
     // Fit image to viewport on load
     const fitImageToView = useCallback(
         (img: HTMLImageElement) => {
@@ -178,19 +182,74 @@ export default function Canvas({
         []
     )
 
-    // Load image helper
+    // Helper to update image and history
+    const updateImage = useCallback((src: string, newFile: boolean = false) => {
+        setImageSrc(src)
+
+        // Load image to fit view
+        const img = new window.Image()
+        img.onload = () => {
+            // We might want to only fit to view on new files, or if dimensions change drastically?
+            // For now, consistent behavior: always fit. 
+            // Improvements: Check if aspect ratio/size allows keeping current transform?
+            // Let's stick to fitting for simplicity and consistent "reset" feeling on undo/redo actions that change dimensions.
+            fitImageToView(img)
+        }
+        img.src = src
+
+        if (newFile) {
+            setHistory([src])
+            setHistoryIndex(0)
+            setFileName((prev) => prev) // Name handles locally
+        } else {
+            setHistory((prev) => {
+                const newHistory = prev.slice(0, historyIndex + 1)
+                newHistory.push(src)
+                return newHistory
+            })
+            setHistoryIndex((prev) => prev + 1)
+        }
+    }, [historyIndex, fitImageToView])
+
+    // Load image helper (entry point for new files)
     const loadImage = useCallback(
         (src: string, name: string) => {
-            setImageSrc(src)
             setFileName(name)
-            setCropRect(null) // Reset crop when loading new image
-            // Wait for render, then fit
+            setCropRect(null)
+            updateImage(src, true)
+        },
+        [updateImage]
+    )
+
+    // Undo/Redo functions
+    const undo = useCallback(() => {
+        if (historyIndex > 0) {
+            const newIndex = historyIndex - 1
+            setHistoryIndex(newIndex)
+            const src = history[newIndex]
+            setImageSrc(src)
+            setCropRect(null)
+
+            // Re-fit?
             const img = new window.Image()
             img.onload = () => fitImageToView(img)
             img.src = src
-        },
-        [fitImageToView]
-    )
+        }
+    }, [historyIndex, history, fitImageToView])
+
+    const redo = useCallback(() => {
+        if (historyIndex < history.length - 1) {
+            const newIndex = historyIndex + 1
+            setHistoryIndex(newIndex)
+            const src = history[newIndex]
+            setImageSrc(src)
+            setCropRect(null)
+
+            const img = new window.Image()
+            img.onload = () => fitImageToView(img)
+            img.src = src
+        }
+    }, [historyIndex, history, fitImageToView])
 
     // Handle loading the sample image
     const handleLoadSample = useCallback(() => {
@@ -258,16 +317,34 @@ export default function Canvas({
         canvas.toBlob((blob) => {
             if (blob) {
                 const url = URL.createObjectURL(blob)
-                loadImage(url, fileName)
                 setCropRect(null)
+                // Add to history
+                updateImage(url, false)
             }
         })
-    }, [cropRect, fileName, loadImage])
+    }, [cropRect, updateImage])
 
     // Space key handling for panning and Enter for crop
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.repeat) return
+
+            // Undo/Redo shortcuts (Ctrl+Z, Cmd+Z, Ctrl+Shift+Z, Cmd+Shift+Z, Cmd+Y)
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault()
+                if (e.shiftKey) {
+                    redo()
+                } else {
+                    undo()
+                }
+                return
+            }
+            // Redo often has Ctrl+Y as alternative
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault()
+                redo()
+                return
+            }
 
             if (e.code === 'Space' && imageSrc) {
                 // Only allow panning if we're not actively dragging a crop handle (though space overrides everything usually)
@@ -294,7 +371,7 @@ export default function Canvas({
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [imageSrc, activeTool, cropRect, applyCrop])
+    }, [imageSrc, activeTool, cropRect, applyCrop, undo, redo])
 
     // Mouse handlers
     const handleMouseDown = useCallback(
