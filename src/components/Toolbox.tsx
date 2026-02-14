@@ -26,52 +26,58 @@ import {
 } from 'lucide-react'
 
 // Tool groups with dividers between them
+// Each tool now has an id
 const toolGroups = [
     [
-        { icon: MousePointer, label: 'Rectangle Select' },
-        { icon: Lasso, label: 'Free Select' },
-        { icon: Wand2, label: 'Fuzzy Select', active: true },
+        { id: 'rect-select', icon: MousePointer, label: 'Rectangle Select' },
+        { id: 'lasso-select', icon: Lasso, label: 'Free Select' },
+        { id: 'wand-select', icon: Wand2, label: 'Fuzzy Select' },
     ],
     [
-        { icon: Scissors, label: 'Scissors' },
-        { icon: Pen, label: 'Paths' },
+        { id: 'scissors', icon: Scissors, label: 'Scissors' },
+        { id: 'paths', icon: Pen, label: 'Paths' },
     ],
     [
-        { icon: Pipette, label: 'Color Picker' },
-        { icon: Ruler, label: 'Measure' },
+        { id: 'picker', icon: Pipette, label: 'Color Picker' },
+        { id: 'measure', icon: Ruler, label: 'Measure' },
     ],
     [
-        { icon: Move, label: 'Move' },
-        { icon: Compass, label: 'Align' },
-        { icon: Crop, label: 'Crop' },
-        { icon: Stamp, label: 'Clone' },
-        { icon: Bandage, label: 'Heal' },
+        { id: 'move', icon: Move, label: 'Move' },
+        { id: 'align', icon: Compass, label: 'Align' },
+        { id: 'crop', icon: Crop, label: 'Crop' },
+        { id: 'clone', icon: Stamp, label: 'Clone' },
+        { id: 'heal', icon: Bandage, label: 'Heal' },
     ],
     [
-        { icon: Paintbrush, label: 'Paintbrush' },
-        { icon: Pencil, label: 'Pencil' },
-        { icon: Blend, label: 'Blur/Sharpen' },
+        { id: 'brush', icon: Paintbrush, label: 'Paintbrush' },
+        { id: 'pencil', icon: Pencil, label: 'Pencil' },
+        { id: 'blur', icon: Blend, label: 'Blur/Sharpen' },
     ],
     [
-        { icon: Eraser, label: 'Eraser' },
-        { icon: PaintBucket, label: 'Bucket Fill' },
-        { icon: CircleDot, label: 'Gradient' },
+        { id: 'eraser', icon: Eraser, label: 'Eraser' },
+        { id: 'bucket', icon: PaintBucket, label: 'Bucket Fill' },
+        { id: 'gradient', icon: CircleDot, label: 'Gradient' },
     ],
     [
-        { icon: Type, label: 'Text' },
+        { id: 'text', icon: Type, label: 'Text' },
     ],
     [
-        { icon: SquareDashedBottom, label: 'Transform' },
+        { id: 'transform', icon: SquareDashedBottom, label: 'Transform' },
     ],
     [
-        { icon: Maximize2, label: 'Zoom' },
+        { id: 'zoom', icon: Maximize2, label: 'Zoom' },
     ],
     [
-        { icon: Hand, label: 'Navigate' },
+        { id: 'navigate', icon: Hand, label: 'Navigate' },
     ],
 ]
 
-export default function Toolbox() {
+interface ToolboxProps {
+    activeTool?: string
+    onToolSelect?: (toolId: string) => void
+}
+
+export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxProps) {
     return (
         <div className="toolbox">
             <div className="toolbox-handle" />
@@ -80,11 +86,13 @@ export default function Toolbox() {
                 <div key={gi}>
                     {group.map((tool, ti) => {
                         const Icon = tool.icon
+                        const isActive = activeTool === tool.id
                         return (
                             <div
                                 key={ti}
-                                className={`toolbox-item${tool.active ? ' active' : ''}`}
-                                title={tool.label}
+                                className={`toolbox-item${isActive ? ' active' : ''}`}
+                                title={`${tool.label} ${tool.id === 'crop' ? '(C)' : tool.id === 'move' ? '(V)' : ''}`}
+                                onClick={() => onToolSelect?.(tool.id)}
                             >
                                 <Icon size={20} />
                             </div>

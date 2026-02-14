@@ -8,6 +8,13 @@ interface CanvasTransform {
     scale: number
 }
 
+interface CropRect {
+    x: number
+    y: number
+    width: number
+    height: number
+}
+
 function Ruler({
     orientation,
     transform,
@@ -119,8 +126,10 @@ function Ruler({
 
 export default function Canvas({
     onCursorMove,
+    activeTool = 'move',
 }: {
     onCursorMove?: (pos: { x: number; y: number } | null) => void
+    activeTool?: string
 }) {
     const [imageSrc, setImageSrc] = useState<string | null>(null)
     const [fileName, setFileName] = useState<string>('')
@@ -136,6 +145,15 @@ export default function Canvas({
     const viewportRef = useRef<HTMLDivElement>(null)
     const imageRef = useRef<HTMLImageElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Crop State
+    const [cropRect, setCropRect] = useState<CropRect | null>(null)
+    const [isCropping, setIsCropping] = useState(false)
+    const cropStart = useRef<{ x: number; y: number } | null>(null)
+
+    // Resizing State
+    const [resizingCheck, setResizingCheck] = useState<'nw' | 'ne' | 'sw' | 'se' | null>(null)
+    const resizeStart = useRef<{ x: number; y: number; rect: CropRect } | null>(null)
 
     // Fit image to viewport on load
     const fitImageToView = useCallback(
@@ -165,6 +183,7 @@ export default function Canvas({
         (src: string, name: string) => {
             setImageSrc(src)
             setFileName(name)
+            setCropRect(null) // Reset crop when loading new image
             // Wait for render, then fit
             const img = new window.Image()
             img.onload = () => fitImageToView(img)
@@ -214,12 +233,52 @@ export default function Canvas({
         }
     }, [loadImage])
 
-    // Space key handling for panning
+    // Apply Crop
+    const applyCrop = useCallback(() => {
+        if (!imageRef.current || !cropRect) return
+
+        const img = imageRef.current
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        // Ensure crop rect is within bounds and positive
+        const x = Math.max(0, cropRect.x)
+        const y = Math.max(0, cropRect.y)
+        const width = Math.min(img.naturalWidth - x, cropRect.width)
+        const height = Math.min(img.naturalHeight - y, cropRect.height)
+
+        if (width <= 0 || height <= 0) return
+
+        canvas.width = width
+        canvas.height = height
+
+        ctx.drawImage(img, x, y, width, height, 0, 0, width, height)
+
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const url = URL.createObjectURL(blob)
+                loadImage(url, fileName)
+                setCropRect(null)
+            }
+        })
+    }, [cropRect, fileName, loadImage])
+
+    // Space key handling for panning and Enter for crop
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.code === 'Space' && !e.repeat && imageSrc) {
+            if (e.repeat) return
+
+            if (e.code === 'Space' && imageSrc) {
+                // Only allow panning if we're not actively dragging a crop handle (though space overrides everything usually)
                 e.preventDefault()
                 setIsSpaceHeld(true)
+            } else if (e.key === 'Enter' && activeTool === 'crop' && cropRect) {
+                e.preventDefault()
+                applyCrop()
+            } else if (e.key === 'Escape' && activeTool === 'crop') {
+                e.preventDefault()
+                setCropRect(null)
             }
         }
         const handleKeyUp = (e: KeyboardEvent) => {
@@ -235,11 +294,12 @@ export default function Canvas({
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [imageSrc])
+    }, [imageSrc, activeTool, cropRect, applyCrop])
 
-    // Mouse handlers for panning
+    // Mouse handlers
     const handleMouseDown = useCallback(
         (e: React.MouseEvent) => {
+            // Panning takes precedence if Space is held
             if (isSpaceHeld) {
                 e.preventDefault()
                 setIsPanning(true)
@@ -250,14 +310,49 @@ export default function Canvas({
                     offsetX: transform.offsetX,
                     offsetY: transform.offsetY,
                 }
+                return
+            }
+
+            // Check if clicking a handle
+            if (activeTool === 'crop' && cropRect) {
+                const target = e.target as HTMLElement
+                if (target.classList.contains('crop-handle')) {
+                    const handle = target.classList.contains('nw') ? 'nw' :
+                        target.classList.contains('ne') ? 'ne' :
+                            target.classList.contains('sw') ? 'sw' : 'se'
+                    setResizingCheck(handle)
+                    resizeStart.current = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        rect: { ...cropRect }
+                    }
+                    e.stopPropagation()
+                    return
+                }
+            }
+
+            // Crop Tool Logic (New Crop)
+            if (activeTool === 'crop' && imageSrc && viewportRef.current) {
+                // Only start new crop if we aren't clicking inside an existing one?
+                // For now, let's assume clicking outside resets, or dragging starts new.
+                // Simple: always start new if not hitting handle (and maybe later check if inside rect to move it)
+
+                const rect = viewportRef.current.getBoundingClientRect()
+                const x = (e.clientX - rect.left - transform.offsetX) / transform.scale
+                const y = (e.clientY - rect.top - transform.offsetY) / transform.scale
+
+                setIsCropping(true)
+                cropStart.current = { x, y }
+                setCropRect({ x, y, width: 0, height: 0 })
+                return
             }
         },
-        [isSpaceHeld, transform]
+        [isSpaceHeld, activeTool, imageSrc, transform, cropRect]
     )
 
     const handleMouseMove = useCallback(
         (e: React.MouseEvent) => {
-            if (isDragging) {
+            if (isSpaceHeld && isDragging) {
                 const dx = e.clientX - dragStart.current.x
                 const dy = e.clientY - dragStart.current.y
                 setTransform((prev) => ({
@@ -265,13 +360,70 @@ export default function Canvas({
                     offsetX: dragStart.current.offsetX + dx,
                     offsetY: dragStart.current.offsetY + dy,
                 }))
+            } else if (activeTool === 'crop' && resizingCheck && resizeStart.current && viewportRef.current) {
+                // Resizing Logic
+                const rect = viewportRef.current.getBoundingClientRect()
+                const currentX = (e.clientX - rect.left - transform.offsetX) / transform.scale
+                const currentY = (e.clientY - rect.top - transform.offsetY) / transform.scale
+
+                const startRect = resizeStart.current.rect
+                let newX = startRect.x
+                let newY = startRect.y
+                let newW = startRect.width
+                let newH = startRect.height
+
+                // Helper to keep aspect ratio or just free resize? Free for now.
+                if (resizingCheck === 'se') {
+                    newW = currentX - startRect.x
+                    newH = currentY - startRect.y
+                } else if (resizingCheck === 'sw') {
+                    newX = currentX
+                    newW = (startRect.x + startRect.width) - currentX
+                    newH = currentY - startRect.y
+                } else if (resizingCheck === 'ne') {
+                    newY = currentY
+                    newW = currentX - startRect.x
+                    newH = (startRect.y + startRect.height) - currentY
+                } else if (resizingCheck === 'nw') {
+                    newX = currentX
+                    newY = currentY
+                    newW = (startRect.x + startRect.width) - currentX
+                    newH = (startRect.y + startRect.height) - currentY
+                }
+
+                // Normalize negatives
+                if (newW < 0) {
+                    newX += newW
+                    newW = Math.abs(newW)
+                    // Flip handle logic if we cross over? For simplicity, just behave weirdly or fix handle?
+                    // A robust implementation swaps handles. For this iteration, let's just allow it.
+                }
+                if (newH < 0) {
+                    newY += newH
+                    newH = Math.abs(newH)
+                }
+
+                setCropRect({ x: newX, y: newY, width: newW, height: newH })
+            } else if (activeTool === 'crop' && isCropping && cropStart.current && viewportRef.current) {
+                // Creating Logic
+                const rect = viewportRef.current.getBoundingClientRect()
+                const currentX = (e.clientX - rect.left - transform.offsetX) / transform.scale
+                const currentY = (e.clientY - rect.top - transform.offsetY) / transform.scale
+
+                const startX = cropStart.current.x
+                const startY = cropStart.current.y
+
+                const width = Math.abs(currentX - startX)
+                const height = Math.abs(currentY - startY)
+                const x = Math.min(startX, currentX)
+                const y = Math.min(startY, currentY)
+
+                setCropRect({ x, y, width, height })
             }
 
             // Cursor position tracking
             if (imageSrc && viewportRef.current && onCursorMove) {
                 const rect = viewportRef.current.getBoundingClientRect()
-                // Calculate position relative to the image
-                // Image is at (offsetX, offsetY) with scale
                 const x = Math.round(
                     (e.clientX - rect.left - transform.offsetX) / transform.scale
                 )
@@ -281,7 +433,7 @@ export default function Canvas({
                 onCursorMove({ x, y })
             }
         },
-        [isDragging, imageSrc, transform, onCursorMove]
+        [isSpaceHeld, isDragging, activeTool, isCropping, resizingCheck, imageSrc, transform, onCursorMove]
     )
 
     const handleMouseUp = useCallback(() => {
@@ -289,6 +441,10 @@ export default function Canvas({
         if (!isSpaceHeld) {
             setIsPanning(false)
         }
+        setIsCropping(false)
+        cropStart.current = null
+        setResizingCheck(null)
+        resizeStart.current = null
     }, [isSpaceHeld])
 
     const handleMouseLeave = useCallback(() => {
@@ -358,6 +514,7 @@ export default function Canvas({
                                     setImageSrc(null)
                                     setFileName('')
                                     setTransform({ offsetX: 0, offsetY: 0, scale: 1 })
+                                    setCropRect(null)
                                     if (onCursorMove) onCursorMove(null)
                                 }}
                             >
@@ -391,7 +548,9 @@ export default function Canvas({
                                 ? 'panning-active'
                                 : isSpaceHeld
                                     ? 'panning-ready'
-                                    : ''
+                                    : activeTool === 'crop'
+                                        ? 'crosshair'
+                                        : ''
                                 }`}
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
@@ -403,6 +562,7 @@ export default function Canvas({
                                 className="canvas-infinite"
                                 style={{
                                     transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
+                                    transformOrigin: '0 0',
                                 }}
                             >
                                 <img
@@ -415,6 +575,22 @@ export default function Canvas({
                                         fitImageToView(e.target as HTMLImageElement)
                                     }
                                 />
+                                {activeTool === 'crop' && cropRect && (
+                                    <div
+                                        className="crop-overlay"
+                                        style={{
+                                            left: `${cropRect.x}px`,
+                                            top: `${cropRect.y}px`,
+                                            width: `${cropRect.width}px`,
+                                            height: `${cropRect.height}px`,
+                                        }}
+                                    >
+                                        <div className="crop-handle nw" />
+                                        <div className="crop-handle ne" />
+                                        <div className="crop-handle sw" />
+                                        <div className="crop-handle se" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
