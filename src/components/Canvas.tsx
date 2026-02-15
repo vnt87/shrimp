@@ -574,7 +574,7 @@ export default function Canvas({
     const lastDrawPoint = useRef<{ x: number; y: number } | null>(null)
 
     // --- Drawing helper: draw stroke segment ---
-    const drawStrokeTo = useCallback((canvasX: number, canvasY: number, isFirst: boolean) => {
+    const drawStrokeTo = useCallback((canvasX: number, canvasY: number, isFirst: boolean, history: boolean = true) => {
         if (!activeLayerId) return
         const layer = layers.find((l: Layer) => l.id === activeLayerId)
         if (!layer || !layer.data || layer.locked) return
@@ -635,7 +635,7 @@ export default function Canvas({
         newCanvas.height = layer.data.height
         const newCtx = newCanvas.getContext('2d')
         newCtx?.drawImage(layer.data, 0, 0)
-        updateLayerData(activeLayerId, newCanvas)
+        updateLayerData(activeLayerId, newCanvas, history)
     }, [activeLayerId, layers, activeTool, toolOptions, foregroundColor, updateLayerData])
 
     const isPointInSelection = useCallback((x: number, y: number) => {
@@ -1261,9 +1261,10 @@ export default function Canvas({
         } else if (activeTool === 'wand-select') {
             magicWandSelect(canvasX, canvasY)
         } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser') {
+            setIsDragging(true)
             isDrawing.current = true
             lastDrawPoint.current = null
-            drawStrokeTo(canvasX, canvasY, true)
+            drawStrokeTo(canvasX, canvasY, true, false)
         } else if (activeTool === 'bucket') {
             floodFill(canvasX, canvasY)
         } else if (activeTool === 'picker') {
@@ -1354,7 +1355,8 @@ export default function Canvas({
             updateLayerPosition(
                 activeLayerId,
                 dragStart.current.layerX + dx,
-                dragStart.current.layerY + dy
+                dragStart.current.layerY + dy,
+                false
             )
         } else if (activeTool === 'lasso-select' && isLassoing.current) {
             currentLassoPath.current.push({ x: canvasX, y: canvasY })
@@ -1395,7 +1397,7 @@ export default function Canvas({
                 height
             })
         } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser')) {
-            drawStrokeTo(canvasX, canvasY, false)
+            drawStrokeTo(canvasX, canvasY, false, false)
         }
 
     }, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo])
@@ -1407,9 +1409,22 @@ export default function Canvas({
         isLassoing.current = false
 
         // Finish drawing stroke
-        if (isDrawing.current) {
+        if (isDrawing.current && activeLayerId) {
+            const layer = layers.find(l => l.id === activeLayerId)
+            if (layer && layer.data) {
+                // Commit final state to history
+                updateLayerData(activeLayerId, layer.data, true)
+            }
             isDrawing.current = false
             lastDrawPoint.current = null
+        }
+
+        // Commit move to history
+        if (activeTool === 'move' && isDragging && activeLayerId) {
+            const layer = layers.find(l => l.id === activeLayerId)
+            if (layer) {
+                updateLayerPosition(activeLayerId, layer.x, layer.y, true)
+            }
         }
 
         // Finish guide dragging
@@ -1450,7 +1465,7 @@ export default function Canvas({
             setDraggingGuideId(null)
         }
 
-    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide])
+    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition])
 
     // Global event listeners for dragging
     useEffect(() => {

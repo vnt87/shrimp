@@ -10,6 +10,7 @@ type HistoryAction<T> =
     | { type: 'UNDO' }
     | { type: 'REDO' }
     | { type: 'SET', newPresent: T | ((prev: T) => T) }
+    | { type: 'REPLACE', newPresent: T | ((prev: T) => T) }
     | { type: 'CLEAR', initialPresent: T }
 
 const initialState = <T>(initialPresent: T): HistoryState<T> => ({
@@ -51,6 +52,16 @@ function historyReducer<T>(state: HistoryState<T>, action: HistoryAction<T>): Hi
                 present: nextPresent,
                 future: [],
             }
+        case 'REPLACE':
+            const replacedPresent = action.newPresent instanceof Function
+                ? (action.newPresent as (prev: T) => T)(present)
+                : action.newPresent
+
+            if (replacedPresent === present) return state
+            return {
+                ...state,
+                present: replacedPresent,
+            }
         case 'CLEAR':
             return initialState(action.initialPresent)
         default:
@@ -67,6 +78,7 @@ export function useHistory<T>(initialPresent: T) {
     const undo = useCallback(() => dispatch({ type: 'UNDO' }), [])
     const redo = useCallback(() => dispatch({ type: 'REDO' }), [])
     const set = useCallback((newPresent: T | ((prev: T) => T)) => dispatch({ type: 'SET', newPresent }), [])
+    const replace = useCallback((newPresent: T | ((prev: T) => T)) => dispatch({ type: 'REPLACE', newPresent }), [])
     const clear = useCallback((initialPresent: T) => dispatch({ type: 'CLEAR', initialPresent }), [])
 
     return {
@@ -74,6 +86,7 @@ export function useHistory<T>(initialPresent: T) {
         set,
         undo,
         redo,
+        replace,
         clear,
         canUndo,
         canRedo,

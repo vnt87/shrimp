@@ -101,10 +101,10 @@ interface EditorContextType {
     toggleLayerLock: (id: string) => void
     setLayerOpacity: (id: string, opacity: number) => void
     setLayerBlendMode: (id: string, mode: string) => void
-    updateLayerData: (id: string, canvas: HTMLCanvasElement) => void
-    updateLayerPosition: (id: string, x: number, y: number) => void
+    updateLayerData: (id: string, canvas: HTMLCanvasElement, history?: boolean) => void
+    updateLayerPosition: (id: string, x: number, y: number, history?: boolean) => void
     updateLayerText: (id: string, text: string) => void
-    updateLayerTextStyle: (id: string, style: Partial<NonNullable<Layer['textStyle']>>) => void
+    updateLayerTextStyle: (id: string, style: Partial<NonNullable<Layer['textStyle']>>, history?: boolean) => void
     addFilter: (layerId: string, filter: LayerFilter) => void
     removeFilter: (layerId: string, filterIndex: number) => void
     updateFilter: (layerId: string, filterIndex: number, params: Record<string, number>) => void
@@ -182,6 +182,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const {
         state: historyState,
         set: setHistoryState,
+        replace: replaceHistoryState,
         undo,
         redo,
         canUndo,
@@ -242,6 +243,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             }
         })
     }, [setHistoryState])
+
+    const replaceState = useCallback((updates: Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>)) => {
+        replaceHistoryState(prevFullState => {
+            const newPart = typeof updates === 'function' ? updates(prevFullState) : updates
+            return {
+                ...prevFullState,
+                ...newPart
+            }
+        })
+    }, [replaceHistoryState])
 
     // --- Helpers for recursive layer operations ---
 
@@ -398,11 +409,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         return newLayerId
     }, [updateState])
 
-    const updateLayerPosition = useCallback((id: string, x: number, y: number) => {
-        updateState(prevState => ({
+    const updateLayerPosition = useCallback((id: string, x: number, y: number, history: boolean = true) => {
+        const updater = (prevState: EditorState) => ({
             layers: updateLayerInTree(prevState.layers, id, { x, y })
-        }))
-    }, [updateState])
+        })
+        if (history) updateState(updater)
+        else replaceState(updater)
+    }, [updateState, replaceState])
 
     const deleteLayer = useCallback((id: string) => {
         updateState(prevState => {
@@ -465,11 +478,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         }))
     }, [updateState])
 
-    const updateLayerData = useCallback((id: string, canvas: HTMLCanvasElement) => {
-        updateState(prevState => ({
+    const updateLayerData = useCallback((id: string, canvas: HTMLCanvasElement, history: boolean = true) => {
+        const updater = (prevState: EditorState) => ({
             layers: updateLayerInTree(prevState.layers, id, { data: canvas })
-        }))
-    }, [updateState])
+        })
+        if (history) updateState(updater)
+        else replaceState(updater)
+    }, [updateState, replaceState])
 
     const updateLayerText = useCallback((id: string, text: string) => {
         updateState(prevState => ({
@@ -477,16 +492,18 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         }))
     }, [updateState])
 
-    const updateLayerTextStyle = useCallback((id: string, style: Partial<NonNullable<Layer['textStyle']>>) => {
-        updateState(prevState => {
+    const updateLayerTextStyle = useCallback((id: string, style: Partial<NonNullable<Layer['textStyle']>>, history: boolean = true) => {
+        const updater = (prevState: EditorState) => {
             const layer = findLayerById(prevState.layers, id)
             if (!layer || layer.type !== 'text') return {}
             const newStyle = { ...layer.textStyle, ...style } as any
             return {
                 layers: updateLayerInTree(prevState.layers, id, { textStyle: newStyle })
             }
-        })
-    }, [updateState])
+        }
+        if (history) updateState(updater)
+        else replaceState(updater)
+    }, [updateState, replaceState])
 
     const addFilter = useCallback((layerId: string, filter: LayerFilter) => {
         updateState(prevState => {
