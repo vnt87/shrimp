@@ -43,6 +43,20 @@ export interface Selection {
     path?: { x: number; y: number }[]
 }
 
+export interface PathPoint {
+    x: number
+    y: number
+    handleIn: { x: number; y: number } | null
+    handleOut: { x: number; y: number } | null
+    type: 'corner' | 'smooth'
+}
+
+export interface Path {
+    id: string
+    points: PathPoint[]
+    closed: boolean
+}
+
 export interface Guide {
     id: string
     orientation: 'horizontal' | 'vertical'
@@ -67,6 +81,7 @@ interface EditorContextType {
     canvasSize: { width: number; height: number }
     selection: Selection | null
     guides: Guide[]
+    activePath: Path | null
 
     // Colors
     foregroundColor: string
@@ -131,6 +146,10 @@ interface EditorContextType {
     removeGuide: (id: string) => void
     updateGuide: (id: string, position: number) => void
 
+    // Path actions
+    setActivePath: (path: Path | null) => void
+    updatePath: (path: Path) => void
+
     // Transform
     transientTransforms: Record<string, TransformData>
     setTransientTransform: (layerId: string, transform: TransformData | null) => void
@@ -146,6 +165,7 @@ interface EditorState {
     canvasSize: { width: number; height: number }
     selection: Selection | null
     guides: Guide[]
+    activePath: Path | null
 }
 
 export function EditorProvider({ children }: { children: React.ReactNode }) {
@@ -155,7 +175,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         activeLayerId: null,
         canvasSize: { width: 800, height: 600 },
         selection: null,
-        guides: []
+        guides: [],
+        activePath: null
     }
 
     const {
@@ -169,7 +190,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } = useHistory<EditorState>(emptyState)
 
     // Derived state for easier usage
-    const { layers, activeLayerId, canvasSize, selection, guides } = historyState
+    const { layers, activeLayerId, canvasSize, selection, guides, activePath } = historyState
     const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([])
 
     // Phase 2: Transient transforms for live preview (not in history)
@@ -544,6 +565,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
             return { layers: insertAfter(prevState.layers) }
         })
+    }, [updateState])
+
+    // --- Path Actions ---
+
+    const setActivePath = useCallback((path: Path | null) => {
+        updateState({ activePath: path })
+    }, [updateState])
+
+    const updatePath = useCallback((path: Path) => {
+        updateState({ activePath: path })
     }, [updateState])
 
     const commitTransform = useCallback((layerId: string, transform: TransformData) => {
@@ -942,7 +973,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             activeLayerId: null,
             selection: null,
             canvasSize: { width: 800, height: 600 },
-            guides: []
+            guides: [],
+            activePath: null
         })
     }, [clearHistory])
 
@@ -1173,7 +1205,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             activeLayerId: layer.id,
             canvasSize: { width, height },
             selection: null,
-            guides: []
+            guides: [],
+            activePath: null
         })
     }, [clearHistory])
 
@@ -1250,7 +1283,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             // Phase 1
             updateFilter,
             toggleFilter,
-            updateLayerTextStyle
+            updateLayerTextStyle,
+
+            // Path Tool
+            activePath,
+            setActivePath,
+            updatePath
         }}>
             {children}
         </EditorContext.Provider>

@@ -1,7 +1,6 @@
 import type { ToolOptions } from '../App'
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
-    Type,
     Bold,
     Italic,
     AlignLeft,
@@ -12,6 +11,7 @@ import {
     ZoomOut
 } from 'lucide-react'
 import FontSelector from './FontSelector'
+import { useEditor } from './EditorContext'
 
 interface ToolOptionsBarProps {
     activeTool: string
@@ -33,10 +33,40 @@ const toolLabels: Record<string, string> = {
     'picker': 'Color Picker',
     'text': 'Text',
     'zoom': 'Zoom',
+    'paths': 'Paths',
 }
 
 export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionChange }: ToolOptionsBarProps) {
+    const {
+        activePath,
+        setSelection,
+        layers,
+        activeLayerId,
+        updateLayerData,
+        foregroundColor
+    } = useEditor()
+
     const label = toolLabels[activeTool] || activeTool
+    const [isCmdPressed, setIsCmdPressed] = useState(false)
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Meta' || e.key === 'Control') {
+                setIsCmdPressed(true)
+            }
+        }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Meta' || e.key === 'Control') {
+                setIsCmdPressed(false)
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+        }
+    }, [])
 
     const renderSlider = (
         key: keyof ToolOptions,
@@ -206,27 +236,6 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
-    const [isCmdPressed, setIsCmdPressed] = useState(false)
-
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Meta' || e.key === 'Control') {
-                setIsCmdPressed(true)
-            }
-        }
-        const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.key === 'Meta' || e.key === 'Control') {
-                setIsCmdPressed(false)
-            }
-        }
-        window.addEventListener('keydown', handleKeyDown)
-        window.addEventListener('keyup', handleKeyUp)
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown)
-            window.removeEventListener('keyup', handleKeyUp)
-        }
-    }, [])
-
     const renderPickerOptions = () => {
         const effectiveTarget = isCmdPressed
             ? (toolOptions.pickerTarget === 'fg' ? 'bg' : 'fg')
@@ -394,6 +403,170 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
+    const handleSelectionFromPath = () => {
+        if (!activePath || activePath.points.length < 2) return
+
+        const points: { x: number, y: number }[] = []
+        // Simple discretization for now
+        // TODO: Proper Bezier subdivision
+        activePath.points.forEach(p => {
+            points.push({ x: p.x, y: p.y })
+        })
+
+        // Calculate bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        points.forEach(p => {
+            minX = Math.min(minX, p.x)
+            minY = Math.min(minY, p.y)
+            maxX = Math.max(maxX, p.x)
+            maxY = Math.max(maxY, p.y)
+        })
+
+        setSelection({
+            type: 'path', // Assuming 'path' (polygon) is supported
+            path: points,
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        })
+    }
+
+    const handleFillPath = () => {
+        if (!activePath || !activeLayerId) return
+        const layer = layers.find(l => l.id === activeLayerId)
+        if (!layer || !layer.data) return
+
+        const canvas = layer.data
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        ctx.fillStyle = foregroundColor
+        ctx.beginPath()
+        const p0 = activePath.points[0]
+        ctx.moveTo(p0.x, p0.y)
+
+        for (let i = 1; i < activePath.points.length; i++) {
+            const p1 = activePath.points[i - 1]
+            const p2 = activePath.points[i]
+            if (p1.handleOut && p2.handleIn) {
+                ctx.bezierCurveTo(p1.handleOut.x, p1.handleOut.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
+            } else if (p1.handleOut) {
+                ctx.quadraticCurveTo(p1.handleOut.x, p1.handleOut.y, p2.x, p2.y)
+            } else if (p2.handleIn) {
+                ctx.quadraticCurveTo(p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
+            } else {
+                ctx.lineTo(p2.x, p2.y)
+            }
+        }
+
+        if (activePath.closed) {
+            const start = activePath.points[0]
+            const end = activePath.points[activePath.points.length - 1]
+            if (end.handleOut && start.handleIn) {
+                ctx.bezierCurveTo(end.handleOut.x, end.handleOut.y, start.handleIn.x, start.handleIn.y, start.x, start.y)
+            } else {
+                ctx.lineTo(start.x, start.y) // Close path
+            }
+            ctx.closePath()
+        }
+
+        ctx.fill()
+        updateLayerData(activeLayerId, canvas)
+    }
+
+    const handleStrokePath = () => {
+        if (!activePath || !activeLayerId) return
+        const layer = layers.find(l => l.id === activeLayerId)
+        if (!layer || !layer.data) return
+
+        const canvas = layer.data
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        ctx.strokeStyle = foregroundColor
+        ctx.lineWidth = toolOptions.brushSize // Use brush size
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+
+        ctx.beginPath()
+        const p0 = activePath.points[0]
+        ctx.moveTo(p0.x, p0.y)
+
+        for (let i = 1; i < activePath.points.length; i++) {
+            const p1 = activePath.points[i - 1]
+            const p2 = activePath.points[i]
+            if (p1.handleOut && p2.handleIn) {
+                ctx.bezierCurveTo(p1.handleOut.x, p1.handleOut.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
+            } else if (p1.handleOut) {
+                ctx.quadraticCurveTo(p1.handleOut.x, p1.handleOut.y, p2.x, p2.y)
+            } else if (p2.handleIn) {
+                ctx.quadraticCurveTo(p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
+            } else {
+                ctx.lineTo(p2.x, p2.y)
+            }
+        }
+
+        if (activePath.closed) {
+            const start = activePath.points[0]
+            const end = activePath.points[activePath.points.length - 1]
+            if (end.handleOut && start.handleIn) {
+                ctx.bezierCurveTo(end.handleOut.x, end.handleOut.y, start.handleIn.x, start.handleIn.y, start.x, start.y)
+            } else {
+                ctx.lineTo(start.x, start.y)
+            }
+            ctx.closePath()
+        }
+
+        ctx.stroke()
+        updateLayerData(activeLayerId, canvas)
+    }
+
+    const renderPathOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span className="slider-label">Edit Mode</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                    {['design', 'edit', 'move'].map(mode => (
+                        <button
+                            key={mode}
+                            className={`tool-option-button ${toolOptions.pathMode === mode ? 'active' : ''}`}
+                            onClick={() => onToolOptionChange('pathMode', mode as any)}
+                            style={{ padding: '2px 8px', fontSize: 11, background: toolOptions.pathMode === mode ? 'var(--accent)' : 'transparent', border: '1px solid var(--border)', borderRadius: 4, color: toolOptions.pathMode === mode ? 'white' : 'inherit' }}
+                        >
+                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                    <input
+                        type="checkbox"
+                        checked={toolOptions.pathPolygonal}
+                        onChange={(e) => onToolOptionChange('pathPolygonal', e.target.checked)}
+                    />
+                    Polygonal
+                </label>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button className="tool-option-button" onClick={handleSelectionFromPath} style={{ padding: '4px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
+                    Selection from Path
+                </button>
+                <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="tool-option-button" onClick={handleFillPath} style={{ flex: 1, padding: '4px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
+                        Fill Path
+                    </button>
+                    <button className="tool-option-button" onClick={handleStrokePath} style={{ flex: 1, padding: '4px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
+                        Stroke Path
+                    </button>
+                </div>
+            </div>
+        </>
+    )
+
     const renderToolSpecificOptions = () => {
         switch (activeTool) {
             case 'brush':
@@ -412,6 +585,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderCropOptions()
             case 'zoom':
                 return renderZoomOptions()
+            case 'paths':
+                return renderPathOptions()
             case 'lasso-select':
             case 'rect-select':
             case 'ellipse-select':

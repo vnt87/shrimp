@@ -37,6 +37,9 @@ export interface ToolOptions {
     pickerTarget: 'fg' | 'bg'
     // Zoom options
     zoomDirection: 'in' | 'out'
+    // Path options
+    pathMode: 'design' | 'edit' | 'move'
+    pathPolygonal: boolean
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -63,6 +66,8 @@ const defaultToolOptions: ToolOptions = {
     bucketOpacity: 100,
     pickerTarget: 'fg',
     zoomDirection: 'in',
+    pathMode: 'design',
+    pathPolygonal: false,
 }
 
 export default function App() {
@@ -101,6 +106,7 @@ export default function App() {
                 case 'i': setActiveTool('picker'); break
                 case 't': setActiveTool('text'); break
                 case 'z': setActiveTool('zoom'); break
+                case 'p': setActiveTool('paths'); break
                 case 'escape': setActiveTool('move'); break
                 case '[':
                     setToolOptions(prev => ({

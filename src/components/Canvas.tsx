@@ -7,6 +7,7 @@ import { useEditor, type Layer, type TransformData } from './EditorContext'
 import PixiLayerSprite from './PixiLayerSprite'
 import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
+import PathOverlay from './PathOverlay'
 import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
@@ -1679,6 +1680,17 @@ export default function Canvas({
                                                 zoomLevel={transform.scale}
                                                 offsetX={0}
                                                 offsetY={0}
+                                                toolOptions={toolOptions}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {activeTool === 'paths' && (
+                                        <div style={{ pointerEvents: 'auto' }}>
+                                            <PathOverlay
+                                                scale={transform.scale}
+                                                offsetX={transform.offsetX}
+                                                offsetY={transform.offsetY}
                                                 toolOptions={toolOptions}
                                             />
                                         </div>
