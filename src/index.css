@@ -632,6 +632,36 @@ body,
   cursor: pointer;
 }
 
+.tool-options-number-input {
+  width: 50px;
+  height: 22px;
+  font-size: 11px;
+  text-align: center;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-input);
+  border-radius: 4px;
+  padding: 0 4px;
+  outline: none;
+}
+
+.tool-options-number-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.slider-unit {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-left: -4px;
+}
+
+.slider-value {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 32px;
+  text-align: right;
+}
+
 .tool-options-dropdown {
   display: flex;
   align-items: center;
@@ -655,6 +685,58 @@ body,
   height: 16px;
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+/* ===== Segmented Control ===== */
+.segmented-control {
+  display: flex;
+  background: var(--bg-input);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-input);
+  height: 24px;
+}
+
+.segmented-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  height: 100%;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.segmented-btn:hover {
+  color: var(--text-primary);
+  background: var(--hover-overlay);
+}
+
+.segmented-btn.active {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  font-weight: 500;
+}
+
+.segmented-btn svg {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+}
+
+.segmented-btn.icon-only {
+  padding: 0 4px;
+  width: 24px;
+}
+
+.segmented-btn.icon-only svg {
+  margin-right: 0;
 }
 
 /* ===== Toolbox ===== */
@@ -2715,6 +2797,56 @@ body,
   justify-content: center;
 }
 
+.dialog-content {
+  pointer-events: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 14px;
+  background: var(--pref-titlebar-bg);
+  border-bottom: 1px solid var(--border-main);
+  flex-shrink: 0;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dialog-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  transition: background var(--transition), color var(--transition);
+}
+
+.dialog-close-btn:hover {
+  background: var(--pref-close-hover);
+  color: white;
+}
+
+.dialog-body {
+  padding: 16px 20px;
+}
+
 /* Make the dialog itself accept pointer events */
 .filters-dialog {
   pointer-events: auto;
@@ -3066,4 +3198,25 @@ body,
   z-index: 1001;
   margin-left: -2px;
   color: var(--text-primary);
+}
+
+/* ===== Inline Canvas Text Editor ===== */
+.canvas-text-editor {
+  background: transparent;
+  border: none;
+  outline: 2px dashed rgba(82, 148, 226, 0.7);
+  outline-offset: 2px;
+  resize: none;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  white-space: pre;
+  caret-color: currentColor;
+  box-sizing: border-box;
+  field-sizing: content;
+}
+
+.canvas-text-editor::placeholder {
+  color: rgba(128, 128, 128, 0.5);
+  font-style: italic;
 }

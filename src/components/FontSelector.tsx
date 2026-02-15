@@ -1,17 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, Check } from 'lucide-react';
-import { TOP_GOOGLE_FONTS, getGoogleFontUrl } from '../utils/googleFonts';
+import { TOP_GOOGLE_FONTS, BUILT_IN_FONTS, getGoogleFontUrl } from '../utils/googleFonts';
 
 interface FontSelectorProps {
     value: string;
     onChange: (font: string) => void;
 }
-
-const BUILT_IN_FONTS = [
-    'Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana',
-    'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS',
-    'Trebuchet MS', 'Arial Black', 'Impact'
-];
 
 export default function FontSelector({ value, onChange }: FontSelectorProps) {
     const [isOpen, setIsOpen] = useState(false);

@@ -1,5 +1,7 @@
-import { FolderOpen, ClipboardPaste, Image } from 'lucide-react'
+import { useState } from 'react'
+import { FolderOpen, ClipboardPaste, Image, FilePlus } from 'lucide-react'
 import ShrimpIcon from './ShrimpIcon'
+import NewImageDialog from './NewImageDialog'
 
 interface EmptyStateProps {
     onLoadSample: () => void
@@ -8,6 +10,8 @@ interface EmptyStateProps {
 }
 
 export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard }: EmptyStateProps) {
+    const [showNewImage, setShowNewImage] = useState(false)
+
     return (
         <div className="empty-state">
             <div className="empty-state-card">
@@ -16,8 +20,12 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
                     <ShrimpIcon size={48} strokeWidth={1.5} />
                 </div>
                 <h1 className="empty-state-title">Welcome to SHRIMP</h1>
-                <p className="empty-state-subtitle">Open an image to get started</p>
+                <p className="empty-state-subtitle">Create or open an image to get started</p>
                 <div className="empty-state-actions">
+                    <button className="empty-state-btn primary" onClick={() => setShowNewImage(true)}>
+                        <FilePlus size={16} />
+                        <span>New File</span>
+                    </button>
                     <button className="empty-state-btn" onClick={onOpenFile}>
                         <FolderOpen size={16} />
                         <span>Open (local file)</span>
@@ -26,12 +34,13 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
                         <ClipboardPaste size={16} />
                         <span>Paste from Clipboard</span>
                     </button>
-                    <button className="empty-state-btn primary" onClick={onLoadSample}>
+                    <button className="empty-state-btn" onClick={onLoadSample}>
                         <Image size={16} />
                         <span>Sample Image</span>
                     </button>
                 </div>
             </div>
+            {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
         </div>
     )
 }

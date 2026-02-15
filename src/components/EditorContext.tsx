@@ -31,6 +31,10 @@ export interface Layer {
         fontWeight?: string
         fontStyle?: string
         letterSpacing?: number
+        lineHeight?: number
+        textDecoration?: 'none' | 'underline' | 'line-through'
+        wordWrap?: boolean
+        wordWrapWidth?: number
     }
 }
 
@@ -94,7 +98,7 @@ interface EditorContextType {
     // Actions
     setCanvasSize: (size: { width: number; height: number }) => void
     addLayer: (name?: string, initialData?: HTMLCanvasElement) => string
-    addTextLayer: (text: string, style: { fontFamily: string, fontSize: number, fill: string, align?: 'left' | 'center' | 'right' | 'justify', fontWeight?: string, fontStyle?: string, letterSpacing?: number }, x: number, y: number) => string
+    addTextLayer: (text: string, style: NonNullable<Layer['textStyle']>, x: number, y: number) => string
     deleteLayer: (id: string) => void
     setActiveLayer: (id: string) => void
     toggleLayerVisibility: (id: string) => void
@@ -382,12 +386,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         return newLayerId
     }, [updateState])
 
-    const addTextLayer = useCallback((text: string, style: { fontFamily: string; fontSize: number; fill: string; align?: 'left' | 'center' | 'right' | 'justify', fontWeight?: string, fontStyle?: string, letterSpacing?: number }, x: number, y: number) => {
+    const addTextLayer = useCallback((text: string, style: NonNullable<Layer['textStyle']>, x: number, y: number) => {
         let newLayerId = ''
         updateState((prevState) => {
             const newLayer: Layer = {
                 id: Math.random().toString(36).substr(2, 9),
-                name: text.substring(0, 20) || 'Text Layer',
+                name: 'T ' + (text.substring(0, 20) || 'Text Layer'),
                 visible: true,
                 locked: false,
                 opacity: 100,
@@ -488,7 +492,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     const updateLayerText = useCallback((id: string, text: string) => {
         updateState(prevState => ({
-            layers: updateLayerInTree(prevState.layers, id, { text, name: text.substring(0, 20) })
+            layers: updateLayerInTree(prevState.layers, id, { text, name: 'T ' + (text.substring(0, 20) || 'Text Layer') })
         }))
     }, [updateState])
 
@@ -1037,6 +1041,61 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
     }, [updateState])
 
+    // Helper: render a text layer to a 2D canvas context
+    const renderTextLayerToCanvas = (ctx: CanvasRenderingContext2D, layer: Layer) => {
+        if (layer.type !== 'text' || !layer.text) return
+        const s = layer.textStyle || { fontFamily: 'Arial', fontSize: 24, fill: '#000000' }
+        const weight = s.fontWeight || 'normal'
+        const style = s.fontStyle || 'normal'
+        ctx.font = `${style} ${weight} ${s.fontSize}px "${s.fontFamily}"`
+        ctx.fillStyle = s.fill
+        ctx.textBaseline = 'top'
+
+        const lines = layer.text.split('\n')
+        const lineH = s.fontSize * (s.lineHeight || 1.2)
+        const letterSp = s.letterSpacing || 0
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i]
+            let drawX = layer.x
+
+            // Alignment
+            if (s.align && s.align !== 'left' && s.wordWrapWidth) {
+                const metrics = ctx.measureText(line)
+                const lineW = metrics.width + letterSp * (line.length - 1)
+                if (s.align === 'center') drawX = layer.x + (s.wordWrapWidth - lineW) / 2
+                else if (s.align === 'right') drawX = layer.x + s.wordWrapWidth - lineW
+            }
+
+            const drawY = layer.y + i * lineH
+
+            if (letterSp && letterSp !== 0) {
+                // Draw character by character for letter spacing
+                let cx = drawX
+                for (const ch of line) {
+                    ctx.fillText(ch, cx, drawY)
+                    cx += ctx.measureText(ch).width + letterSp
+                }
+            } else {
+                ctx.fillText(line, drawX, drawY)
+            }
+
+            // Decorations
+            const dec = s.textDecoration || 'none'
+            if (dec === 'underline' || dec === 'line-through') {
+                const metrics = ctx.measureText(line)
+                const lineW = letterSp ? (metrics.width + letterSp * (line.length - 1)) : metrics.width
+                ctx.strokeStyle = s.fill
+                ctx.lineWidth = Math.max(1, s.fontSize / 16)
+                ctx.beginPath()
+                const yOff = dec === 'underline' ? drawY + s.fontSize * 0.95 : drawY + s.fontSize * 0.45
+                ctx.moveTo(drawX, yOff)
+                ctx.lineTo(drawX + lineW, yOff)
+                ctx.stroke()
+            }
+        }
+    }
+
     // --- Image Actions ---
     const flattenImage = useCallback(() => {
         updateState(prevState => {
@@ -1056,7 +1115,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
                     if (!l.visible) continue
                     if (l.type === 'group' && l.children) {
                         result.push(...collectVisible(l.children))
-                    } else if (l.data) {
+                    } else if (l.data || l.type === 'text') {
                         result.push(l)
                     }
                 }
@@ -1066,10 +1125,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             const visibleLayers = collectVisible(prevState.layers).reverse()
 
             for (const layer of visibleLayers) {
-                if (!layer.data) continue
                 ctx.globalAlpha = layer.opacity / 100
                 ctx.globalCompositeOperation = layer.blendMode === 'normal' ? 'source-over' : (layer.blendMode as GlobalCompositeOperation) || 'source-over'
-                ctx.drawImage(layer.data, layer.x, layer.y)
+                if (layer.type === 'text') {
+                    renderTextLayerToCanvas(ctx, layer)
+                } else if (layer.data) {
+                    ctx.drawImage(layer.data, layer.x, layer.y)
+                }
             }
 
             ctx.globalAlpha = 1
@@ -1105,7 +1167,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
             const upper = prevState.layers[idx]
             const lower = prevState.layers[idx + 1]
-            if (!upper.data || !lower.data) return {}
+            if ((!upper.data && upper.type !== 'text') || (!lower.data && lower.type !== 'text')) return {}
 
             const mergedCanvas = document.createElement('canvas')
             mergedCanvas.width = prevState.canvasSize.width
@@ -1114,9 +1176,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             if (!ctx) return {}
 
             ctx.globalAlpha = lower.opacity / 100
-            ctx.drawImage(lower.data, lower.x, lower.y)
+            if (lower.type === 'text') renderTextLayerToCanvas(ctx, lower)
+            else if (lower.data) ctx.drawImage(lower.data, lower.x, lower.y)
             ctx.globalAlpha = upper.opacity / 100
-            ctx.drawImage(upper.data, upper.x, upper.y)
+            if (upper.type === 'text') renderTextLayerToCanvas(ctx, upper)
+            else if (upper.data) ctx.drawImage(upper.data, upper.x, upper.y)
             ctx.globalAlpha = 1
 
             const mergedLayer: Layer = {
@@ -1159,7 +1223,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
                 if (!l.visible) continue
                 if (l.type === 'group' && l.children) {
                     result.push(...collectVisible(l.children))
-                } else if (l.data) {
+                } else if (l.data || l.type === 'text') {
                     result.push(l)
                 }
             }
@@ -1169,9 +1233,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         const visibleLayers = collectVisible(layers).reverse()
 
         for (const layer of visibleLayers) {
-            if (!layer.data) continue
             ctx.globalAlpha = layer.opacity / 100
-            ctx.drawImage(layer.data, layer.x, layer.y)
+            if (layer.type === 'text') {
+                renderTextLayerToCanvas(ctx, layer)
+            } else if (layer.data) {
+                ctx.drawImage(layer.data, layer.x, layer.y)
+            }
         }
 
         const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png'

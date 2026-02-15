@@ -3,6 +3,12 @@ export interface GoogleFont {
     category: string;
 }
 
+export const BUILT_IN_FONTS = [
+    'Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana',
+    'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS',
+    'Trebuchet MS', 'Arial Black', 'Impact'
+];
+
 export const TOP_GOOGLE_FONTS: GoogleFont[] = [
     { family: "Roboto", category: "sans-serif" },
     { family: "Open Sans", category: "sans-serif" },

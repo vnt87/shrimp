@@ -1,27 +1,26 @@
 import { useEffect, useState } from 'react';
-import { getGoogleFontUrl } from '../utils/googleFonts';
+import { getGoogleFontUrl, BUILT_IN_FONTS } from '../utils/googleFonts';
 
 export const useGoogleFont = (fontFamily: string) => {
     const [status, setStatus] = useState<'loading' | 'active' | 'error' | 'idle'>('idle');
 
     useEffect(() => {
-        if (!fontFamily)return;
+        if (!fontFamily) return;
 
         // Check if it's a built-in font
-        const builtInFonts = ['Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS', 'Trebuchet MS', 'Arial Black', 'Impact'];
-        if (builtInFonts.includes(fontFamily)) {
+        if (BUILT_IN_FONTS.includes(fontFamily)) {
             setStatus('active');
             return;
         }
 
         const loadFont = async () => {
             setStatus('loading');
-            
+
             // 1. Create link tag if not already there
             const linkId = `google-font-${fontFamily.toLowerCase().replace(/\s+/g, '-')}`;
             let link = document.getElementById(linkId) as HTMLLinkElement;
-            
-            if (!link){
+
+            if (!link) {
                 link = document.createElement('link');
                 link.id = linkId;
                 link.rel = 'stylesheet';

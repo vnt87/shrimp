@@ -3,12 +3,22 @@ import { useState, useEffect } from 'react'
 import {
     Bold,
     Italic,
+    Underline,
+    Strikethrough,
     AlignLeft,
     AlignCenter,
     AlignRight,
     AlignJustify,
     ZoomIn,
-    ZoomOut
+    ZoomOut,
+    PenTool,
+    MousePointer2,
+    Move as MoveIcon,
+    Hexagon,
+    BoxSelect,
+    PaintBucket,
+    PenLine,
+    Trash2
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import { useEditor } from './EditorContext'
@@ -39,6 +49,7 @@ const toolLabels: Record<string, string> = {
 export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionChange }: ToolOptionsBarProps) {
     const {
         activePath,
+        setActivePath,
         setSelection,
         layers,
         activeLayerId,
@@ -87,9 +98,21 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 value={toolOptions[key] as number}
                 onChange={(e) => onToolOptionChange(key, Number(e.target.value) as ToolOptions[typeof key])}
             />
-            <span className="slider-value" style={{ minWidth: 36, textAlign: 'right', fontSize: 11, color: 'var(--text-secondary)' }}>
-                {toolOptions[key]}{unit}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input
+                    type="number"
+                    className="tool-options-number-input"
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={toolOptions[key] as number}
+                    onChange={(e) => {
+                        const v = parseFloat(e.target.value)
+                        if (!isNaN(v)) onToolOptionChange(key, Math.min(max, Math.max(min, v)) as ToolOptions[typeof key])
+                    }}
+                />
+                {unit && <span className="slider-unit">{unit}</span>}
+            </div>
         </div>
     )
 
@@ -115,18 +138,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         <>
             {renderSlider('fillThreshold', 'Threshold', 0, 255, 1, '')}
             <div className="tool-options-divider" />
-            <div className="tool-options-slider-group">
-                <span className="slider-label">Opacity</span>
-                <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={toolOptions.bucketOpacity}
-                    onChange={(e) => onToolOptionChange('bucketOpacity', parseInt(e.target.value))}
-                    className="tool-options-slider"
-                />
-                <span className="slider-value">{toolOptions.bucketOpacity}%</span>
-            </div>
+            {renderSlider('bucketOpacity', 'Opacity', 0, 100, 1, '%')}
             <div className="tool-options-divider" />
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="slider-label">Fill</span>
@@ -285,6 +297,14 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     value={toolOptions.textColor}
                     onChange={(e) => onToolOptionChange('textColor', e.target.value)}
                 />
+                <button
+                    className="pref-btn pref-btn-secondary"
+                    style={{ height: 24, fontSize: 10, padding: '0 6px', minWidth: 'auto' }}
+                    onClick={() => onToolOptionChange('textColor', foregroundColor)}
+                    title="Use foreground color"
+                >
+                    FG
+                </button>
             </div>
             <div className="tool-options-divider" />
             <div className="tool-options-slider-group">
@@ -318,7 +338,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
             <div className="tool-options-divider" />
 
-            {/* Style */}
+            {/* Style: Bold, Italic, Underline, Strikethrough */}
             <div className="tool-options-group" style={{ display: 'flex', gap: 2 }}>
                 <button
                     className={`pref-btn ${toolOptions.textBold ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
@@ -336,11 +356,31 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 >
                     <Italic size={14} />
                 </button>
+                <button
+                    className={`pref-btn ${toolOptions.textUnderline ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                    style={{ width: 28, minWidth: 28, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => onToolOptionChange('textUnderline', !toolOptions.textUnderline)}
+                    title="Underline"
+                >
+                    <Underline size={14} />
+                </button>
+                <button
+                    className={`pref-btn ${toolOptions.textStrikethrough ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                    style={{ width: 28, minWidth: 28, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => onToolOptionChange('textStrikethrough', !toolOptions.textStrikethrough)}
+                    title="Strikethrough"
+                >
+                    <Strikethrough size={14} />
+                </button>
             </div>
 
             <div className="tool-options-divider" />
 
             {renderSlider('textLetterSpacing', 'Spacing', -10, 50, 1, 'px')}
+
+            <div className="tool-options-divider" />
+
+            {renderSlider('textLineHeight', 'Line H', 0.5, 3, 0.1, '×')}
         </>
     )
 
@@ -403,15 +443,77 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
+    // Sample a cubic Bézier curve into discrete points
+    const sampleCubicBezier = (
+        p0x: number, p0y: number,
+        cp1x: number, cp1y: number,
+        cp2x: number, cp2y: number,
+        p1x: number, p1y: number,
+        steps: number
+    ): { x: number; y: number }[] => {
+        const pts: { x: number; y: number }[] = []
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps
+            const mt = 1 - t
+            pts.push({
+                x: mt * mt * mt * p0x + 3 * mt * mt * t * cp1x + 3 * mt * t * t * cp2x + t * t * t * p1x,
+                y: mt * mt * mt * p0y + 3 * mt * mt * t * cp1y + 3 * mt * t * t * cp2y + t * t * t * p1y
+            })
+        }
+        return pts
+    }
+
+    // Sample a quadratic Bézier curve into discrete points
+    const sampleQuadBezier = (
+        p0x: number, p0y: number,
+        cpx: number, cpy: number,
+        p1x: number, p1y: number,
+        steps: number
+    ): { x: number; y: number }[] => {
+        const pts: { x: number; y: number }[] = []
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps
+            const mt = 1 - t
+            pts.push({
+                x: mt * mt * p0x + 2 * mt * t * cpx + t * t * p1x,
+                y: mt * mt * p0y + 2 * mt * t * cpy + t * t * p1y
+            })
+        }
+        return pts
+    }
+
     const handleSelectionFromPath = () => {
         if (!activePath || activePath.points.length < 2) return
 
-        const points: { x: number, y: number }[] = []
-        // Simple discretization for now
-        // TODO: Proper Bezier subdivision
-        activePath.points.forEach(p => {
-            points.push({ x: p.x, y: p.y })
-        })
+        const SAMPLE_STEPS = 20
+        const points: { x: number, y: number }[] = [{ x: activePath.points[0].x, y: activePath.points[0].y }]
+
+        // Sample each segment
+        for (let i = 1; i < activePath.points.length; i++) {
+            const p1 = activePath.points[i - 1]
+            const p2 = activePath.points[i]
+
+            if (p1.handleOut && p2.handleIn) {
+                points.push(...sampleCubicBezier(p1.x, p1.y, p1.handleOut.x, p1.handleOut.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y, SAMPLE_STEPS))
+            } else if (p1.handleOut) {
+                points.push(...sampleQuadBezier(p1.x, p1.y, p1.handleOut.x, p1.handleOut.y, p2.x, p2.y, SAMPLE_STEPS))
+            } else if (p2.handleIn) {
+                points.push(...sampleQuadBezier(p1.x, p1.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y, SAMPLE_STEPS))
+            } else {
+                points.push({ x: p2.x, y: p2.y })
+            }
+        }
+
+        // Handle closing segment for closed paths
+        if (activePath.closed && activePath.points.length > 2) {
+            const end = activePath.points[activePath.points.length - 1]
+            const start = activePath.points[0]
+            if (end.handleOut && start.handleIn) {
+                points.push(...sampleCubicBezier(end.x, end.y, end.handleOut.x, end.handleOut.y, start.handleIn.x, start.handleIn.y, start.x, start.y, SAMPLE_STEPS))
+            } else {
+                points.push({ x: start.x, y: start.y })
+            }
+        }
 
         // Calculate bounds
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -423,7 +525,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         })
 
         setSelection({
-            type: 'path', // Assuming 'path' (polygon) is supported
+            type: 'path',
             path: points,
             x: minX,
             y: minY,
@@ -524,45 +626,72 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
     const renderPathOptions = () => (
         <>
-            <div className="tool-options-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span className="slider-label">Edit Mode</span>
-                <div style={{ display: 'flex', gap: 4 }}>
-                    {['design', 'edit', 'move'].map(mode => (
-                        <button
-                            key={mode}
-                            className={`tool-option-button ${toolOptions.pathMode === mode ? 'active' : ''}`}
-                            onClick={() => onToolOptionChange('pathMode', mode as any)}
-                            style={{ padding: '2px 8px', fontSize: 11, background: toolOptions.pathMode === mode ? 'var(--accent)' : 'transparent', border: '1px solid var(--border)', borderRadius: 4, color: toolOptions.pathMode === mode ? 'white' : 'inherit' }}
-                        >
-                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                        </button>
-                    ))}
-                </div>
-            </div>
-            <div className="tool-options-divider" />
             <div className="tool-options-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                    <input
-                        type="checkbox"
-                        checked={toolOptions.pathPolygonal}
-                        onChange={(e) => onToolOptionChange('pathPolygonal', e.target.checked)}
-                    />
-                    Polygonal
-                </label>
-            </div>
-            <div className="tool-options-divider" />
-            <div className="tool-options-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <button className="tool-option-button" onClick={handleSelectionFromPath} style={{ padding: '4px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
-                    Selection from Path
-                </button>
-                <div style={{ display: 'flex', gap: 4 }}>
-                    <button className="tool-option-button" onClick={handleFillPath} style={{ flex: 1, padding: '4px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
-                        Fill Path
+                <div className="segmented-control">
+                    <button
+                        className={`segmented-btn ${toolOptions.pathMode === 'design' ? 'active' : ''}`}
+                        onClick={() => onToolOptionChange('pathMode', 'design')}
+                        title="Design Mode"
+                    >
+                        <PenTool />
+                        <span>Design</span>
                     </button>
-                    <button className="tool-option-button" onClick={handleStrokePath} style={{ flex: 1, padding: '4px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
-                        Stroke Path
+                    <button
+                        className={`segmented-btn ${toolOptions.pathMode === 'edit' ? 'active' : ''}`}
+                        onClick={() => onToolOptionChange('pathMode', 'edit')}
+                        title="Edit Mode"
+                    >
+                        <MousePointer2 />
+                        <span>Edit</span>
+                    </button>
+                    <button
+                        className={`segmented-btn ${toolOptions.pathMode === 'move' ? 'active' : ''}`}
+                        onClick={() => onToolOptionChange('pathMode', 'move')}
+                        title="Move Mode"
+                    >
+                        <MoveIcon />
+                        <span>Move</span>
                     </button>
                 </div>
+            </div>
+
+            <div className="tool-options-divider" />
+
+            <div className="tool-options-group">
+                <button
+                    className={`tool-options-icon-btn ${toolOptions.pathPolygonal ? 'active' : ''}`}
+                    onClick={() => onToolOptionChange('pathPolygonal', !toolOptions.pathPolygonal)}
+                    title="Polygonal (Straight lines)"
+                    style={{
+                        background: toolOptions.pathPolygonal ? 'var(--accent-active)' : undefined,
+                        color: toolOptions.pathPolygonal ? 'white' : undefined
+                    }}
+                >
+                    <Hexagon />
+                </button>
+            </div>
+
+            <div className="tool-options-divider" />
+
+            <div className="tool-options-group">
+                <button className="tool-options-icon-btn" onClick={handleSelectionFromPath} title="Selection from Path">
+                    <BoxSelect />
+                </button>
+                <button className="tool-options-icon-btn" onClick={handleFillPath} title="Fill Path">
+                    <PaintBucket />
+                </button>
+                <button className="tool-options-icon-btn" onClick={handleStrokePath} title="Stroke Path">
+                    <PenLine />
+                </button>
+                <div className="tool-options-divider" style={{ margin: '0 4px', height: '10px' }} />
+                <button
+                    className="tool-options-icon-btn"
+                    onClick={() => setActivePath(null)}
+                    title="Clear Path"
+                    style={{ color: 'var(--pref-close-hover)' }}
+                >
+                    <Trash2 />
+                </button>
             </div>
         </>
     )

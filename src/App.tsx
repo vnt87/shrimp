@@ -22,6 +22,9 @@ export interface ToolOptions {
     textBold: boolean
     textItalic: boolean
     textLetterSpacing: number
+    textLineHeight: number
+    textUnderline: boolean
+    textStrikethrough: boolean
     // Crop tools
     cropDeletePixels: boolean
     cropFixedRatio: boolean
@@ -55,6 +58,9 @@ const defaultToolOptions: ToolOptions = {
     textBold: false,
     textItalic: false,
     textLetterSpacing: 0,
+    textLineHeight: 1.2,
+    textUnderline: false,
+    textStrikethrough: false,
     cropDeletePixels: true,
     cropFixedRatio: false,
     cropAspectRatio: 1,

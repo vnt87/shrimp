@@ -212,10 +212,24 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
 
     if (layer.type === 'text') {
         useGoogleFont(layer.textStyle?.fontFamily || 'Arial');
+        const textRef = useRef<any>(null)
+        const [textSize, setTextSize] = useState<{ w: number, h: number }>({ w: 100, h: 30 })
+
+        // Measure actual text after render
+        useTick(() => {
+            if (textRef.current && textRef.current.width && textRef.current.height) {
+                const tw = Math.ceil(textRef.current.width)
+                const th = Math.ceil(textRef.current.height)
+                if (tw !== textSize.w || th !== textSize.h) {
+                    setTextSize({ w: tw, h: th })
+                }
+            }
+        })
 
         return (
             <React.Fragment>
                 <pixiText
+                    ref={textRef}
                     text={layer.text || ''}
                     x={transform ? transform.x : layer.x}
                     y={transform ? transform.y : layer.y}
@@ -232,14 +246,13 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
                         fontWeight: layer.textStyle.fontWeight as any,
                         fontStyle: layer.textStyle.fontStyle as any,
                         letterSpacing: layer.textStyle.letterSpacing,
+                        lineHeight: layer.textStyle.lineHeight ? layer.textStyle.fontSize * layer.textStyle.lineHeight : undefined,
+                        wordWrap: layer.textStyle.wordWrap,
+                        wordWrapWidth: layer.textStyle.wordWrapWidth,
                     } : { fontFamily: 'Arial', fontSize: 24, fill: '#000000' }}
                 />
-                {/* Font status: {fontStatus} - triggering re-render on load */}
                 {layer.id === activeLayerId && (
-                    // Simple outline for text? Or just bounding box?
-                    // Text metrics are hard to get synchronously in React render without ref.
-                    // For now, skip outline or use estimated size.
-                    <LayerOutline layer={{ ...layer, data: { width: 100, height: 30 } as any }} transform={transform} />
+                    <LayerOutline layer={{ ...layer, data: { width: textSize.w, height: textSize.h } as any }} transform={transform} />
                 )}
             </React.Fragment>
         )
@@ -391,6 +404,7 @@ export default function Canvas({
         backgroundColor,
         setForegroundColor,
         setBackgroundColor,
+        setActiveLayer,
     } = useEditor()
 
     const [transform, setTransform] = useState<CanvasTransform>({
@@ -474,7 +488,9 @@ export default function Canvas({
                     style.fontWeight !== (toolOptions?.textBold ? 'bold' : 'normal') ||
                     style.fontStyle !== (toolOptions?.textItalic ? 'italic' : 'normal') ||
                     style.letterSpacing !== toolOptions?.textLetterSpacing ||
-                    style.align !== toolOptions?.textAlign;
+                    style.align !== toolOptions?.textAlign ||
+                    style.lineHeight !== toolOptions?.textLineHeight ||
+                    style.textDecoration !== (toolOptions?.textUnderline ? 'underline' : toolOptions?.textStrikethrough ? 'line-through' : 'none');
 
                 if (hasChanged) {
                     updateLayerTextStyle(activeLayerId, {
@@ -484,7 +500,9 @@ export default function Canvas({
                         fontWeight: toolOptions?.textBold ? 'bold' : 'normal',
                         fontStyle: toolOptions?.textItalic ? 'italic' : 'normal',
                         letterSpacing: toolOptions?.textLetterSpacing,
-                        align: toolOptions?.textAlign
+                        align: toolOptions?.textAlign,
+                        lineHeight: toolOptions?.textLineHeight,
+                        textDecoration: toolOptions?.textUnderline ? 'underline' : toolOptions?.textStrikethrough ? 'line-through' : 'none',
                     })
                 }
             }
@@ -502,6 +520,46 @@ export default function Canvas({
     const [draggingGuideId, setDraggingGuideId] = useState<string | null>(null)
     const [tempGuide, setTempGuide] = useState<{ orientation: 'horizontal' | 'vertical', pos: number } | null>(null)
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
+
+    // Inline text editor state
+    const [textEditorState, setTextEditorState] = useState<{
+        layerId: string | null    // which layer we're editing, or null
+        isNew: boolean            // true = creating new layer on commit
+        value: string             // current textarea content
+        canvasX: number           // position in canvas coords
+        canvasY: number           // position in canvas coords
+    } | null>(null)
+    const textEditorRef = useRef<HTMLTextAreaElement>(null)
+
+    // Commit (save) the inline text editor
+    const commitTextEditor = useCallback(() => {
+        if (!textEditorState) return
+        const { layerId, isNew, value, canvasX, canvasY } = textEditorState
+        if (value.trim()) {
+            if (isNew) {
+                const style = {
+                    fontFamily: toolOptions?.fontFamily || 'Arial',
+                    fontSize: toolOptions?.fontSize || 24,
+                    fill: toolOptions?.textColor || '#000000',
+                    align: toolOptions?.textAlign || 'left' as const,
+                    fontWeight: toolOptions?.textBold ? 'bold' : 'normal',
+                    fontStyle: toolOptions?.textItalic ? 'italic' : 'normal',
+                    letterSpacing: toolOptions?.textLetterSpacing || 0,
+                    lineHeight: toolOptions?.textLineHeight || 1.2,
+                    textDecoration: (toolOptions?.textUnderline ? 'underline' : toolOptions?.textStrikethrough ? 'line-through' : 'none') as 'none' | 'underline' | 'line-through',
+                }
+                addTextLayer(value, style, canvasX, canvasY)
+            } else if (layerId) {
+                updateLayerText(layerId, value)
+            }
+        }
+        setTextEditorState(null)
+    }, [textEditorState, toolOptions, addTextLayer, updateLayerText])
+
+    // Cancel text editor - Removed as Esc now commits
+    // const cancelTextEditor = useCallback(() => {
+    //     setTextEditorState(null)
+    // }, [])
 
     // Modifier key state for Picker
     const [isCmdPressed, setIsCmdPressed] = useState(false)
@@ -1188,12 +1246,17 @@ export default function Canvas({
         if (!activeLayerId) return
         const layer = layers.find(l => l.id === activeLayerId)
         if (layer && layer.type === 'text') {
-            const newText = prompt('Edit text:', layer.text)
-            if (newText !== null && newText !== layer.text) {
-                updateLayerText(activeLayerId, newText)
-            }
+            // Switch to text tool and open inline editor for existing text layer
+            onToolChange?.('text')
+            setTextEditorState({
+                layerId: layer.id,
+                isNew: false,
+                value: layer.text || '',
+                canvasX: layer.x,
+                canvasY: layer.y,
+            })
         }
-    }, [activeLayerId, layers, updateLayerText])
+    }, [activeLayerId, layers])
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         if (e.detail === 2) {
@@ -1270,18 +1333,47 @@ export default function Canvas({
         } else if (activeTool === 'picker') {
             pickColor(canvasX, canvasY)
         } else if (activeTool === 'text') {
-            const defaultText = prompt('Enter text:', 'New Text Layer')
-            if (defaultText) {
-                const style = {
-                    fontFamily: toolOptions?.fontFamily || 'Arial',
-                    fontSize: toolOptions?.fontSize || 24,
-                    fill: toolOptions?.textColor || '#000000',
-                    align: toolOptions?.textAlign || 'left',
-                    fontWeight: toolOptions?.textBold ? 'bold' : 'normal',
-                    fontStyle: toolOptions?.textItalic ? 'italic' : 'normal',
-                    letterSpacing: toolOptions?.textLetterSpacing || 0
-                }
-                addTextLayer(defaultText, style, canvasX, canvasY)
+            // If text editor is open, commit it first
+            if (textEditorState) {
+                commitTextEditor()
+                return
+            }
+
+            // Check if clicking on an existing text layer
+            const clickedTextLayer = [...layers].reverse().find(l => {
+                if (l.type !== 'text' || !l.visible || !l.text) return false
+                // Simple bounding box hit test using estimated text size
+                const s = l.textStyle || { fontSize: 24 }
+                const estWidth = l.text.length * s.fontSize * 0.6  // rough estimate
+                const lines = l.text.split('\n')
+                const estHeight = lines.length * s.fontSize * 1.4
+                return canvasX >= l.x && canvasX <= l.x + estWidth &&
+                    canvasY >= l.y && canvasY <= l.y + estHeight
+            })
+
+            if (clickedTextLayer) {
+                // Select the existing text layer and open editor
+                setActiveLayer(clickedTextLayer.id)
+                setTimeout(() => {
+                    setTextEditorState({
+                        layerId: clickedTextLayer.id,
+                        isNew: false,
+                        value: clickedTextLayer.text || '',
+                        canvasX: clickedTextLayer.x,
+                        canvasY: clickedTextLayer.y,
+                    })
+                }, 10)
+            } else {
+                // Open inline editor for a new text layer
+                setTimeout(() => {
+                    setTextEditorState({
+                        layerId: null,
+                        isNew: true,
+                        value: '',
+                        canvasX,
+                        canvasY,
+                    })
+                }, 10)
             }
         } else if (activeTool === 'zoom') {
             const effectiveDirection = isCmdPressed
@@ -1300,7 +1392,7 @@ export default function Canvas({
 
             animateTo({ scale: targetScale, offsetX: targetOffsetX, offsetY: targetOffsetY })
         }
-    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer, isCmdPressed, viewportRef])
+    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer, isCmdPressed, viewportRef, textEditorState, commitTextEditor, setActiveLayer])
 
     const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
         if (!viewportRef) return
@@ -1703,9 +1795,7 @@ export default function Canvas({
                                     {activeTool === 'paths' && (
                                         <div style={{ pointerEvents: 'auto' }}>
                                             <PathOverlay
-                                                scale={transform.scale}
-                                                offsetX={transform.offsetX}
-                                                offsetY={transform.offsetY}
+                                                zoomLevel={transform.scale}
                                                 toolOptions={toolOptions}
                                             />
                                         </div>
@@ -1715,6 +1805,57 @@ export default function Canvas({
                                 </div>
 
                                 {/* Scrollbars would go here if we implemented custom ones */}
+
+                                {/* Inline Text Editor Overlay */}
+                                {textEditorState && (
+                                    <textarea
+                                        ref={textEditorRef}
+                                        className="canvas-text-editor"
+                                        autoFocus
+                                        value={textEditorState.value}
+                                        onChange={(e) => {
+                                            setTextEditorState(prev => prev ? { ...prev, value: e.target.value } : null)
+                                            // Auto-resize textarea
+                                            e.target.style.height = 'auto'
+                                            e.target.style.height = `${e.target.scrollHeight}px`
+                                        }}
+                                        onBlur={() => commitTextEditor()}
+                                        onKeyDown={(e) => {
+                                            e.stopPropagation()
+                                            if (e.key === 'Escape') {
+                                                commitTextEditor()
+                                            } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                                commitTextEditor()
+                                            }
+                                        }}
+                                        style={{
+                                            position: 'absolute',
+                                            left: textEditorState.canvasX * transform.scale + transform.offsetX,
+                                            top: textEditorState.canvasY * transform.scale + transform.offsetY,
+                                            fontFamily: toolOptions?.fontFamily || 'Arial',
+                                            fontSize: (toolOptions?.fontSize || 24) * transform.scale,
+                                            fontWeight: toolOptions?.textBold ? 'bold' : 'normal',
+                                            fontStyle: toolOptions?.textItalic ? 'italic' : 'normal',
+                                            color: toolOptions?.textColor || '#000000',
+                                            letterSpacing: (toolOptions?.textLetterSpacing || 0) * transform.scale,
+                                            lineHeight: toolOptions?.textLineHeight || 1.2,
+                                            textAlign: toolOptions?.textAlign || 'left',
+                                            textDecoration: toolOptions?.textUnderline ? 'underline' : toolOptions?.textStrikethrough ? 'line-through' : 'none',
+                                            minWidth: 100 * transform.scale,
+                                            minHeight: (toolOptions?.fontSize || 24) * transform.scale * 1.4,
+                                            background: 'rgba(255, 255, 255, 0.1)',
+                                            border: '1px dashed var(--accent-primary)',
+                                            padding: 0,
+                                            margin: 0,
+                                            outline: 'none',
+                                            resize: 'none',
+                                            overflow: 'hidden',
+                                            zIndex: 2000,
+                                            pointerEvents: 'auto',
+                                        }}
+                                        placeholder="Type text..."
+                                    />
+                                )}
 
                                 {/* Context Menu */}
                                 {contextMenu && (
