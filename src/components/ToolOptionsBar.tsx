@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import { useEditor } from './EditorContext'
+import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
 
 interface ToolOptionsBarProps {
     activeTool: string
@@ -51,12 +52,13 @@ const toolLabels: Record<string, string> = {
 export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionChange }: ToolOptionsBarProps) {
     const {
         activePath,
-        setActivePath,
+        activePathId,
         setSelection,
-        layers,
-        activeLayerId,
-        updateLayerData,
-        foregroundColor
+        addLayer,
+        deletePath,
+        foregroundColor,
+        canvasSize,
+        layers
     } = useEditor()
 
     const label = toolLabels[activeTool] || activeTool
@@ -528,175 +530,52 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
-    // Sample a cubic Bézier curve into discrete points
-    const sampleCubicBezier = (
-        p0x: number, p0y: number,
-        cp1x: number, cp1y: number,
-        cp2x: number, cp2y: number,
-        p1x: number, p1y: number,
-        steps: number
-    ): { x: number; y: number }[] => {
-        const pts: { x: number; y: number }[] = []
-        for (let i = 1; i <= steps; i++) {
-            const t = i / steps
-            const mt = 1 - t
-            pts.push({
-                x: mt * mt * mt * p0x + 3 * mt * mt * t * cp1x + 3 * mt * t * t * cp2x + t * t * t * p1x,
-                y: mt * mt * mt * p0y + 3 * mt * mt * t * cp1y + 3 * mt * t * t * cp2y + t * t * t * p1y
-            })
-        }
-        return pts
-    }
-
-    // Sample a quadratic Bézier curve into discrete points
-    const sampleQuadBezier = (
-        p0x: number, p0y: number,
-        cpx: number, cpy: number,
-        p1x: number, p1y: number,
-        steps: number
-    ): { x: number; y: number }[] => {
-        const pts: { x: number; y: number }[] = []
-        for (let i = 1; i <= steps; i++) {
-            const t = i / steps
-            const mt = 1 - t
-            pts.push({
-                x: mt * mt * p0x + 2 * mt * t * cpx + t * t * p1x,
-                y: mt * mt * p0y + 2 * mt * t * cpy + t * t * p1y
-            })
-        }
-        return pts
-    }
-
     const handleSelectionFromPath = () => {
-        if (!activePath || activePath.points.length < 2) return
-
-        const SAMPLE_STEPS = 20
-        const points: { x: number, y: number }[] = [{ x: activePath.points[0].x, y: activePath.points[0].y }]
-
-        // Sample each segment
-        for (let i = 1; i < activePath.points.length; i++) {
-            const p1 = activePath.points[i - 1]
-            const p2 = activePath.points[i]
-
-            if (p1.handleOut && p2.handleIn) {
-                points.push(...sampleCubicBezier(p1.x, p1.y, p1.handleOut.x, p1.handleOut.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y, SAMPLE_STEPS))
-            } else if (p1.handleOut) {
-                points.push(...sampleQuadBezier(p1.x, p1.y, p1.handleOut.x, p1.handleOut.y, p2.x, p2.y, SAMPLE_STEPS))
-            } else if (p2.handleIn) {
-                points.push(...sampleQuadBezier(p1.x, p1.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y, SAMPLE_STEPS))
-            } else {
-                points.push({ x: p2.x, y: p2.y })
-            }
-        }
-
-        // Handle closing segment for closed paths
-        if (activePath.closed && activePath.points.length > 2) {
-            const end = activePath.points[activePath.points.length - 1]
-            const start = activePath.points[0]
-            if (end.handleOut && start.handleIn) {
-                points.push(...sampleCubicBezier(end.x, end.y, end.handleOut.x, end.handleOut.y, start.handleIn.x, start.handleIn.y, start.x, start.y, SAMPLE_STEPS))
-            } else {
-                points.push({ x: start.x, y: start.y })
-            }
-        }
-
-        // Calculate bounds
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-        points.forEach(p => {
-            minX = Math.min(minX, p.x)
-            minY = Math.min(minY, p.y)
-            maxX = Math.max(maxX, p.x)
-            maxY = Math.max(maxY, p.y)
-        })
+        if (!activePath) return
+        const selection = pathToSelectionPolygon(activePath, 1, true)
+        if (!selection) return
 
         setSelection({
             type: 'path',
-            path: points,
-            x: minX,
-            y: minY,
-            width: maxX - minX,
-            height: maxY - minY
+            path: selection.points,
+            x: selection.bounds.minX,
+            y: selection.bounds.minY,
+            width: selection.bounds.maxX - selection.bounds.minX,
+            height: selection.bounds.maxY - selection.bounds.minY
         })
-    }
-
-    const drawPathOnContext = (ctx: CanvasRenderingContext2D, path: NonNullable<typeof activePath>, layerOffset: { x: number; y: number }) => {
-        const toLocal = (p: { x: number; y: number }) => ({
-            x: p.x - layerOffset.x,
-            y: p.y - layerOffset.y
-        })
-
-        const p0 = toLocal(path.points[0])
-        ctx.moveTo(p0.x, p0.y)
-
-        for (let i = 1; i < path.points.length; i++) {
-            const p1 = path.points[i - 1]
-            const p2 = path.points[i]
-            const p2Local = toLocal(p2)
-            const p1HandleOutLocal = p1.handleOut ? toLocal(p1.handleOut) : null
-            const p2HandleInLocal = p2.handleIn ? toLocal(p2.handleIn) : null
-
-            if (p1HandleOutLocal && p2HandleInLocal) {
-                ctx.bezierCurveTo(p1HandleOutLocal.x, p1HandleOutLocal.y, p2HandleInLocal.x, p2HandleInLocal.y, p2Local.x, p2Local.y)
-            } else if (p1HandleOutLocal) {
-                ctx.quadraticCurveTo(p1HandleOutLocal.x, p1HandleOutLocal.y, p2Local.x, p2Local.y)
-            } else if (p2HandleInLocal) {
-                ctx.quadraticCurveTo(p2HandleInLocal.x, p2HandleInLocal.y, p2Local.x, p2Local.y)
-            } else {
-                ctx.lineTo(p2Local.x, p2Local.y)
-            }
-        }
-
-        if (path.closed) {
-            const start = toLocal(path.points[0])
-            const end = path.points[path.points.length - 1]
-            const endHandleOutLocal = end.handleOut ? toLocal(end.handleOut) : null
-            const startHandleInLocal = path.points[0].handleIn ? toLocal(path.points[0].handleIn!) : null
-            if (endHandleOutLocal && startHandleInLocal) {
-                ctx.bezierCurveTo(endHandleOutLocal.x, endHandleOutLocal.y, startHandleInLocal.x, startHandleInLocal.y, start.x, start.y)
-            } else {
-                ctx.lineTo(start.x, start.y)
-            }
-            ctx.closePath()
-        }
     }
 
     const handleFillPath = () => {
-        if (!activePath || !activeLayerId) return
-        const layer = layers.find(l => l.id === activeLayerId)
-        if (!layer || !layer.data) return
-
-        const canvas = layer.data
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        ctx.fillStyle = foregroundColor
-        ctx.beginPath()
-        drawPathOnContext(ctx, activePath, { x: layer.x, y: layer.y })
-
-        ctx.fill()
-        updateLayerData(activeLayerId, canvas)
+        if (!activePath) return
+        const canvas = createFilledPathCanvas({
+            path: activePath,
+            canvasWidth: canvasSize.width,
+            canvasHeight: canvasSize.height,
+            color: foregroundColor
+        })
+        if (!canvas) return
+        const count = layers.filter((layer) => layer.name.startsWith('Path Fill')).length + 1
+        addLayer(`Path Fill ${count}`, canvas)
     }
 
     const handleStrokePath = () => {
-        if (!activePath || !activeLayerId) return
-        const layer = layers.find(l => l.id === activeLayerId)
-        if (!layer || !layer.data) return
-
-        const canvas = layer.data
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        ctx.strokeStyle = foregroundColor
-        ctx.lineWidth = toolOptions.brushSize // Use brush size
-        ctx.lineCap = 'round'
-        ctx.lineJoin = 'round'
-
-        ctx.beginPath()
-        drawPathOnContext(ctx, activePath, { x: layer.x, y: layer.y })
-
-        ctx.stroke()
-        updateLayerData(activeLayerId, canvas)
+        if (!activePath) return
+        const canvas = createStrokedPathCanvas({
+            path: activePath,
+            canvasWidth: canvasSize.width,
+            canvasHeight: canvasSize.height,
+            color: foregroundColor,
+            lineWidth: toolOptions.brushSize
+        })
+        if (!canvas) return
+        const count = layers.filter((layer) => layer.name.startsWith('Path Stroke')).length + 1
+        addLayer(`Path Stroke ${count}`, canvas)
     }
+
+    const canSelectFromPath = !!activePath && activePath.nodes.length >= 2
+    const canFillPath = !!activePath && activePath.closed && activePath.nodes.length >= 3
+    const canStrokePath = !!activePath && activePath.nodes.length >= 2
+    const canDeleteActivePath = !!activePathId
 
     const renderPathOptions = () => (
         <>
@@ -763,22 +642,25 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 <div style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: 4, padding: 2, gap: 1 }}>
                     <button
                         onClick={handleSelectionFromPath}
-                        title="Selection from Path"
-                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: activePath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: activePath ? 'pointer' : 'default', opacity: activePath ? 1 : 0.5 }}
+                        title={canSelectFromPath ? 'Selection from Path' : 'Need an active path with at least 2 points'}
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: canSelectFromPath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: canSelectFromPath ? 'pointer' : 'default', opacity: canSelectFromPath ? 1 : 0.5 }}
+                        disabled={!canSelectFromPath}
                     >
                         <BoxSelect size={15} />
                     </button>
                     <button
                         onClick={handleFillPath}
-                        title="Fill Path"
-                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: activePath && activeLayerId ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: activePath && activeLayerId ? 'pointer' : 'default', opacity: activePath && activeLayerId ? 1 : 0.5 }}
+                        title={canFillPath ? 'Fill Path (new layer)' : 'Fill requires an active closed path (3+ points)'}
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: canFillPath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: canFillPath ? 'pointer' : 'default', opacity: canFillPath ? 1 : 0.5 }}
+                        disabled={!canFillPath}
                     >
                         <PaintBucket size={15} />
                     </button>
                     <button
                         onClick={handleStrokePath}
-                        title="Stroke Path"
-                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: activePath && activeLayerId ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: activePath && activeLayerId ? 'pointer' : 'default', opacity: activePath && activeLayerId ? 1 : 0.5 }}
+                        title={canStrokePath ? 'Stroke Path (new layer)' : 'Need an active path with at least 2 points'}
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: canStrokePath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: canStrokePath ? 'pointer' : 'default', opacity: canStrokePath ? 1 : 0.5 }}
+                        disabled={!canStrokePath}
                     >
                         <PenLine size={15} />
                     </button>
@@ -787,8 +669,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 <div style={{ width: 1, height: 16, background: 'var(--border-main)' }} />
 
                 <button
-                    onClick={() => setActivePath(null)}
-                    title="Clear Path"
+                    onClick={() => activePathId && deletePath(activePathId)}
+                    title={canDeleteActivePath ? 'Delete Active Path' : 'No active path'}
                     style={{
                         height: 24,
                         width: 28,
@@ -800,9 +682,9 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                         background: 'transparent',
                         color: 'var(--pref-close-hover)',
                         cursor: 'pointer',
-                        opacity: activePath ? 1 : 0.5
+                        opacity: canDeleteActivePath ? 1 : 0.5
                     }}
-                    disabled={!activePath}
+                    disabled={!canDeleteActivePath}
                 >
                     <Trash2 size={16} />
                 </button>

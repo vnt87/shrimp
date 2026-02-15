@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { useHistory } from '../hooks/useHistory'
+import { createVectorPath, duplicatePath as duplicateVectorPath } from '../path/commands'
+import type { VectorPath } from '../path/types'
 
 export interface LayerFilter {
     type: 'blur' | 'brightness' | 'hue-saturation' | 'noise' | 'color-matrix' | 'custom'
@@ -47,20 +49,6 @@ export interface Selection {
     path?: { x: number; y: number }[]
 }
 
-export interface PathPoint {
-    x: number
-    y: number
-    handleIn: { x: number; y: number } | null
-    handleOut: { x: number; y: number } | null
-    type: 'corner' | 'smooth'
-}
-
-export interface Path {
-    id: string
-    points: PathPoint[]
-    closed: boolean
-}
-
 export interface Guide {
     id: string
     orientation: 'horizontal' | 'vertical'
@@ -91,7 +79,10 @@ interface EditorContextType {
     canvasSize: { width: number; height: number }
     selection: Selection | null
     guides: Guide[]
-    activePath: Path | null
+    paths: VectorPath[]
+    activePathId: string | null
+    activePath: VectorPath | null
+    activePathNodeId: string | null
 
     // Colors
     foregroundColor: string
@@ -161,8 +152,15 @@ interface EditorContextType {
     updateGuide: (id: string, position: number) => void
 
     // Path actions
-    setActivePath: (path: Path | null) => void
-    updatePath: (path: Path, history?: boolean) => void
+    createPath: (name?: string) => string
+    setActivePathId: (id: string | null) => void
+    updatePath: (pathId: string, updater: (path: VectorPath) => VectorPath, history?: boolean) => void
+    renamePath: (pathId: string, name: string) => void
+    duplicatePath: (pathId: string) => string | null
+    deletePath: (pathId: string) => void
+    setPathVisibility: (pathId: string, visible: boolean) => void
+    setPathLocked: (pathId: string, locked: boolean) => void
+    setActivePathNodeId: (nodeId: string | null) => void
 
     // Transform
     transientTransforms: Record<string, TransformData>
@@ -179,7 +177,8 @@ interface EditorState {
     canvasSize: { width: number; height: number }
     selection: Selection | null
     guides: Guide[]
-    activePath: Path | null
+    paths: VectorPath[]
+    activePathId: string | null
 }
 
 export function EditorProvider({ children }: { children: React.ReactNode }) {
@@ -190,7 +189,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         canvasSize: { width: 800, height: 600 },
         selection: null,
         guides: [],
-        activePath: null
+        paths: [],
+        activePathId: null
     }
 
     const {
@@ -206,7 +206,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } = useHistory<EditorState>(emptyState)
 
     // Derived state for easier usage
-    const { layers, activeLayerId, canvasSize, selection, guides, activePath } = historyState
+    const { layers, activeLayerId, canvasSize, selection, guides, paths, activePathId } = historyState
+    const activePath = useMemo(
+        () => (activePathId ? paths.find((path) => path.id === activePathId) ?? null : null),
+        [paths, activePathId]
+    )
+    const [activePathNodeId, setActivePathNodeId] = useState<string | null>(null)
     const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([])
 
     // Phase 2: Transient transforms for live preview (not in history)
@@ -248,6 +253,17 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setSelectedLayerIds([activeLayerId])
         }
     }, [activeLayerId])
+
+    useEffect(() => {
+        if (!activePath) {
+            setActivePathNodeId(null)
+            return
+        }
+        if (!activePathNodeId) return
+        if (!activePath.nodes.some((node) => node.id === activePathNodeId)) {
+            setActivePathNodeId(null)
+        }
+    }, [activePath, activePathNodeId])
 
     const updateState = useCallback((updates: Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>)) => {
         setHistoryState(prevFullState => {
@@ -340,16 +356,28 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
                 return active ? `Active layer changed (${active.name})` : 'Active layer changed'
             }
 
-            if (!prev.activePath && next.activePath) return 'Path created'
-            if (prev.activePath && !next.activePath) return 'Path cleared'
-            if (prev.activePath && next.activePath) {
-                if (prev.activePath.closed !== next.activePath.closed) return next.activePath.closed ? 'Path closed' : 'Path opened'
-                if (prev.activePath.points.length !== next.activePath.points.length) {
-                    return next.activePath.points.length > prev.activePath.points.length
-                        ? `Path point added (${next.activePath.points.length} pts)`
-                        : `Path point removed (${next.activePath.points.length} pts)`
+            if (prev.paths.length !== next.paths.length) {
+                return next.paths.length > prev.paths.length ? 'Path created' : 'Path deleted'
+            }
+            if (prev.activePathId !== next.activePathId) {
+                return 'Active path changed'
+            }
+            if (prev.paths !== next.paths) {
+                const prevMap = new Map(prev.paths.map((path) => [path.id, path]))
+                for (const nextPath of next.paths) {
+                    const prevPath = prevMap.get(nextPath.id)
+                    if (!prevPath) continue
+                    if (prevPath.name !== nextPath.name) return 'Path renamed'
+                    if (prevPath.visible !== nextPath.visible) return nextPath.visible ? 'Path shown' : 'Path hidden'
+                    if (prevPath.locked !== nextPath.locked) return nextPath.locked ? 'Path locked' : 'Path unlocked'
+                    if (prevPath.closed !== nextPath.closed) return nextPath.closed ? 'Path closed' : 'Path opened'
+                    if (prevPath.nodes.length !== nextPath.nodes.length) {
+                        return nextPath.nodes.length > prevPath.nodes.length
+                            ? `Path point added (${nextPath.nodes.length} pts)`
+                            : `Path point removed (${nextPath.nodes.length} pts)`
+                    }
+                    if (prevPath !== nextPath) return 'Path edited'
                 }
-                if (prev.activePath !== next.activePath) return 'Path edited'
             }
 
             if (!prev.selection && next.selection) return `Selection created (${next.selection.type})`
@@ -747,17 +775,91 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     // --- Path Actions ---
 
-    const setActivePath = useCallback((path: Path | null) => {
-        updateState({ activePath: path })
+    const nextPathName = useCallback((existingPaths: VectorPath[], baseName: string = 'Path') => {
+        const names = new Set(existingPaths.map((path) => path.name))
+        if (!names.has(baseName)) return baseName
+        let i = 2
+        while (names.has(`${baseName} ${i}`)) i++
+        return `${baseName} ${i}`
+    }, [])
+
+    const createPath = useCallback((name?: string) => {
+        let createdId = ''
+        updateState((prevState) => {
+            const nextName = name?.trim() || nextPathName(prevState.paths)
+            const created = createVectorPath(nextName)
+            createdId = created.id
+            return {
+                paths: [created, ...prevState.paths],
+                activePathId: created.id
+            }
+        })
+        return createdId
+    }, [updateState, nextPathName])
+
+    const setActivePathId = useCallback((id: string | null) => {
+        updateState({ activePathId: id })
     }, [updateState])
 
-    const updatePath = useCallback((path: Path, history: boolean = true) => {
-        if (history) {
-            updateState({ activePath: path })
-            return
+    const updatePath = useCallback((pathId: string, updater: (path: VectorPath) => VectorPath, history: boolean = true) => {
+        const apply = (prevState: EditorState) => {
+            const index = prevState.paths.findIndex((path) => path.id === pathId)
+            if (index < 0) return {}
+
+            const current = prevState.paths[index]
+            const updated = updater(current)
+            if (updated === current) return {}
+
+            const nextPaths = [...prevState.paths]
+            nextPaths[index] = { ...updated, updatedAt: Date.now() }
+            return { paths: nextPaths }
         }
-        replaceState({ activePath: path })
+
+        if (history) updateState(apply)
+        else replaceState(apply)
     }, [updateState, replaceState])
+
+    const renamePath = useCallback((pathId: string, name: string) => {
+        const trimmed = name.trim()
+        if (!trimmed) return
+        updatePath(pathId, (path) => ({ ...path, name: trimmed }))
+    }, [updatePath])
+
+    const duplicatePath = useCallback((pathId: string) => {
+        let duplicatedId: string | null = null
+        updateState((prevState) => {
+            const path = prevState.paths.find((candidate) => candidate.id === pathId)
+            if (!path) return {}
+
+            const duplicated = duplicateVectorPath(path, nextPathName(prevState.paths, `${path.name} Copy`))
+            duplicatedId = duplicated.id
+            return {
+                paths: [duplicated, ...prevState.paths],
+                activePathId: duplicated.id
+            }
+        })
+        return duplicatedId
+    }, [updateState, nextPathName])
+
+    const deletePath = useCallback((pathId: string) => {
+        updateState((prevState) => {
+            const nextPaths = prevState.paths.filter((path) => path.id !== pathId)
+            if (nextPaths.length === prevState.paths.length) return {}
+            const nextActivePathId = prevState.activePathId === pathId ? (nextPaths[0]?.id ?? null) : prevState.activePathId
+            return {
+                paths: nextPaths,
+                activePathId: nextActivePathId
+            }
+        })
+    }, [updateState])
+
+    const setPathVisibility = useCallback((pathId: string, visible: boolean) => {
+        updatePath(pathId, (path) => ({ ...path, visible }))
+    }, [updatePath])
+
+    const setPathLocked = useCallback((pathId: string, locked: boolean) => {
+        updatePath(pathId, (path) => ({ ...path, locked }))
+    }, [updatePath])
 
     const commitTransform = useCallback((layerId: string, transform: TransformData) => {
         updateState(prevState => {
@@ -1156,7 +1258,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             selection: null,
             canvasSize: { width: 800, height: 600 },
             guides: [],
-            activePath: null
+            paths: [],
+            activePathId: null
         })
     }, [clearHistory])
 
@@ -1451,7 +1554,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             canvasSize: { width, height },
             selection: null,
             guides: [],
-            activePath: null
+            paths: [],
+            activePathId: null
         })
     }, [clearHistory])
 
@@ -1476,7 +1580,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             canvasSize: { width: canvas.width, height: canvas.height },
             selection: null,
             guides: [],
-            activePath: null
+            paths: [],
+            activePathId: null
         })
     }, [clearHistory])
 
@@ -1492,6 +1597,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             activeLayerId,
             canvasSize,
             selection,
+            paths,
+            activePathId,
+            activePath,
+            activePathNodeId,
             // Colors
             foregroundColor,
             backgroundColor,
@@ -1560,9 +1669,15 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             updateLayerTextStyle,
 
             // Path Tool
-            activePath,
-            setActivePath,
-            updatePath
+            createPath,
+            setActivePathId,
+            updatePath,
+            renamePath,
+            duplicatePath,
+            deletePath,
+            setPathVisibility,
+            setPathLocked,
+            setActivePathNodeId
         }}>
             {children}
         </EditorContext.Provider>

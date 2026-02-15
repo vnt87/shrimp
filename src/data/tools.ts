@@ -7,7 +7,7 @@ import {
     Brush,
     Eraser,
     PaintBucket,
-    Blend,
+    Contrast,
     PenTool,
     Pencil,
     Pipette,
@@ -56,7 +56,7 @@ export const toolGroups: ToolDefinition[][] = [
     [
         { id: 'eraser', icon: Eraser, label: 'Eraser' },
         { id: 'bucket', icon: PaintBucket, label: 'Bucket Fill' },
-        { id: 'gradient', icon: Blend, label: 'Gradient' },
+        { id: 'gradient', icon: Contrast, label: 'Gradient' },
     ],
     [
         { id: 'text', icon: Type, label: 'Text' },

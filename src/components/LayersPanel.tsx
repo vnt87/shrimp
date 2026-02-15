@@ -258,9 +258,18 @@ export default function LayersPanel() {
     const {
         layers,
         activeLayerId,
+        paths,
+        activePathId,
         activePath,
-        setActivePath,
+        activePathNodeId,
+        setActivePathId,
+        createPath,
         updatePath,
+        renamePath,
+        duplicatePath: duplicateVectorPath,
+        deletePath,
+        setPathVisibility,
+        setPathLocked,
         toggleLayerLock,
         setLayerOpacity,
         setLayerBlendMode,
@@ -279,6 +288,8 @@ export default function LayersPanel() {
         restoreHistoryIndex
     } = useEditor()
     const [activeTab, setActiveTab] = useState<'layers' | 'channels' | 'paths' | 'history'>('layers')
+    const [renamingPathId, setRenamingPathId] = useState<string | null>(null)
+    const [renamingPathValue, setRenamingPathValue] = useState('')
 
     // Determine active layer object for lock/opacity controls
     const findLayer = (list: Layer[], id: string): Layer | null => {
@@ -331,8 +342,27 @@ export default function LayersPanel() {
 
     const togglePathClosed = () => {
         if (!activePath) return
-        if (!activePath.closed && activePath.points.length < 3) return
-        updatePath({ ...activePath, closed: !activePath.closed })
+        if (!activePath.closed && activePath.nodes.length < 3) return
+        updatePath(activePath.id, (path) => ({ ...path, closed: !path.closed }), true)
+    }
+
+    const selectedNode = activePath && activePathNodeId
+        ? activePath.nodes.find((node) => node.id === activePathNodeId) ?? null
+        : null
+
+    const beginRenamePath = (pathId: string, currentName: string) => {
+        setRenamingPathId(pathId)
+        setRenamingPathValue(currentName)
+    }
+
+    const submitRenamePath = () => {
+        if (!renamingPathId) return
+        const trimmed = renamingPathValue.trim()
+        if (trimmed) {
+            renamePath(renamingPathId, trimmed)
+        }
+        setRenamingPathId(null)
+        setRenamingPathValue('')
     }
 
     return (
@@ -487,17 +517,37 @@ export default function LayersPanel() {
             {activeTab === 'paths' && (
                 <>
                     <div className="layers-blend-row" style={{ justifyContent: 'space-between' }}>
-                        <span className="dialogue-bar-label">Active Path</span>
+                        <span className="dialogue-bar-label">Paths</span>
                         <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                            {activePath ? `${activePath.points.length} pts` : 'None'}
+                            {paths.length}
                         </span>
                     </div>
 
                     <div className="dialogue-divider" />
 
                     <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div className="panel-inline-actions">
+                            <button
+                                type="button"
+                                className="panel-btn panel-btn-secondary"
+                                onClick={() => createPath()}
+                                title="Create empty path"
+                            >
+                                New
+                            </button>
+                            <button
+                                type="button"
+                                className="panel-btn panel-btn-secondary"
+                                onClick={() => activePathId && deletePath(activePathId)}
+                                disabled={!activePathId}
+                                title="Delete active path"
+                            >
+                                Delete
+                            </button>
+                        </div>
+
                         <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                            Status: {activePath ? (activePath.closed ? 'Closed' : 'Open') : 'No path'}
+                            Status: {activePath ? (activePath.closed ? 'Closed' : 'Open') : 'No active path'}
                         </div>
 
                         <div className="panel-inline-actions">
@@ -505,42 +555,112 @@ export default function LayersPanel() {
                                 type="button"
                                 className="panel-btn panel-btn-secondary"
                                 onClick={togglePathClosed}
-                                disabled={!activePath || (!activePath.closed && activePath.points.length < 3)}
+                                disabled={!activePath || (!activePath.closed && activePath.nodes.length < 3)}
                                 title={activePath?.closed ? 'Open path' : 'Close path'}
                             >
                                 {activePath?.closed ? 'Open' : 'Close'}
                             </button>
-                            <button
-                                type="button"
-                                className="panel-btn panel-btn-secondary"
-                                onClick={() => setActivePath(null)}
-                                disabled={!activePath}
-                                title="Clear path"
-                            >
-                                Clear
-                            </button>
                         </div>
+
+                        {selectedNode && (
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                                {`Selected: x:${Math.round(selectedNode.x)} y:${Math.round(selectedNode.y)} · ${selectedNode.type}`}
+                            </div>
+                        )}
                     </div>
 
                     <div className="dialogue-divider" />
 
                     <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
-                        {!activePath && (
+                        {paths.length === 0 && (
                             <div style={{ padding: 12, color: 'var(--text-secondary)', textAlign: 'center', fontSize: 12 }}>
-                                No active path. Use the Paths tool (`P`) to create one.
+                                No saved paths. Use the Paths tool (`P`) to create one.
                             </div>
                         )}
-                        {activePath?.points.map((point, index) => (
-                            <div key={`${activePath.id}-${index}`} className="layer-row" style={{ cursor: 'default' }}>
+                        {paths.map((path) => (
+                            <div
+                                key={path.id}
+                                className={`layer-row${path.id === activePathId ? ' selected' : ''}`}
+                                onClick={() => setActivePathId(path.id)}
+                                style={{ cursor: 'default' }}
+                            >
                                 <div className="layer-info" style={{ gap: 8 }}>
                                     <div className="layer-folder-icon">
                                         <Anchor size={14} />
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        <span className="layer-name">{`Point ${index + 1}`}</span>
+                                        {renamingPathId === path.id ? (
+                                            <input
+                                                value={renamingPathValue}
+                                                onChange={(e) => setRenamingPathValue(e.target.value)}
+                                                onBlur={submitRenamePath}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') submitRenamePath()
+                                                    if (e.key === 'Escape') {
+                                                        setRenamingPathId(null)
+                                                        setRenamingPathValue('')
+                                                    }
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="layer-rename-input"
+                                            />
+                                        ) : (
+                                            <span
+                                                className="layer-name"
+                                                onDoubleClick={(e) => {
+                                                    e.stopPropagation()
+                                                    beginRenamePath(path.id, path.name)
+                                                }}
+                                            >
+                                                {path.name}
+                                            </span>
+                                        )}
                                         <span className="layer-name muted" style={{ fontSize: 11 }}>
-                                            {`x:${Math.round(point.x)} y:${Math.round(point.y)} · ${point.type}`}
+                                            {`${path.closed ? 'closed' : 'open'} · ${path.nodes.length} pts${path.locked ? ' · locked' : ''}`}
                                         </span>
+                                    </div>
+                                </div>
+
+                                <div className="layer-status" style={{ display: 'flex', gap: 4 }}>
+                                    <div
+                                        className="layer-status-icon"
+                                        title={path.visible ? 'Hide path' : 'Show path'}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setPathVisibility(path.id, !path.visible)
+                                        }}
+                                    >
+                                        {path.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                                    </div>
+                                    <div
+                                        className={`layer-status-icon${path.locked ? ' active' : ''}`}
+                                        title={path.locked ? 'Unlock path' : 'Lock path'}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setPathLocked(path.id, !path.locked)
+                                        }}
+                                    >
+                                        <Lock size={14} />
+                                    </div>
+                                    <div
+                                        className="layer-status-icon"
+                                        title="Duplicate path"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            duplicateVectorPath(path.id)
+                                        }}
+                                    >
+                                        <Copy size={14} />
+                                    </div>
+                                    <div
+                                        className="layer-status-icon"
+                                        title="Delete path"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            deletePath(path.id)
+                                        }}
+                                    >
+                                        <Trash2 size={14} />
                                     </div>
                                 </div>
                             </div>
