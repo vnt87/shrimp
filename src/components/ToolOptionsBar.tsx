@@ -627,31 +627,36 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
     const renderPathOptions = () => (
         <>
             <div className="tool-options-group">
-                <div className="segmented-control">
-                    <button
-                        className={`segmented-btn ${toolOptions.pathMode === 'design' ? 'active' : ''}`}
-                        onClick={() => onToolOptionChange('pathMode', 'design')}
-                        title="Design Mode"
-                    >
-                        <PenTool />
-                        <span>Design</span>
-                    </button>
-                    <button
-                        className={`segmented-btn ${toolOptions.pathMode === 'edit' ? 'active' : ''}`}
-                        onClick={() => onToolOptionChange('pathMode', 'edit')}
-                        title="Edit Mode"
-                    >
-                        <MousePointer2 />
-                        <span>Edit</span>
-                    </button>
-                    <button
-                        className={`segmented-btn ${toolOptions.pathMode === 'move' ? 'active' : ''}`}
-                        onClick={() => onToolOptionChange('pathMode', 'move')}
-                        title="Move Mode"
-                    >
-                        <MoveIcon />
-                        <span>Move</span>
-                    </button>
+                <div style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
+                    {[
+                        { mode: 'design', icon: PenTool, label: 'Design' },
+                        { mode: 'edit', icon: MousePointer2, label: 'Edit' },
+                        { mode: 'move', icon: MoveIcon, label: 'Move' }
+                    ].map(({ mode, icon: Icon, label }) => (
+                        <button
+                            key={mode}
+                            onClick={() => onToolOptionChange('pathMode', mode as any)}
+                            title={`${label} Mode`}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '4px 8px',
+                                background: toolOptions.pathMode === mode ? 'var(--bg-hover)' : 'transparent',
+                                color: toolOptions.pathMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                borderRadius: 4,
+                                border: 'none',
+                                fontSize: 12,
+                                fontWeight: toolOptions.pathMode === mode ? 500 : 400,
+                                cursor: 'pointer',
+                                transition: 'all 0.1s ease',
+                                boxShadow: toolOptions.pathMode === mode ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
+                            }}
+                        >
+                            <Icon size={14} />
+                            <span>{label}</span>
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -659,38 +664,73 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
             <div className="tool-options-group">
                 <button
-                    className={`tool-options-icon-btn ${toolOptions.pathPolygonal ? 'active' : ''}`}
+                    className={`pref-btn ${toolOptions.pathPolygonal ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                     onClick={() => onToolOptionChange('pathPolygonal', !toolOptions.pathPolygonal)}
                     title="Polygonal (Straight lines)"
                     style={{
-                        background: toolOptions.pathPolygonal ? 'var(--accent-active)' : undefined,
-                        color: toolOptions.pathPolygonal ? 'white' : undefined
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: 26,
+                        padding: '0 8px',
+                        gap: 6,
+                        fontSize: 12,
+                        borderRadius: 4
                     }}
                 >
-                    <Hexagon />
+                    <Hexagon size={14} />
+                    <span>Polygonal</span>
                 </button>
             </div>
 
             <div className="tool-options-divider" />
 
-            <div className="tool-options-group">
-                <button className="tool-options-icon-btn" onClick={handleSelectionFromPath} title="Selection from Path">
-                    <BoxSelect />
-                </button>
-                <button className="tool-options-icon-btn" onClick={handleFillPath} title="Fill Path">
-                    <PaintBucket />
-                </button>
-                <button className="tool-options-icon-btn" onClick={handleStrokePath} title="Stroke Path">
-                    <PenLine />
-                </button>
-                <div className="tool-options-divider" style={{ margin: '0 4px', height: '10px' }} />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: 4, padding: 2, gap: 1 }}>
+                    <button
+                        onClick={handleSelectionFromPath}
+                        title="Selection from Path"
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: activePath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: activePath ? 'pointer' : 'default', opacity: activePath ? 1 : 0.5 }}
+                    >
+                        <BoxSelect size={15} />
+                    </button>
+                    <button
+                        onClick={handleFillPath}
+                        title="Fill Path"
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: activePath && activeLayerId ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: activePath && activeLayerId ? 'pointer' : 'default', opacity: activePath && activeLayerId ? 1 : 0.5 }}
+                    >
+                        <PaintBucket size={15} />
+                    </button>
+                    <button
+                        onClick={handleStrokePath}
+                        title="Stroke Path"
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: activePath && activeLayerId ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: activePath && activeLayerId ? 'pointer' : 'default', opacity: activePath && activeLayerId ? 1 : 0.5 }}
+                    >
+                        <PenLine size={15} />
+                    </button>
+                </div>
+
+                <div style={{ width: 1, height: 16, background: 'var(--border-main)' }} />
+
                 <button
-                    className="tool-options-icon-btn"
                     onClick={() => setActivePath(null)}
                     title="Clear Path"
-                    style={{ color: 'var(--pref-close-hover)' }}
+                    style={{
+                        height: 24,
+                        width: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 4,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--pref-close-hover)',
+                        cursor: 'pointer',
+                        opacity: activePath ? 1 : 0.5
+                    }}
+                    disabled={!activePath}
                 >
-                    <Trash2 />
+                    <Trash2 size={16} />
                 </button>
             </div>
         </>

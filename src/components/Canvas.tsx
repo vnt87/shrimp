@@ -185,7 +185,7 @@ function Ruler({
 /**
  * Recursive component to render layers and groups.
  */
-function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer }) {
+function PixiLayerRecursive({ layer, hiddenLayerId }: { layer: import('./EditorContext').Layer, hiddenLayerId?: string | null }) {
     const { activeLayerId, transientTransforms } = useEditor()
     const transform = transientTransforms?.[layer.id]
 
@@ -204,7 +204,7 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
                 alpha={layer.opacity / 100}
             >
                 {layer.children?.slice().reverse().map(child => (
-                    <PixiLayerRecursive key={child.id} layer={child} />
+                    <PixiLayerRecursive key={child.id} layer={child} hiddenLayerId={hiddenLayerId} />
                 ))}
             </pixiContainer>
         )
@@ -237,7 +237,9 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
                     rotation={transform ? transform.rotation : 0}
                     skew={transform ? { x: transform.skewX, y: transform.skewY } : { x: 0, y: 0 }}
                     pivot={transform ? { x: transform.pivotX, y: transform.pivotY } : { x: 0, y: 0 }}
-                    alpha={layer.opacity / 100}
+                    alpha={layer.id === hiddenLayerId ? 0 : layer.opacity / 100}
+                    resolution={window.devicePixelRatio || 2}
+                    roundPixels={true}
                     style={layer.textStyle ? {
                         fontFamily: layer.textStyle.fontFamily,
                         fontSize: layer.textStyle.fontSize,
@@ -330,12 +332,14 @@ function PixiScene({
     transform,
     cursorRef,
     toolOptions,
-    activeTool
+    activeTool,
+    hiddenLayerId
 }: {
     transform: CanvasTransform
     cursorRef: React.MutableRefObject<{ x: number, y: number }>
     toolOptions?: ToolOptions
     activeTool: string
+    hiddenLayerId?: string | null
 }) {
     const { layers, selection, activeLayerId } = useEditor()
 
@@ -347,7 +351,7 @@ function PixiScene({
         >
             {/* GPU-rendered layers (recursive) */}
             {layers.slice().reverse().map(layer => (
-                <PixiLayerRecursive key={layer.id} layer={layer} />
+                <PixiLayerRecursive key={layer.id} layer={layer} hiddenLayerId={hiddenLayerId} />
             ))}
 
             {/* GPU-rendered selection overlay */}
@@ -1288,6 +1292,39 @@ export default function Canvas({
 
         if (activeTool === 'move' && activeLayerId) {
             const layer = layers.find(l => l.id === activeLayerId)
+
+            // Check if clicking on another text layer to auto-select it
+            // This allows moving text layers even if not currently selected
+            const clickedTextLayer = [...layers].reverse().find(l => {
+                if (!l.visible) return false;
+
+                // For text layers, we need a better hit test than just x/y
+                if (l.type === 'text' && l.text) {
+                    const s = l.textStyle || { fontSize: 24 }
+                    const estWidth = l.text.length * s.fontSize * 0.6
+                    const lines = l.text.split('\n')
+                    const estHeight = lines.length * s.fontSize * 1.4
+                    return canvasX >= l.x && canvasX <= l.x + estWidth &&
+                        canvasY >= l.y && canvasY <= l.y + estHeight
+                }
+
+                return false;
+            })
+
+            if (clickedTextLayer && clickedTextLayer.id !== activeLayerId) {
+                setActiveLayer(clickedTextLayer.id)
+                setIsDragging(true)
+                dragStart.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    offsetX: 0,
+                    offsetY: 0,
+                    layerX: clickedTextLayer.x,
+                    layerY: clickedTextLayer.y
+                }
+                return;
+            }
+
             if (layer) {
                 setIsDragging(true)
                 dragStart.current = {
@@ -1717,6 +1754,7 @@ export default function Canvas({
                                         cursorRef={cursorRef}
                                         toolOptions={toolOptions}
                                         activeTool={activeTool}
+                                        hiddenLayerId={textEditorState?.layerId}
                                     />
                                 </Application>
 
