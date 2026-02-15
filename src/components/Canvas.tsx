@@ -324,10 +324,30 @@ function PixiScene({
     activeTool: string
 }) {
     const { layers, selection, activeLayerId } = useEditor()
+    const { app } = useApplication()
 
+    // Keep the PixiJS renderer sized to the canvas's parent element
+    useEffect(() => {
+        if (!app?.renderer || !app.canvas) return
+        const parent = app.canvas.parentElement
+        if (!parent) return
 
-    // Manual resize removed to rely on Application resizeTo prop
-    // which now correctly receives the viewport element via callback ref.
+        const resize = () => {
+            const w = parent.clientWidth
+            const h = parent.clientHeight
+            if (w > 0 && h > 0 && app.renderer) {
+                app.renderer.resize(w, h)
+            }
+        }
+
+        // Initial resize
+        resize()
+
+        // Watch for future size changes
+        const ro = new ResizeObserver(resize)
+        ro.observe(parent)
+        return () => ro.disconnect()
+    }, [app])
 
     return (
         <pixiContainer

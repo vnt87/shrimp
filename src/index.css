@@ -940,6 +940,19 @@ body,
   cursor: default;
 }
 
+/* Ensure the PixiJS canvas fills the entire viewport */
+.canvas-viewport .viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-viewport .viewport canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .canvas-viewport.panning-ready {
   cursor: grab;
 }
