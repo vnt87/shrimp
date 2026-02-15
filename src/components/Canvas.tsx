@@ -1882,7 +1882,7 @@ export default function Canvas({
                                             minWidth: 100 * transform.scale,
                                             minHeight: (toolOptions?.fontSize || 24) * transform.scale * 1.4,
                                             background: 'rgba(255, 255, 255, 0.1)',
-                                            border: '1px dashed var(--accent-primary)',
+                                            border: '1px dashed var(--accent-active)',
                                             padding: 0,
                                             margin: 0,
                                             outline: 'none',

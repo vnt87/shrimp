@@ -86,35 +86,45 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         max: number,
         step: number = 1,
         unit: string = ''
-    ) => (
-        <div className="tool-options-slider-group" key={key}>
-            <span className="slider-label">{labelText}</span>
-            <input
-                type="range"
-                className="tool-options-slider"
-                min={min}
-                max={max}
-                step={step}
-                value={toolOptions[key] as number}
-                onChange={(e) => onToolOptionChange(key, Number(e.target.value) as ToolOptions[typeof key])}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    ) => {
+        const value = toolOptions[key] as number
+        const range = max - min
+        const fill = range > 0 ? ((value - min) / range) * 100 : 0
+        const fillPercent = Math.min(100, Math.max(0, fill))
+
+        return (
+            <div className="tool-options-slider-group" key={key}>
+                <span className="slider-label">{labelText}</span>
                 <input
-                    type="number"
-                    className="tool-options-number-input"
+                    type="range"
+                    className="tool-options-slider"
                     min={min}
                     max={max}
                     step={step}
-                    value={toolOptions[key] as number}
-                    onChange={(e) => {
-                        const v = parseFloat(e.target.value)
-                        if (!isNaN(v)) onToolOptionChange(key, Math.min(max, Math.max(min, v)) as ToolOptions[typeof key])
+                    value={value}
+                    style={{
+                        background: `linear-gradient(to right, var(--accent-active) 0%, var(--accent-active) ${fillPercent}%, var(--bg-input) ${fillPercent}%, var(--bg-input) 100%)`
                     }}
+                    onChange={(e) => onToolOptionChange(key, Number(e.target.value) as ToolOptions[typeof key])}
                 />
-                {unit && <span className="slider-unit">{unit}</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input
+                        type="number"
+                        className="tool-options-number-input"
+                        min={min}
+                        max={max}
+                        step={step}
+                        value={value}
+                        onChange={(e) => {
+                            const v = parseFloat(e.target.value)
+                            if (!isNaN(v)) onToolOptionChange(key, Math.min(max, Math.max(min, v)) as ToolOptions[typeof key])
+                        }}
+                    />
+                    {unit && <span className="slider-unit">{unit}</span>}
+                </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     const renderBrushOptions = () => (
         <>
@@ -534,6 +544,47 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         })
     }
 
+    const drawPathOnContext = (ctx: CanvasRenderingContext2D, path: NonNullable<typeof activePath>, layerOffset: { x: number; y: number }) => {
+        const toLocal = (p: { x: number; y: number }) => ({
+            x: p.x - layerOffset.x,
+            y: p.y - layerOffset.y
+        })
+
+        const p0 = toLocal(path.points[0])
+        ctx.moveTo(p0.x, p0.y)
+
+        for (let i = 1; i < path.points.length; i++) {
+            const p1 = path.points[i - 1]
+            const p2 = path.points[i]
+            const p2Local = toLocal(p2)
+            const p1HandleOutLocal = p1.handleOut ? toLocal(p1.handleOut) : null
+            const p2HandleInLocal = p2.handleIn ? toLocal(p2.handleIn) : null
+
+            if (p1HandleOutLocal && p2HandleInLocal) {
+                ctx.bezierCurveTo(p1HandleOutLocal.x, p1HandleOutLocal.y, p2HandleInLocal.x, p2HandleInLocal.y, p2Local.x, p2Local.y)
+            } else if (p1HandleOutLocal) {
+                ctx.quadraticCurveTo(p1HandleOutLocal.x, p1HandleOutLocal.y, p2Local.x, p2Local.y)
+            } else if (p2HandleInLocal) {
+                ctx.quadraticCurveTo(p2HandleInLocal.x, p2HandleInLocal.y, p2Local.x, p2Local.y)
+            } else {
+                ctx.lineTo(p2Local.x, p2Local.y)
+            }
+        }
+
+        if (path.closed) {
+            const start = toLocal(path.points[0])
+            const end = path.points[path.points.length - 1]
+            const endHandleOutLocal = end.handleOut ? toLocal(end.handleOut) : null
+            const startHandleInLocal = path.points[0].handleIn ? toLocal(path.points[0].handleIn!) : null
+            if (endHandleOutLocal && startHandleInLocal) {
+                ctx.bezierCurveTo(endHandleOutLocal.x, endHandleOutLocal.y, startHandleInLocal.x, startHandleInLocal.y, start.x, start.y)
+            } else {
+                ctx.lineTo(start.x, start.y)
+            }
+            ctx.closePath()
+        }
+    }
+
     const handleFillPath = () => {
         if (!activePath || !activeLayerId) return
         const layer = layers.find(l => l.id === activeLayerId)
@@ -545,33 +596,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
         ctx.fillStyle = foregroundColor
         ctx.beginPath()
-        const p0 = activePath.points[0]
-        ctx.moveTo(p0.x, p0.y)
-
-        for (let i = 1; i < activePath.points.length; i++) {
-            const p1 = activePath.points[i - 1]
-            const p2 = activePath.points[i]
-            if (p1.handleOut && p2.handleIn) {
-                ctx.bezierCurveTo(p1.handleOut.x, p1.handleOut.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
-            } else if (p1.handleOut) {
-                ctx.quadraticCurveTo(p1.handleOut.x, p1.handleOut.y, p2.x, p2.y)
-            } else if (p2.handleIn) {
-                ctx.quadraticCurveTo(p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
-            } else {
-                ctx.lineTo(p2.x, p2.y)
-            }
-        }
-
-        if (activePath.closed) {
-            const start = activePath.points[0]
-            const end = activePath.points[activePath.points.length - 1]
-            if (end.handleOut && start.handleIn) {
-                ctx.bezierCurveTo(end.handleOut.x, end.handleOut.y, start.handleIn.x, start.handleIn.y, start.x, start.y)
-            } else {
-                ctx.lineTo(start.x, start.y) // Close path
-            }
-            ctx.closePath()
-        }
+        drawPathOnContext(ctx, activePath, { x: layer.x, y: layer.y })
 
         ctx.fill()
         updateLayerData(activeLayerId, canvas)
@@ -592,33 +617,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         ctx.lineJoin = 'round'
 
         ctx.beginPath()
-        const p0 = activePath.points[0]
-        ctx.moveTo(p0.x, p0.y)
-
-        for (let i = 1; i < activePath.points.length; i++) {
-            const p1 = activePath.points[i - 1]
-            const p2 = activePath.points[i]
-            if (p1.handleOut && p2.handleIn) {
-                ctx.bezierCurveTo(p1.handleOut.x, p1.handleOut.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
-            } else if (p1.handleOut) {
-                ctx.quadraticCurveTo(p1.handleOut.x, p1.handleOut.y, p2.x, p2.y)
-            } else if (p2.handleIn) {
-                ctx.quadraticCurveTo(p2.handleIn.x, p2.handleIn.y, p2.x, p2.y)
-            } else {
-                ctx.lineTo(p2.x, p2.y)
-            }
-        }
-
-        if (activePath.closed) {
-            const start = activePath.points[0]
-            const end = activePath.points[activePath.points.length - 1]
-            if (end.handleOut && start.handleIn) {
-                ctx.bezierCurveTo(end.handleOut.x, end.handleOut.y, start.handleIn.x, start.handleIn.y, start.x, start.y)
-            } else {
-                ctx.lineTo(start.x, start.y)
-            }
-            ctx.closePath()
-        }
+        drawPathOnContext(ctx, activePath, { x: layer.x, y: layer.y })
 
         ctx.stroke()
         updateLayerData(activeLayerId, canvas)

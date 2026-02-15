@@ -10,13 +10,15 @@ interface PathOverlayProps {
 export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps) {
     const { activePath, setActivePath, updatePath } = useEditor()
     const containerRef = useRef<HTMLDivElement>(null)
+    const dragPreviewPathRef = useRef<Path | null>(null)
 
     const [dragState, setDragState] = useState<{
-        type: 'point' | 'handleIn' | 'handleOut'
-        pointIndex: number
+        type: 'point' | 'handleIn' | 'handleOut' | 'path'
+        pointIndex?: number
         startX: number
         startY: number
-        initialPoint: PathPoint
+        initialPoint?: PathPoint
+        initialPath?: Path
     } | null>(null)
 
     // For rubber-band preview + close-path indicator
@@ -76,6 +78,120 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
         return Math.hypot(startPoint.x - canvasX, startPoint.y - canvasY) < 10 / zoomLevel
     }, [activePath, zoomLevel])
 
+    const pointToSegmentDistance = useCallback(
+        (
+            px: number,
+            py: number,
+            x1: number,
+            y1: number,
+            x2: number,
+            y2: number
+        ) => {
+            const dx = x2 - x1
+            const dy = y2 - y1
+            const lenSq = dx * dx + dy * dy
+            if (lenSq === 0) return Math.hypot(px - x1, py - y1)
+            const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq))
+            const projX = x1 + t * dx
+            const projY = y1 + t * dy
+            return Math.hypot(px - projX, py - projY)
+        },
+        []
+    )
+
+    const isNearPathSegment = useCallback((canvasX: number, canvasY: number): boolean => {
+        if (!activePath || activePath.points.length < 2) return false
+        const threshold = 8 / zoomLevel
+        const SAMPLE_STEPS = 16
+
+        const sampleCubic = (
+            p0x: number, p0y: number,
+            cp1x: number, cp1y: number,
+            cp2x: number, cp2y: number,
+            p1x: number, p1y: number
+        ): { x: number; y: number }[] => {
+            const pts: { x: number; y: number }[] = []
+            for (let i = 0; i <= SAMPLE_STEPS; i++) {
+                const t = i / SAMPLE_STEPS
+                const mt = 1 - t
+                pts.push({
+                    x: mt * mt * mt * p0x + 3 * mt * mt * t * cp1x + 3 * mt * t * t * cp2x + t * t * t * p1x,
+                    y: mt * mt * mt * p0y + 3 * mt * mt * t * cp1y + 3 * mt * t * t * cp2y + t * t * t * p1y
+                })
+            }
+            return pts
+        }
+
+        const sampleQuad = (
+            p0x: number, p0y: number,
+            cpx: number, cpy: number,
+            p1x: number, p1y: number
+        ): { x: number; y: number }[] => {
+            const pts: { x: number; y: number }[] = []
+            for (let i = 0; i <= SAMPLE_STEPS; i++) {
+                const t = i / SAMPLE_STEPS
+                const mt = 1 - t
+                pts.push({
+                    x: mt * mt * p0x + 2 * mt * t * cpx + t * t * p1x,
+                    y: mt * mt * p0y + 2 * mt * t * cpy + t * t * p1y
+                })
+            }
+            return pts
+        }
+
+        const segmentHit = (pts: { x: number; y: number }[]) => {
+            for (let i = 1; i < pts.length; i++) {
+                const a = pts[i - 1]
+                const b = pts[i]
+                if (pointToSegmentDistance(canvasX, canvasY, a.x, a.y, b.x, b.y) <= threshold) return true
+            }
+            return false
+        }
+
+        for (let i = 1; i < activePath.points.length; i++) {
+            const p1 = activePath.points[i - 1]
+            const p2 = activePath.points[i]
+            if (p1.handleOut && p2.handleIn) {
+                if (segmentHit(sampleCubic(p1.x, p1.y, p1.handleOut.x, p1.handleOut.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y))) return true
+            } else if (p1.handleOut) {
+                if (segmentHit(sampleQuad(p1.x, p1.y, p1.handleOut.x, p1.handleOut.y, p2.x, p2.y))) return true
+            } else if (p2.handleIn) {
+                if (segmentHit(sampleQuad(p1.x, p1.y, p2.handleIn.x, p2.handleIn.y, p2.x, p2.y))) return true
+            } else if (pointToSegmentDistance(canvasX, canvasY, p1.x, p1.y, p2.x, p2.y) <= threshold) {
+                return true
+            }
+        }
+
+        if (activePath.closed && activePath.points.length > 2) {
+            const end = activePath.points[activePath.points.length - 1]
+            const start = activePath.points[0]
+            if (end.handleOut && start.handleIn) {
+                if (segmentHit(sampleCubic(end.x, end.y, end.handleOut.x, end.handleOut.y, start.handleIn.x, start.handleIn.y, start.x, start.y))) return true
+            } else if (pointToSegmentDistance(canvasX, canvasY, end.x, end.y, start.x, start.y) <= threshold) {
+                return true
+            }
+        }
+
+        return false
+    }, [activePath, zoomLevel, pointToSegmentDistance])
+
+    const startNewPath = useCallback((x: number, y: number) => {
+        const newPoint: PathPoint = {
+            x, y,
+            handleIn: null,
+            handleOut: null,
+            type: 'corner'
+        }
+        const newPath: Path = {
+            id: Math.random().toString(36).substr(2, 9),
+            points: [newPoint],
+            closed: false
+        }
+        setActivePath(newPath)
+        setSelectedPointIndex(0)
+        return { newPath, newPoint }
+    }, [setActivePath])
+
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         if (e.button !== 0) return // Only left click
         e.stopPropagation() // Prevent canvas panning/drawing
@@ -96,6 +212,7 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
                     startY: y,
                     initialPoint: { ...pt }
                 })
+                dragPreviewPathRef.current = null
                 return
             }
 
@@ -111,6 +228,7 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
                     startY: y,
                     initialPoint: { ...pt }
                 })
+                dragPreviewPathRef.current = null
                 return
             }
 
@@ -119,25 +237,28 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
             return
         }
 
-        // --- MOVE MODE: do nothing for now ---
-        if (pathMode === 'move') return
+        // --- MOVE MODE: drag whole path ---
+        if (pathMode === 'move') {
+            if (!activePath) return
+            const shouldDragPath =
+                hitTestHandle(x, y) !== null ||
+                hitTestPoint(x, y) !== null ||
+                isNearPathSegment(x, y)
+            if (!shouldDragPath) return
+            setDragState({
+                type: 'path',
+                startX: x,
+                startY: y,
+                initialPath: activePath
+            })
+            dragPreviewPathRef.current = null
+            return
+        }
 
         // --- DESIGN MODE: create new points ---
         if (!activePath) {
             // Start new path
-            const newPoint: PathPoint = {
-                x, y,
-                handleIn: null,
-                handleOut: null,
-                type: 'corner'
-            }
-            const newPath: Path = {
-                id: Math.random().toString(36).substr(2, 9),
-                points: [newPoint],
-                closed: false
-            }
-            setActivePath(newPath)
-            setSelectedPointIndex(0)
+            const { newPoint } = startNewPath(x, y)
 
             // Only start dragging if NOT polygonal
             if (!toolOptions?.pathPolygonal) {
@@ -148,9 +269,24 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
                     startY: y,
                     initialPoint: newPoint
                 })
+                dragPreviewPathRef.current = null
             }
         } else {
             // Add to existing path
+            if (activePath.closed) {
+                const { newPoint } = startNewPath(x, y)
+                if (!toolOptions?.pathPolygonal) {
+                    setDragState({
+                        type: 'handleOut',
+                        pointIndex: 0,
+                        startX: x,
+                        startY: y,
+                        initialPoint: newPoint
+                    })
+                    dragPreviewPathRef.current = null
+                }
+                return
+            }
 
             // Check if clicking close to start point to close path
             if (isNearStartPoint(x, y)) {
@@ -181,9 +317,10 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
                     startY: y,
                     initialPoint: newPoint
                 })
+                dragPreviewPathRef.current = null
             }
         }
-    }, [activePath, setActivePath, updatePath, toCanvas, zoomLevel, pathMode, hitTestPoint, hitTestHandle, isNearStartPoint, toolOptions?.pathPolygonal])
+    }, [activePath, updatePath, toCanvas, pathMode, hitTestPoint, hitTestHandle, isNearStartPoint, isNearPathSegment, toolOptions?.pathPolygonal, startNewPath])
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         const { x, y } = toCanvas(e.clientX, e.clientY)
@@ -198,34 +335,56 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
         const dx = x - dragState.startX
         const dy = y - dragState.startY
 
-        if (dragState.type === 'handleOut') {
+        if (dragState.type === 'path') {
+            const path = dragState.initialPath
+            if (!path) return
+
+            const nextPath: Path = {
+                ...path,
+                points: path.points.map((p) => ({
+                    ...p,
+                    x: p.x + dx,
+                    y: p.y + dy,
+                    handleIn: p.handleIn ? { x: p.handleIn.x + dx, y: p.handleIn.y + dy } : null,
+                    handleOut: p.handleOut ? { x: p.handleOut.x + dx, y: p.handleOut.y + dy } : null
+                }))
+            }
+            dragPreviewPathRef.current = nextPath
+            updatePath(nextPath, false)
+        } else if (dragState.type === 'handleOut') {
+            const pt = dragState.initialPoint
+            if (!pt) return
+
             // Polygonal mode blocks handle creation
             if (toolOptions?.pathPolygonal) return
 
             // Dragging the "out" handle — creates a smooth point
-            const handleX = dragState.initialPoint.x + dx
-            const handleY = dragState.initialPoint.y + dy
-            const handleInX = dragState.initialPoint.x - dx
-            const handleInY = dragState.initialPoint.y - dy
+            const handleX = pt.x + dx
+            const handleY = pt.y + dy
+            const handleInX = pt.x - dx
+            const handleInY = pt.y - dy
 
             const updatedPoint: PathPoint = {
-                ...activePath.points[dragState.pointIndex],
+                ...activePath.points[dragState.pointIndex!],
                 type: 'smooth',
                 handleOut: { x: handleX, y: handleY },
                 handleIn: { x: handleInX, y: handleInY }
             }
 
             const newPoints = [...activePath.points]
-            newPoints[dragState.pointIndex] = updatedPoint
-            updatePath({ ...activePath, points: newPoints })
+            newPoints[dragState.pointIndex!] = updatedPoint
+            const nextPath = { ...activePath, points: newPoints }
+            dragPreviewPathRef.current = nextPath
+            updatePath(nextPath, false)
         } else if (dragState.type === 'handleIn') {
             // Dragging the "in" handle
             const pt = dragState.initialPoint
+            if (!pt) return
             const handleInX = (pt.handleIn?.x ?? pt.x) + dx
             const handleInY = (pt.handleIn?.y ?? pt.y) + dy
 
             const updatedPoint: PathPoint = {
-                ...activePath.points[dragState.pointIndex],
+                ...activePath.points[dragState.pointIndex!],
                 handleIn: { x: handleInX, y: handleInY }
             }
 
@@ -237,16 +396,19 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
             }
 
             const newPoints = [...activePath.points]
-            newPoints[dragState.pointIndex] = updatedPoint
-            updatePath({ ...activePath, points: newPoints })
+            newPoints[dragState.pointIndex!] = updatedPoint
+            const nextPath = { ...activePath, points: newPoints }
+            dragPreviewPathRef.current = nextPath
+            updatePath(nextPath, false)
         } else if (dragState.type === 'point') {
             // Dragging an anchor point — move it and its handles
             const pt = dragState.initialPoint
+            if (!pt) return
             const newX = pt.x + dx
             const newY = pt.y + dy
 
             const updatedPoint: PathPoint = {
-                ...activePath.points[dragState.pointIndex],
+                ...activePath.points[dragState.pointIndex!],
                 x: newX,
                 y: newY,
             }
@@ -266,14 +428,20 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
             }
 
             const newPoints = [...activePath.points]
-            newPoints[dragState.pointIndex] = updatedPoint
-            updatePath({ ...activePath, points: newPoints })
+            newPoints[dragState.pointIndex!] = updatedPoint
+            const nextPath = { ...activePath, points: newPoints }
+            dragPreviewPathRef.current = nextPath
+            updatePath(nextPath, false)
         }
     }, [dragState, activePath, updatePath, toCanvas, toolOptions?.pathPolygonal])
 
     const handleMouseUp = useCallback(() => {
+        if (dragPreviewPathRef.current) {
+            updatePath(dragPreviewPathRef.current, true)
+            dragPreviewPathRef.current = null
+        }
         setDragState(null)
-    }, [])
+    }, [updatePath])
 
     // Keyboard listener for deletion
     useEffect(() => {
@@ -442,6 +610,7 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
         if (pathMode === 'design' && mouseCanvasPos && isNearStartPoint(mouseCanvasPos.x, mouseCanvasPos.y)) {
             return 'pointer'
         }
+        if (pathMode === 'move') return 'move'
         return 'crosshair'
     }
 

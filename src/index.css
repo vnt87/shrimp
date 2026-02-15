@@ -587,7 +587,7 @@ body,
 }
 
 .tool-options-checkbox .checkbox-box.checked svg {
-  color: var(--checkbox-checked);
+  color: var(--accent-active);
 }
 
 .tool-options-checkbox .checkbox-box.unchecked svg {
@@ -598,6 +598,58 @@ body,
   font-size: var(--font-size-sm);
   color: var(--text-primary);
   white-space: nowrap;
+}
+
+.tool-options-checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  margin: 0 5px;
+  white-space: nowrap;
+}
+
+.tool-options-checkbox-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--border-input);
+  border-radius: 3px;
+  background: var(--bg-input);
+  display: grid;
+  place-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+
+.tool-options-checkbox-group input[type="checkbox"]::before {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  transform: rotate(-45deg) scale(0);
+  transform-origin: center;
+  transition: transform var(--transition);
+}
+
+.tool-options-checkbox-group input[type="checkbox"]:checked {
+  background: var(--accent-active);
+  border-color: var(--accent-active);
+}
+
+.tool-options-checkbox-group input[type="checkbox"]:checked::before {
+  transform: rotate(-45deg) scale(1);
+}
+
+.tool-options-checkbox-group label {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  line-height: 1;
+  cursor: pointer;
 }
 
 .tool-options-slider-group {
@@ -646,7 +698,7 @@ body,
 }
 
 .tool-options-number-input:focus {
-  border-color: var(--accent-primary);
+  border-color: var(--accent-active);
 }
 
 .slider-unit {
@@ -3105,7 +3157,7 @@ body,
 }
 
 .font-option.active {
-  background: var(--accent-primary);
+  background: var(--accent-active);
   color: white;
 }
 

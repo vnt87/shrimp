@@ -152,7 +152,7 @@ interface EditorContextType {
 
     // Path actions
     setActivePath: (path: Path | null) => void
-    updatePath: (path: Path) => void
+    updatePath: (path: Path, history?: boolean) => void
 
     // Transform
     transientTransforms: Record<string, TransformData>
@@ -594,9 +594,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         updateState({ activePath: path })
     }, [updateState])
 
-    const updatePath = useCallback((path: Path) => {
-        updateState({ activePath: path })
-    }, [updateState])
+    const updatePath = useCallback((path: Path, history: boolean = true) => {
+        if (history) {
+            updateState({ activePath: path })
+            return
+        }
+        replaceState({ activePath: path })
+    }, [updateState, replaceState])
 
     const commitTransform = useCallback((layerId: string, transform: TransformData) => {
         updateState(prevState => {
