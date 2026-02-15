@@ -51,17 +51,9 @@ export default function ContextMenu({ x, y, onClose, onSelect }: ContextMenuProp
     }, [])
 
     const style: React.CSSProperties = {
-        position: 'fixed',
         top: y,
         left: x,
-        zIndex: 1000,
-        backgroundColor: '#2b2b2b',
-        color: 'var(--text-primary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '4px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-        padding: '4px 0',
-        minWidth: '180px'
+        position: 'fixed'
     }
 
     return (
@@ -79,43 +71,14 @@ function ContextSubMenu({ label, tools, onSelect, onClose }: { label: string, to
     return (
         <div
             className="context-menu-item"
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '6px 12px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                color: 'var(--text-primary)',
-                position: 'relative'
-            }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                setIsOpen(true)
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-                setIsOpen(false)
-            }}
+            onMouseEnter={() => setIsOpen(true)}
+            onMouseLeave={() => setIsOpen(false)}
         >
             <span>{label}</span>
             <ChevronRight size={12} style={{ marginLeft: 'auto' }} />
 
             {isOpen && (
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: '100%',
-                        backgroundColor: '#2b2b2b',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-                        padding: '4px 0',
-                        minWidth: '160px',
-                        zIndex: 1001,
-                        marginLeft: '-2px'
-                    }}
-                >
+                <div className="context-submenu">
                     {tools.map((tool) => {
                         const Icon = tool.icon
                         return (
@@ -126,21 +89,6 @@ function ContextSubMenu({ label, tools, onSelect, onClose }: { label: string, to
                                     e.stopPropagation()
                                     onSelect(tool.id)
                                     onClose()
-                                }}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '6px 12px',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    color: 'var(--text-primary)',
-                                    gap: '8px'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent'
                                 }}
                             >
                                 <Icon size={14} />

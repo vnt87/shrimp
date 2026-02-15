@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Application, extend, useApplication, useTick } from '@pixi/react'
+import { Application, extend, useTick } from '@pixi/react'
 import { Container, Sprite, Graphics, Text } from 'pixi.js'
 import EmptyState from './EmptyState'
 import { useEditor, type Layer, type TransformData } from './EditorContext'
@@ -324,30 +324,6 @@ function PixiScene({
     activeTool: string
 }) {
     const { layers, selection, activeLayerId } = useEditor()
-    const { app } = useApplication()
-
-    // Keep the PixiJS renderer sized to the canvas's parent element
-    useEffect(() => {
-        if (!app?.renderer || !app.canvas) return
-        const parent = app.canvas.parentElement
-        if (!parent) return
-
-        const resize = () => {
-            const w = parent.clientWidth
-            const h = parent.clientHeight
-            if (w > 0 && h > 0 && app.renderer) {
-                app.renderer.resize(w, h)
-            }
-        }
-
-        // Initial resize
-        resize()
-
-        // Watch for future size changes
-        const ro = new ResizeObserver(resize)
-        ro.observe(parent)
-        return () => ro.disconnect()
-    }, [app])
 
     return (
         <pixiContainer
@@ -557,7 +533,40 @@ export default function Canvas({
     const isLassoing = useRef(false)
 
     const [viewportRef, setViewportRef] = useState<HTMLDivElement | null>(null)
+    const pixiAppRef = useRef<any>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Keep the PixiJS renderer sized to the .canvas-viewport element
+    useEffect(() => {
+        if (!viewportRef) return
+
+        const resize = () => {
+            const app = pixiAppRef.current
+            if (!app?.renderer || !app.canvas) return
+            const w = viewportRef.clientWidth
+            const h = viewportRef.clientHeight
+            if (w > 0 && h > 0) {
+                app.renderer.resize(w, h)
+                const canvas = app.canvas as HTMLCanvasElement
+                canvas.style.width = w + 'px'
+                canvas.style.height = h + 'px'
+            }
+        }
+
+        // Observe the viewport for size changes
+        const ro = new ResizeObserver(resize)
+        ro.observe(viewportRef)
+
+        // Also try an initial resize after a short delay (to ensure pixi app is initialized)
+        const timer = setTimeout(resize, 100)
+        const timer2 = setTimeout(resize, 500)
+
+        return () => {
+            ro.disconnect()
+            clearTimeout(timer)
+            clearTimeout(timer2)
+        }
+    }, [viewportRef])
 
     // Drawing state
     const isDrawing = useRef(false)
@@ -1591,9 +1600,9 @@ export default function Canvas({
                                 }}
                             >
                                 <Application
-                                    resizeTo={viewportRef || undefined}
                                     backgroundColor={0x505050}
                                     backgroundAlpha={0} // Transparent background so checkboard shows through
+                                    onInit={(app: any) => { pixiAppRef.current = app }}
                                 >
                                     <PixiScene
                                         transform={transform}
