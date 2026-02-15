@@ -1,9 +1,9 @@
 import {
-    MousePointer,
+    BoxSelect,
     Hand,
     Scissors,
     Crop,
-    Search,
+    ZoomIn,
     Move,
     Type,
     Paintbrush,
@@ -11,17 +11,17 @@ import {
     PaintBucket,
     Stamp,
     Bandage,
-    Pen,
+    PenTool,
     Pencil,
     Pipette,
     Wand2,
     Blend,
-    Lasso,
-    CircleDot,
-    SquareDashedBottom,
+    LassoSelect,
+    CircleDashed,
+    Scale3d,
     Ruler,
-    Compass,
-    // Removed unused imports
+    AlignLeft,
+    Droplet,
     LucideIcon
 } from 'lucide-react'
 
@@ -40,14 +40,14 @@ export const shortcuts: Record<string, string> = {
 // Tool groups with dividers between them
 export const toolGroups: ToolDefinition[][] = [
     [
-        { id: 'rect-select', icon: MousePointer, label: 'Rect Select' },
-        { id: 'ellipse-select', icon: CircleDot, label: 'Ellipse Select' },
-        { id: 'lasso-select', icon: Lasso, label: 'Lasso Select' },
+        { id: 'rect-select', icon: BoxSelect, label: 'Rect Select' },
+        { id: 'ellipse-select', icon: CircleDashed, label: 'Ellipse Select' },
+        { id: 'lasso-select', icon: LassoSelect, label: 'Lasso Select' },
         { id: 'wand-select', icon: Wand2, label: 'Magic Wand' },
     ],
     [
         { id: 'scissors', icon: Scissors, label: 'Scissors' },
-        { id: 'paths', icon: Pen, label: 'Paths' },
+        { id: 'paths', icon: PenTool, label: 'Paths' },
     ],
     [
         { id: 'picker', icon: Pipette, label: 'Color Picker' },
@@ -55,7 +55,7 @@ export const toolGroups: ToolDefinition[][] = [
     ],
     [
         { id: 'move', icon: Move, label: 'Move' },
-        { id: 'align', icon: Compass, label: 'Align' },
+        { id: 'align', icon: AlignLeft, label: 'Align' },
         { id: 'crop', icon: Crop, label: 'Crop' },
         { id: 'clone', icon: Stamp, label: 'Clone' },
         { id: 'heal', icon: Bandage, label: 'Heal' },
@@ -63,21 +63,21 @@ export const toolGroups: ToolDefinition[][] = [
     [
         { id: 'brush', icon: Paintbrush, label: 'Paintbrush' },
         { id: 'pencil', icon: Pencil, label: 'Pencil' },
-        { id: 'blur', icon: Blend, label: 'Blur/Sharpen' },
+        { id: 'blur', icon: Droplet, label: 'Blur/Sharpen' },
     ],
     [
         { id: 'eraser', icon: Eraser, label: 'Eraser' },
         { id: 'bucket', icon: PaintBucket, label: 'Bucket Fill' },
-        { id: 'gradient', icon: CircleDot, label: 'Gradient' },
+        { id: 'gradient', icon: Blend, label: 'Gradient' },
     ],
     [
         { id: 'text', icon: Type, label: 'Text' },
     ],
     [
-        { id: 'transform', icon: SquareDashedBottom, label: 'Transform' },
+        { id: 'transform', icon: Scale3d, label: 'Transform' },
     ],
     [
-        { id: 'zoom', icon: Search, label: 'Zoom' },
+        { id: 'zoom', icon: ZoomIn, label: 'Zoom' },
     ],
     [
         { id: 'navigate', icon: Hand, label: 'Navigate' },
