@@ -389,6 +389,7 @@ export default function Canvas({
         foregroundColor,
         backgroundColor,
         setForegroundColor,
+        setBackgroundColor,
     } = useEditor()
 
     const [transform, setTransform] = useState<CanvasTransform>({
@@ -439,6 +440,28 @@ export default function Canvas({
     const [draggingGuideId, setDraggingGuideId] = useState<string | null>(null)
     const [tempGuide, setTempGuide] = useState<{ orientation: 'horizontal' | 'vertical', pos: number } | null>(null)
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
+
+    // Modifier key state for Picker
+    const [isCmdPressed, setIsCmdPressed] = useState(false)
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Meta' || e.key === 'Control') {
+                setIsCmdPressed(true)
+            }
+        }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Meta' || e.key === 'Control') {
+                setIsCmdPressed(false)
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+        }
+    }, [])
 
     // Selection state
     const isSelecting = useRef(false)
@@ -585,8 +608,69 @@ export default function Canvas({
         const b = mergedImageData.data[idx + 2]
 
         const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
-        setForegroundColor(hex)
-    }, [getMergedImageData, setForegroundColor])
+
+        const target = isCmdPressed
+            ? (toolOptions?.pickerTarget === 'fg' ? 'bg' : 'fg')
+            : (toolOptions?.pickerTarget || 'fg')
+
+        if (target === 'fg') {
+            setForegroundColor(hex)
+        } else {
+            setBackgroundColor(hex)
+        }
+    }, [getMergedImageData, setForegroundColor, setBackgroundColor, toolOptions, isCmdPressed])
+
+    // Floating Info Window Logic
+    const [hoverColor, setHoverColor] = useState<{ hex: string, hsl: string } | null>(null)
+    const [hoverPos, setHoverPos] = useState<{ x: number, y: number } | null>(null)
+
+    // Throttled color sampling for tooltip
+    const lastSampleTime = useRef(0)
+    const sampleColorUnderCursor = useCallback((x: number, y: number) => {
+        const now = Date.now()
+        if (now - lastSampleTime.current < 50) return // 20fps cap
+        lastSampleTime.current = now
+
+        const merged = getMergedImageData()
+        if (!merged) return
+
+        const lx = Math.round(x)
+        const ly = Math.round(y)
+
+        if (lx < 0 || ly < 0 || lx >= merged.width || ly >= merged.height) {
+            setHoverColor(null)
+            return
+        }
+
+        const idx = (ly * merged.width + lx) * 4
+        const r = merged.data[idx]
+        const g = merged.data[idx + 1]
+        const b = merged.data[idx + 2]
+        const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
+
+        // Convert to HSL
+        const rNorm = r / 255, gNorm = g / 255, bNorm = b / 255
+        const max = Math.max(rNorm, gNorm, bNorm), min = Math.min(rNorm, gNorm, bNorm)
+        let h = 0, s = 0, l = (max + min) / 2
+        if (max !== min) {
+            const d = max - min
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+            if (max === rNorm) h = (gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0)
+            else if (max === gNorm) h = (bNorm - rNorm) / d + 2
+            else h = (rNorm - gNorm) / d + 4
+            h /= 6
+        }
+        const hDeg = Math.round(h * 360)
+        const sPct = Math.round(s * 100)
+        const lPct = Math.round(l * 100)
+
+        setHoverColor({
+            hex,
+            hsl: `HSL ${hDeg}° ${sPct}% ${lPct}%`
+        })
+        setHoverPos({ x, y })
+    }, [getMergedImageData])
+
 
     // --- Flood fill (bucket tool) ---
     const floodFill = useCallback((canvasX: number, canvasY: number) => {
@@ -1356,8 +1440,26 @@ export default function Canvas({
                             ref={viewportRef}
                             className={`canvas-viewport ${isPanning ? 'panning-active' : isSpaceHeld ? 'panning-ready' : ''} ${activeTool === 'move' ? 'cursor-move' : ''} ${activeTool.includes('select') ? 'crosshair' : ''} ${activeTool === 'picker' ? 'cursor-picker' : ''}`}
                             onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
+                            onMouseMove={(e) => {
+                                handleMouseMove(e)
+                                if (activeTool === 'picker') {
+                                    const rect = viewportRef.current?.getBoundingClientRect()
+                                    if (rect) {
+                                        const x = (e.clientX - rect.left - transform.offsetX) / transform.scale
+                                        const y = (e.clientY - rect.top - transform.offsetY) / transform.scale
+                                        sampleColorUnderCursor(x, y)
+                                        // Also update hover pos relative to viewport for the tooltip positioning
+                                        setHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top + 20 }) // Offset slightly
+                                    }
+                                } else {
+                                    setHoverColor(null)
+                                }
+                            }}
                             onMouseUp={handleMouseUp}
+                            onMouseLeave={(e) => {
+                                handleMouseUp(e)
+                                setHoverColor(null)
+                            }}
                             onWheel={handleWheel}
                             onContextMenu={(e) => {
                                 e.preventDefault()
@@ -1394,6 +1496,45 @@ export default function Canvas({
                                         activeTool={activeTool}
                                     />
                                 </Application>
+
+                                {/* Floating Info Window for Color Picker */}
+                                {activeTool === 'picker' && hoverColor && hoverPos && (
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            left: hoverPos.x + 15,
+                                            top: hoverPos.y + 15,
+                                            width: 170, // Fixed width to prevent wiggling
+                                            background: 'rgba(30, 30, 30, 0.95)',
+                                            backdropFilter: 'blur(4px)',
+                                            padding: '8px 12px',
+                                            borderRadius: 8,
+                                            color: 'white',
+                                            fontSize: 12,
+                                            pointerEvents: 'none',
+                                            zIndex: 1000,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                                            border: '1px solid rgba(255,255,255,0.1)'
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: 32,
+                                            height: 32,
+                                            borderRadius: 6,
+                                            background: hoverColor.hex,
+                                            border: '1px solid rgba(255,255,255,0.2)',
+                                            boxShadow: 'inset 0 0 4px rgba(0,0,0,0.2)'
+                                        }} />
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            <span style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 13 }}>{hoverColor.hex.toUpperCase()}</span>
+                                            <span style={{ fontSize: 11, opacity: 0.8, fontFamily: 'monospace' }}>{hoverColor.hsl}</span>
+                                            <span style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>{isCmdPressed ? 'Click to Set BG' : 'Click to Set FG'}</span>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* React overlays (HTML) */}
                                 <div

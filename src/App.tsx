@@ -33,6 +33,8 @@ export interface ToolOptions {
     bucketAffectedArea: 'similar' | 'selection'
     bucketSampleMerged: boolean
     bucketOpacity: number
+    // Picker options
+    pickerTarget: 'fg' | 'bg'
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -57,6 +59,7 @@ const defaultToolOptions: ToolOptions = {
     bucketAffectedArea: 'similar',
     bucketSampleMerged: false,
     bucketOpacity: 100,
+    pickerTarget: 'fg',
 }
 
 export default function App() {

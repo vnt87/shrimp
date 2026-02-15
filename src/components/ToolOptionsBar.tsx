@@ -1,4 +1,5 @@
 import type { ToolOptions } from '../App'
+import React, { useState, useEffect } from 'react'
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Italic } from 'lucide-react'
 import FontSelector from './FontSelector'
 
@@ -195,6 +196,63 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
+    const [isCmdPressed, setIsCmdPressed] = useState(false)
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Meta' || e.key === 'Control') {
+                setIsCmdPressed(true)
+            }
+        }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Meta' || e.key === 'Control') {
+                setIsCmdPressed(false)
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+        }
+    }, [])
+
+    const renderPickerOptions = () => {
+        const effectiveTarget = isCmdPressed
+            ? (toolOptions.pickerTarget === 'fg' ? 'bg' : 'fg')
+            : (toolOptions.pickerTarget || 'fg')
+
+        return (
+            <>
+                <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="slider-label">Target</span>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                        <button
+                            className={`pref-btn ${effectiveTarget === 'fg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                            style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                            onClick={() => onToolOptionChange('pickerTarget', 'fg')}
+                            title="Set Foreground Color"
+                        >
+                            Set FG
+                        </button>
+                        <button
+                            className={`pref-btn ${effectiveTarget === 'bg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                            style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                            onClick={() => onToolOptionChange('pickerTarget', 'bg')}
+                            title="Set Background Color"
+                        >
+                            Set BG
+                        </button>
+                    </div>
+                </div>
+                <div className="tool-options-divider" />
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic', marginLeft: 4 }}>
+                    Hold Cmd/Ctrl to toggle
+                </span>
+            </>
+        )
+    }
+
     const renderTextOptions = () => (
         <>
             {renderSlider('fontSize', 'Size', 8, 200, 1, 'px')}
@@ -279,6 +337,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderBucketOptions()
             case 'text':
                 return renderTextOptions()
+            case 'picker':
+                return renderPickerOptions()
             case 'crop':
                 return renderCropOptions()
             case 'lasso-select':
