@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { PersistenceManager } from '../utils/persistence'
 
 import { createVectorPath, duplicatePath as duplicateVectorPath } from '../path/commands'
 import type { VectorPath } from '../path/types'
@@ -238,6 +239,45 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         createDocument('Untitled-1', createInitialContent())
     ])
     const [activeDocumentId, setActiveDocumentId] = useState<string | null>(documents[0].id)
+    const [isLoading, setIsLoading] = useState(true)
+
+    // Load state from persistence on mount
+    useEffect(() => {
+        const load = async () => {
+            const savedState = await PersistenceManager.loadState()
+            if (savedState) {
+                const newDoc = createDocument('Restored Session', savedState)
+                setDocuments([newDoc])
+                setActiveDocumentId(newDoc.id)
+            }
+            setIsLoading(false)
+        }
+        load()
+    }, [])
+
+    // Save state on change (debounced)
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    useEffect(() => {
+        if (isLoading) return
+
+        const activeDoc = documents.find(d => d.id === activeDocumentId)
+        if (!activeDoc) return
+
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current)
+        }
+
+        saveTimeoutRef.current = setTimeout(() => {
+            PersistenceManager.saveState(activeDoc.history.present)
+        }, 2000) // Auto-save after 2 seconds of inactivity
+
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current)
+            }
+        }
+    }, [documents, activeDocumentId, isLoading])
 
     // Computed active document
     const activeDocument = useMemo(() =>
