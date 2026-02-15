@@ -500,22 +500,22 @@ export default function LayersPanel() {
                             Status: {activePath ? (activePath.closed ? 'Closed' : 'Open') : 'No path'}
                         </div>
 
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div className="panel-inline-actions">
                             <button
-                                className={`dialogue-action-btn${!activePath ? ' disabled' : ''}`}
+                                type="button"
+                                className="panel-btn panel-btn-secondary"
                                 onClick={togglePathClosed}
                                 disabled={!activePath || (!activePath.closed && activePath.points.length < 3)}
                                 title={activePath?.closed ? 'Open path' : 'Close path'}
-                                style={{ width: 'auto', padding: '0 8px' }}
                             >
                                 {activePath?.closed ? 'Open' : 'Close'}
                             </button>
                             <button
-                                className={`dialogue-action-btn${!activePath ? ' disabled' : ''}`}
+                                type="button"
+                                className="panel-btn panel-btn-secondary"
                                 onClick={() => setActivePath(null)}
                                 disabled={!activePath}
                                 title="Clear path"
-                                style={{ width: 'auto', padding: '0 8px' }}
                             >
                                 Clear
                             </button>
@@ -553,10 +553,10 @@ export default function LayersPanel() {
                 <>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px' }}>
                         <span className="dialogue-bar-label">History Log</span>
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div className="panel-inline-actions">
                             <button
                                 type="button"
-                                className={`dialogue-action-btn${!canUndo ? ' disabled' : ''}`}
+                                className="panel-icon-btn"
                                 title="Undo"
                                 onClick={() => canUndo && undo()}
                                 disabled={!canUndo}
@@ -565,7 +565,7 @@ export default function LayersPanel() {
                             </button>
                             <button
                                 type="button"
-                                className={`dialogue-action-btn${!canRedo ? ' disabled' : ''}`}
+                                className="panel-icon-btn"
                                 title="Redo"
                                 onClick={() => canRedo && redo()}
                                 disabled={!canRedo}
