@@ -21,7 +21,7 @@ import { useTheme } from './ThemeContext'
 import { useEditor, type LayerFilter } from './EditorContext'
 import FiltersDialog from './FiltersDialog'
 
-import { toolGroups, MENU_TOOL_GROUPS } from '../data/tools'
+import { MENU_TOOL_GROUPS } from '../data/tools'
 
 type MenuOption = string | { label: string; icon?: any; command?: string; shortcut?: string; disabled?: boolean; children?: MenuOption[] }
 

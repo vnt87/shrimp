@@ -2,3 +2,4 @@
 node_modules
 .agent/skills/vercel-react-best-practices
 .env
+dist
