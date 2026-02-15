@@ -7,6 +7,7 @@ import Toolbox from './components/Toolbox'
 import Canvas from './components/Canvas'
 import RightPanel from './components/RightPanel'
 import StatusBar from './components/StatusBar'
+import DocumentTabs from './components/DocumentTabs'
 
 export interface ToolOptions {
     brushSize: number
@@ -162,12 +163,15 @@ export default function App() {
                     <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
                     <div className="main-content">
                         <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
-                        <Canvas
-                            onCursorMove={setCursorPos}
-                            activeTool={activeTool}
-                            onToolChange={setActiveTool}
-                            toolOptions={toolOptions}
-                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
+                            <DocumentTabs />
+                            <Canvas
+                                onCursorMove={setCursorPos}
+                                activeTool={activeTool}
+                                onToolChange={setActiveTool}
+                                toolOptions={toolOptions}
+                            />
+                        </div>
                         <RightPanel />
                     </div>
                     <StatusBar cursorPos={cursorPos} />

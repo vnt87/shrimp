@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Application, extend, useTick } from '@pixi/react'
 import { Container, Sprite, Graphics, Text } from 'pixi.js'
@@ -396,7 +396,7 @@ export default function Canvas({
         updateLayerText,
         selection,
         setSelection,
-        closeImage,
+
         undo,
         redo,
         cropCanvas,
@@ -1786,15 +1786,7 @@ export default function Canvas({
 
             {layers.length > 0 ? (
                 <>
-                    <div className="canvas-tabs">
-                        <div className="canvas-tab active">
-                            <span>Image</span>
-                            <div className="tab-close" onClick={closeImage} style={{ cursor: 'pointer' }}>
-                                <X size={10} />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="canvas-separator" />
+
                     <div className="canvas-with-rulers">
                         <div className="ruler-corner" />
                         <div className="ruler-horizontal">

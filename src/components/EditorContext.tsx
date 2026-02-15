@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
-import { useHistory } from '../hooks/useHistory'
+
 import { createVectorPath, duplicatePath as duplicateVectorPath } from '../path/commands'
 import type { VectorPath } from '../path/types'
 
@@ -73,7 +73,43 @@ export interface TransformData {
     pivotY: number
 }
 
+// --- Multi-Document Types ---
+
+export interface EditorContent {
+    layers: Layer[]
+    activeLayerId: string | null
+    canvasSize: { width: number; height: number }
+    selection: Selection | null
+    guides: Guide[]
+    paths: VectorPath[]
+    activePathId: string | null
+}
+
+interface HistoryState<T> {
+    past: T[]
+    present: T
+    future: T[]
+}
+
+export interface Document {
+    id: string
+    name: string
+    // The content that is tracked in history
+    history: HistoryState<EditorContent>
+    // Transient state per document (zoom, scroll, view transform? - maybe later)
+    // For now, let's keep transient transforms global or map them by docId+layerId
+}
+
 interface EditorContextType {
+    // Document Management
+    documents: Document[]
+    activeDocumentId: string | null
+    activeDocument: Document | null
+    addDocument: (initialContent?: Partial<EditorContent>, name?: string) => void
+    closeDocument: (id: string) => void
+    setActiveDocumentId: (id: string) => void
+
+    // Original properties (proxied to active document)
     layers: Layer[]
     activeLayerId: string | null
     canvasSize: { width: number; height: number }
@@ -84,7 +120,7 @@ interface EditorContextType {
     activePath: VectorPath | null
     activePathNodeId: string | null
 
-    // Colors
+    // Colors (Global)
     foregroundColor: string
     backgroundColor: string
     setForegroundColor: (color: string) => void
@@ -92,7 +128,7 @@ interface EditorContextType {
     swapColors: () => void
     resetColors: () => void
 
-    // Actions
+    // Actions (Applied to active document)
     setCanvasSize: (size: { width: number; height: number }) => void
     addLayer: (name?: string, initialData?: HTMLCanvasElement) => string
     addTextLayer: (text: string, style: NonNullable<Layer['textStyle']>, x: number, y: number) => string
@@ -134,7 +170,7 @@ interface EditorContextType {
     historyEntries: HistoryEntry[]
     historyCurrentIndex: number
     restoreHistoryIndex: (index: number) => void
-    addToHistory: () => void
+    addToHistory: () => void // Explicit commit? Usually implicit via set/replace
     cropCanvas: (x: number, y: number, width: number, height: number, deletePixels?: boolean) => void
     closeImage: () => void
 
@@ -171,43 +207,144 @@ interface EditorContextType {
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
 
-// Define the state we want to track in history
-interface EditorState {
-    layers: Layer[]
-    activeLayerId: string | null
-    canvasSize: { width: number; height: number }
-    selection: Selection | null
-    guides: Guide[]
-    paths: VectorPath[]
-    activePathId: string | null
-}
-
-export function EditorProvider({ children }: { children: React.ReactNode }) {
-    // Initial state
-    const emptyState: EditorState = {
+function createInitialContent(width = 800, height = 600): EditorContent {
+    return {
         layers: [],
         activeLayerId: null,
-        canvasSize: { width: 800, height: 600 },
+        canvasSize: { width, height },
         selection: null,
         guides: [],
         paths: [],
         activePathId: null
     }
+}
 
-    const {
-        state: historyState,
-        set: setHistoryState,
-        replace: replaceHistoryState,
-        undo,
-        redo,
-        canUndo,
-        canRedo,
-        clear: clearHistory,
-        historyState: fullHistoryState
-    } = useHistory<EditorState>(emptyState)
+function createDocument(name: string, content: EditorContent): Document {
+    return {
+        id: Math.random().toString(36).substr(2, 9),
+        name,
+        history: {
+            past: [],
+            present: content,
+            future: []
+        }
+    }
+}
 
-    // Derived state for easier usage
-    const { layers, activeLayerId, canvasSize, selection, guides, paths, activePathId } = historyState
+export function EditorProvider({ children }: { children: React.ReactNode }) {
+    // --- State ---
+    // Start with one untitled document
+    const [documents, setDocuments] = useState<Document[]>(() => [
+        createDocument('Untitled-1', createInitialContent())
+    ])
+    const [activeDocumentId, setActiveDocumentId] = useState<string | null>(documents[0].id)
+
+    // Computed active document
+    const activeDocument = useMemo(() =>
+        documents.find(d => d.id === activeDocumentId) || null
+        , [documents, activeDocumentId])
+
+    // Fallback for when no document is active (shouldn't really happen in UI, but for safety)
+    const emptyContent = useMemo(() => createInitialContent(), [])
+
+    // Proxy state from active document
+    const currentContent = activeDocument ? activeDocument.history.present : emptyContent
+    const { layers, activeLayerId, canvasSize, selection, guides, paths, activePathId } = currentContent
+
+    // Helper to update active document's history
+    const updateActiveDocument = useCallback((
+        updateFn: (doc: Document) => Document
+    ) => {
+        setDocuments(prev => prev.map(doc => {
+            if (doc.id === activeDocumentId) {
+                return updateFn(doc)
+            }
+            return doc
+        }))
+    }, [activeDocumentId])
+
+    // --- History Logic (Mental Model: useHistory but manual) ---
+
+    const undo = useCallback(() => {
+        updateActiveDocument(doc => {
+            const { past, present, future } = doc.history
+            if (past.length === 0) return doc
+            const previous = past[past.length - 1]
+            const newPast = past.slice(0, past.length - 1)
+            return {
+                ...doc,
+                history: {
+                    past: newPast,
+                    present: previous,
+                    future: [present, ...future]
+                }
+            }
+        })
+    }, [updateActiveDocument])
+
+    const redo = useCallback(() => {
+        updateActiveDocument(doc => {
+            const { past, present, future } = doc.history
+            if (future.length === 0) return doc
+            const next = future[0]
+            const newFuture = future.slice(1)
+            return {
+                ...doc,
+                history: {
+                    past: [...past, present],
+                    present: next,
+                    future: newFuture
+                }
+            }
+        })
+    }, [updateActiveDocument])
+
+    const canUndo = activeDocument ? activeDocument.history.past.length > 0 : false
+    const canRedo = activeDocument ? activeDocument.history.future.length > 0 : false
+
+    // Generic state update for active document
+    // historyMode: 'push' (default) | 'replace'
+    const modifyContent = useCallback((
+        updates: Partial<EditorContent> | ((prev: EditorContent) => Partial<EditorContent>),
+        historyMode: 'push' | 'replace' = 'push'
+    ) => {
+        updateActiveDocument(doc => {
+            const current = doc.history.present
+            const changes = typeof updates === 'function' ? updates(current) : updates
+            const newContent = { ...current, ...changes }
+
+            // If no change, return original doc (optimization)
+            // (Deep equality check is expensive, so likely just shallow check or rely on updates occurring)
+
+            if (historyMode === 'replace') {
+                return {
+                    ...doc,
+                    history: {
+                        ...doc.history,
+                        present: newContent
+                    }
+                }
+            } else {
+                return {
+                    ...doc,
+                    history: {
+                        past: [...doc.history.past, current],
+                        present: newContent,
+                        future: [] // clearer future on new action
+                    }
+                }
+            }
+        })
+    }, [updateActiveDocument])
+
+    // Helper to replace "setHistoryState" and "replaceHistoryState"
+    // setHistoryState -> modifyContent(..., 'push')
+    // replaceHistoryState -> modifyContent(..., 'replace')
+
+    const updateState = useCallback((updates: Partial<EditorContent> | ((prev: EditorContent) => Partial<EditorContent>)) => modifyContent(updates, 'push'), [modifyContent])
+    const replaceState = useCallback((updates: Partial<EditorContent> | ((prev: EditorContent) => Partial<EditorContent>)) => modifyContent(updates, 'replace'), [modifyContent])
+
+
     const activePath = useMemo(
         () => (activePathId ? paths.find((path) => path.id === activePathId) ?? null : null),
         [paths, activePathId]
@@ -260,50 +397,100 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setActivePathNodeId(null)
             return
         }
-        if (!activePathNodeId) return
-        if (!activePath.nodes.some((node) => node.id === activePathNodeId)) {
-            setActivePathNodeId(null)
-        }
     }, [activePath, activePathNodeId])
-
-    const updateState = useCallback((updates: Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>)) => {
-        setHistoryState(prevFullState => {
-            const newPart = typeof updates === 'function' ? updates(prevFullState) : updates
-            return {
-                ...prevFullState,
-                ...newPart
-            }
-        })
-    }, [setHistoryState])
-
-    const replaceState = useCallback((updates: Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>)) => {
-        replaceHistoryState(prevFullState => {
-            const newPart = typeof updates === 'function' ? updates(prevFullState) : updates
-            return {
-                ...prevFullState,
-                ...newPart
-            }
-        })
-    }, [replaceHistoryState])
-
     const restoreHistoryIndex = useCallback((targetIndex: number) => {
-        const total = fullHistoryState.past.length + 1 + fullHistoryState.future.length
-        if (targetIndex < 0 || targetIndex >= total) return
+        // Implement history jumping by replacing the state
+        // This is complex because we need to move items between past/future
+        setDocuments(prevDocs => {
+            if (!activeDocumentId) return prevDocs
+            return prevDocs.map(doc => {
+                if (doc.id !== activeDocumentId) return doc
 
-        const currentIndex = fullHistoryState.past.length
-        const delta = targetIndex - currentIndex
-        if (delta === 0) return
+                const { past, present, future } = doc.history
+                const all = [...past, present, ...future]
 
-        if (delta < 0) {
-            for (let i = 0; i < -delta; i++) undo()
-        } else {
-            for (let i = 0; i < delta; i++) redo()
+                if (targetIndex < 0 || targetIndex >= all.length) return doc
+
+                const newPresent = all[targetIndex]
+                const newPast = all.slice(0, targetIndex)
+                const newFuture = all.slice(targetIndex + 1)
+
+                return {
+                    ...doc,
+                    history: {
+                        past: newPast,
+                        present: newPresent,
+                        future: newFuture
+                    },
+                    isDirty: true
+                }
+            })
+        })
+    }, [activeDocumentId])
+
+
+
+    // --- Document Actions ---
+
+    const addDocument = useCallback((initialContent?: Partial<EditorContent>, name?: string) => {
+        // Check if we should replace the initial empty document
+        // We use 'documents' in dependency, so we can access it directly
+        if (documents.length === 1) {
+            const existing = documents[0]
+            const isEmpty = existing.history.present.layers.length === 0 &&
+                existing.history.past.length === 0 &&
+                existing.name.startsWith('Untitled')
+
+            if (isEmpty) {
+                const docName = name || existing.name
+                const newDoc = createDocument(docName, { ...createInitialContent(), ...initialContent })
+
+                setDocuments([newDoc])
+                setActiveDocumentId(newDoc.id)
+                return
+            }
         }
-    }, [fullHistoryState.past.length, fullHistoryState.future.length, undo, redo])
+
+        const docName = name || `Untitled-${documents.length + 1}`
+        const newDoc = createDocument(docName, { ...createInitialContent(), ...initialContent })
+
+        setDocuments(prev => [...prev, newDoc])
+        setActiveDocumentId(newDoc.id)
+    }, [documents])
+
+    // Better closeDocument with synchronized active ID update
+    const closeDocument = useCallback((id: string) => {
+        setDocuments(prev => {
+            const index = prev.findIndex(d => d.id === id)
+            if (index === -1) return prev
+
+            const newDocs = prev.filter(d => d.id !== id)
+
+            if (newDocs.length === 0) {
+                const newDoc = createDocument('Untitled-1', createInitialContent())
+                setActiveDocumentId(newDoc.id)
+                return [newDoc]
+            }
+
+            if (activeDocumentId === id) {
+                // Activate the one to the right, or left if last
+                const newActiveIndex = Math.min(index, newDocs.length - 1)
+                setActiveDocumentId(newDocs[newActiveIndex].id)
+            }
+
+            return newDocs
+        })
+    }, [activeDocumentId])
+
+    // --- State Update Helpers (Document Aware) ---
+
+
 
     const historyEntries = useMemo<HistoryEntry[]>(() => {
-        const snapshots = [...fullHistoryState.past, fullHistoryState.present, ...fullHistoryState.future]
-        const currentIndex = fullHistoryState.past.length
+        if (!activeDocument) return []
+        const { past, present, future } = activeDocument.history
+        const snapshots = [...past, present, ...future]
+        const currentIndex = past.length
 
         const flattenLayers = (list: Layer[]): Layer[] => {
             const out: Layer[] = []
@@ -326,7 +513,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             return count
         }
 
-        const labelFor = (prev: EditorState | null, next: EditorState): string => {
+        const labelFor = (prev: EditorContent | null, next: EditorContent): string => {
             if (!prev) return 'Initial state'
 
             if (
@@ -442,7 +629,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             label: labelFor(index > 0 ? snapshots[index - 1] : null, snapshot),
             isCurrent: index === currentIndex
         }))
-    }, [fullHistoryState])
+    }, [activeDocument])
 
     // --- Helpers for recursive layer operations ---
 
@@ -600,7 +787,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }, [updateState])
 
     const updateLayerPosition = useCallback((id: string, x: number, y: number, history: boolean = true) => {
-        const updater = (prevState: EditorState) => ({
+        const updater = (prevState: EditorContent) => ({
             layers: updateLayerInTree(prevState.layers, id, { x, y })
         })
         if (history) updateState(updater)
@@ -669,7 +856,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }, [updateState])
 
     const updateLayerData = useCallback((id: string, canvas: HTMLCanvasElement, history: boolean = true) => {
-        const updater = (prevState: EditorState) => ({
+        const updater = (prevState: EditorContent) => ({
             layers: updateLayerInTree(prevState.layers, id, { data: canvas })
         })
         if (history) updateState(updater)
@@ -683,7 +870,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }, [updateState])
 
     const updateLayerTextStyle = useCallback((id: string, style: Partial<NonNullable<Layer['textStyle']>>, history: boolean = true) => {
-        const updater = (prevState: EditorState) => {
+        const updater = (prevState: EditorContent) => {
             const layer = findLayerById(prevState.layers, id)
             if (!layer || layer.type !== 'text') return {}
             const newStyle = { ...layer.textStyle, ...style } as any
@@ -706,7 +893,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }, [updateState])
 
     const setLayerFilters = useCallback((layerId: string, filters: LayerFilter[], history: boolean = true) => {
-        const updater = (prevState: EditorState) => {
+        const updater = (prevState: EditorContent) => {
             const layer = findLayerById(prevState.layers, layerId)
             if (!layer) return {}
             return {
@@ -824,7 +1011,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }, [updateState])
 
     const updatePath = useCallback((pathId: string, updater: (path: VectorPath) => VectorPath, history: boolean = true) => {
-        const apply = (prevState: EditorState) => {
+        const apply = (prevState: EditorContent) => {
             const index = prevState.paths.findIndex((path) => path.id === pathId)
             if (index < 0) return {}
 
@@ -1273,17 +1460,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
     }, [updateState])
 
-    const closeImage = useCallback(() => {
-        clearHistory({
-            layers: [],
-            activeLayerId: null,
-            selection: null,
-            canvasSize: { width: 800, height: 600 },
-            guides: [],
-            paths: [],
-            activePathId: null
-        })
-    }, [clearHistory])
+    // closeImage removed (duplicate)
 
     const setSelectionWrapper = useCallback((sel: Selection | null) => {
         updateState({ selection: sel })
@@ -1570,7 +1747,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             type: 'layer'
         }
 
-        clearHistory({
+        const content: EditorContent = {
             layers: [layer],
             activeLayerId: layer.id,
             canvasSize: { width, height },
@@ -1578,8 +1755,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             guides: [],
             paths: [],
             activePathId: null
-        })
-    }, [clearHistory])
+        }
+
+        addDocument(content)
+    }, [addDocument])
 
     const openImage = useCallback((name: string, canvas: HTMLCanvasElement) => {
         const layer: Layer = {
@@ -1596,7 +1775,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             type: 'layer'
         }
 
-        clearHistory({
+        const content: EditorContent = {
             layers: [layer],
             activeLayerId: layer.id,
             canvasSize: { width: canvas.width, height: canvas.height },
@@ -1604,8 +1783,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             guides: [],
             paths: [],
             activePathId: null
-        })
-    }, [clearHistory])
+        }
+
+        addDocument(content, name)
+    }, [addDocument])
+
+    const closeImage = useCallback(() => {
+        if (activeDocumentId) {
+            closeDocument(activeDocumentId)
+        }
+    }, [activeDocumentId, closeDocument])
 
     // Explicit add to history for components that manipulate state externally?
     // Not really needed since we use the setters above.
@@ -1615,6 +1802,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <EditorContext.Provider value={{
+            documents,
+            activeDocumentId,
+            activeDocument,
+            addDocument,
+            closeDocument,
+            setActiveDocumentId,
             layers,
             activeLayerId,
             canvasSize,
@@ -1665,7 +1858,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             canUndo,
             canRedo,
             historyEntries,
-            historyCurrentIndex: fullHistoryState.past.length,
+            historyCurrentIndex: activeDocument?.history.past.length ?? 0,
             restoreHistoryIndex,
             addToHistory,
             cropCanvas,
