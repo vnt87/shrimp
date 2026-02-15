@@ -27,6 +27,7 @@ export interface ToolDefinition {
 export const shortcuts: Record<string, string> = {
     'rect-select': 'R', 'ellipse-select': 'E', 'move': 'V', 'crop': 'C',
     'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
+    'gradient': 'Shift+G',
     'picker': 'I', 'text': 'T', 'zoom': 'Z', 'paths': 'P',
 }
 

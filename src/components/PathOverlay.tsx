@@ -239,7 +239,21 @@ export default function PathOverlay({ zoomLevel, toolOptions }: PathOverlayProps
 
         // --- MOVE MODE: drag whole path ---
         if (pathMode === 'move') {
-            if (!activePath) return
+            if (!activePath) {
+                // Avoid dead state: in move mode with no path yet, start a new path.
+                const { newPoint } = startNewPath(x, y)
+                if (!toolOptions?.pathPolygonal) {
+                    setDragState({
+                        type: 'handleOut',
+                        pointIndex: 0,
+                        startX: x,
+                        startY: y,
+                        initialPoint: newPoint
+                    })
+                    dragPreviewPathRef.current = null
+                }
+                return
+            }
             const shouldDragPath =
                 hitTestHandle(x, y) !== null ||
                 hitTestPoint(x, y) !== null ||

@@ -12,6 +12,7 @@ import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
 import ContextMenu from './ContextMenu'
+import { cloneCanvas, renderGradientToLayer } from '../utils/gradient'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics, Text })
@@ -477,6 +478,14 @@ export default function Canvas({
         }
     }, [])
 
+    useEffect(() => {
+        return () => {
+            if (gradientPreviewRaf.current !== null) {
+                cancelAnimationFrame(gradientPreviewRaf.current)
+            }
+        }
+    }, [])
+
     const { updateLayerTextStyle } = useEditor()
 
     useEffect(() => {
@@ -634,6 +643,18 @@ export default function Canvas({
     const isDrawing = useRef(false)
     const lastDrawPoint = useRef<{ x: number; y: number } | null>(null)
 
+    // Gradient state
+    const isGradientDragging = useRef(false)
+    const gradientStart = useRef<{ x: number; y: number } | null>(null)
+    const gradientEnd = useRef<{ x: number; y: number } | null>(null)
+    const gradientBaseCanvas = useRef<HTMLCanvasElement | null>(null)
+    const gradientPreviewRaf = useRef<number | null>(null)
+    const pendingGradientEnd = useRef<{ x: number; y: number } | null>(null)
+    const [gradientGuide, setGradientGuide] = useState<{
+        start: { x: number; y: number }
+        end: { x: number; y: number }
+    } | null>(null)
+
     // --- Drawing helper: draw stroke segment ---
     const drawStrokeTo = useCallback((canvasX: number, canvasY: number, isFirst: boolean, history: boolean = true) => {
         if (!activeLayerId) return
@@ -725,6 +746,62 @@ export default function Canvas({
         }
         return false
     }, [selection])
+
+    const renderGradientPreview = useCallback((endPoint: { x: number; y: number }, history: boolean) => {
+        if (!activeLayerId || !gradientStart.current || !gradientBaseCanvas.current) return
+
+        const layer = layers.find((l: Layer) => l.id === activeLayerId)
+        if (!layer || !layer.data || layer.locked) return
+
+        const result = renderGradientToLayer({
+            baseCanvas: gradientBaseCanvas.current,
+            layerX: layer.x,
+            layerY: layer.y,
+            start: gradientStart.current,
+            end: endPoint,
+            foregroundColor,
+            backgroundColor,
+            reverse: toolOptions?.gradientReverse ?? false,
+            opacity: toolOptions?.gradientOpacity ?? 100,
+            type: toolOptions?.gradientType ?? 'linear',
+            affectedArea: toolOptions?.gradientAffectedArea ?? 'layer',
+            selectionContains: isPointInSelection
+        })
+
+        updateLayerData(activeLayerId, result, history)
+    }, [activeLayerId, layers, foregroundColor, backgroundColor, toolOptions, isPointInSelection, updateLayerData])
+
+    const scheduleGradientPreview = useCallback((endPoint: { x: number; y: number }) => {
+        pendingGradientEnd.current = endPoint
+
+        if (gradientPreviewRaf.current !== null) return
+
+        gradientPreviewRaf.current = requestAnimationFrame(() => {
+            gradientPreviewRaf.current = null
+            if (!pendingGradientEnd.current) return
+            renderGradientPreview(pendingGradientEnd.current, false)
+        })
+    }, [renderGradientPreview])
+
+    const clearGradientState = useCallback(() => {
+        isGradientDragging.current = false
+        gradientStart.current = null
+        gradientEnd.current = null
+        gradientBaseCanvas.current = null
+        pendingGradientEnd.current = null
+        setGradientGuide(null)
+        if (gradientPreviewRaf.current !== null) {
+            cancelAnimationFrame(gradientPreviewRaf.current)
+            gradientPreviewRaf.current = null
+        }
+    }, [])
+
+    const cancelGradientDrag = useCallback(() => {
+        if (activeLayerId && gradientBaseCanvas.current) {
+            updateLayerData(activeLayerId, cloneCanvas(gradientBaseCanvas.current), false)
+        }
+        clearGradientState()
+    }, [activeLayerId, clearGradientState, updateLayerData])
 
     const getMergedImageData = useCallback(() => {
         if (!canvasSize) return null
@@ -1207,6 +1284,12 @@ export default function Canvas({
                 setIsSpaceHeld(true)
             }
             if (e.key === 'Escape') {
+                if (isGradientDragging.current) {
+                    e.preventDefault()
+                    cancelGradientDrag()
+                    setIsDragging(false)
+                    return
+                }
                 // Clear selection
                 setSelection(null)
             }
@@ -1224,7 +1307,7 @@ export default function Canvas({
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [setSelection, undo, redo])
+    }, [setSelection, undo, redo, cancelGradientDrag])
 
     // Mouse handlers
     const handleGuideDragStart = (orientation: 'horizontal' | 'vertical') => (e: React.MouseEvent) => {
@@ -1358,6 +1441,25 @@ export default function Canvas({
             isDrawing.current = true
             lastDrawPoint.current = null
             drawStrokeTo(canvasX, canvasY, true, false)
+        } else if (activeTool === 'gradient') {
+            if (!activeLayerId) return
+            const layer = layers.find((l: Layer) => l.id === activeLayerId)
+            if (!layer || !layer.data || layer.locked) return
+
+            if (gradientPreviewRaf.current !== null) {
+                cancelAnimationFrame(gradientPreviewRaf.current)
+                gradientPreviewRaf.current = null
+            }
+            pendingGradientEnd.current = null
+            setIsDragging(true)
+            isGradientDragging.current = true
+            gradientStart.current = { x: canvasX, y: canvasY }
+            gradientEnd.current = { x: canvasX, y: canvasY }
+            gradientBaseCanvas.current = cloneCanvas(layer.data)
+            setGradientGuide({
+                start: { x: canvasX, y: canvasY },
+                end: { x: canvasX, y: canvasY }
+            })
         } else if (activeTool === 'bucket') {
             floodFill(canvasX, canvasY)
         } else if (activeTool === 'picker') {
@@ -1518,11 +1620,19 @@ export default function Canvas({
                 width,
                 height
             })
+        } else if (activeTool === 'gradient' && isGradientDragging.current && gradientStart.current) {
+            const endPoint = { x: canvasX, y: canvasY }
+            gradientEnd.current = endPoint
+            setGradientGuide({
+                start: gradientStart.current,
+                end: endPoint
+            })
+            scheduleGradientPreview(endPoint)
         } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser')) {
             drawStrokeTo(canvasX, canvasY, false, false)
         }
 
-    }, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo])
+    }, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo, scheduleGradientPreview])
 
     const handleMouseUp = useCallback((e: React.MouseEvent | MouseEvent) => {
         setIsDragging(false)
@@ -1539,6 +1649,11 @@ export default function Canvas({
             }
             isDrawing.current = false
             lastDrawPoint.current = null
+        }
+
+        if (isGradientDragging.current && activeLayerId && gradientEnd.current) {
+            renderGradientPreview(gradientEnd.current, true)
+            clearGradientState()
         }
 
         // Commit move to history
@@ -1587,7 +1702,7 @@ export default function Canvas({
             setDraggingGuideId(null)
         }
 
-    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition])
+    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition, renderGradientPreview, clearGradientState])
 
     // Global event listeners for dragging
     useEffect(() => {
@@ -1603,6 +1718,13 @@ export default function Canvas({
             }
         }
     }, [isDragging, tempGuide, draggingGuideId, handleMouseMove, handleMouseUp])
+
+    useEffect(() => {
+        if (activeTool !== 'gradient' && isGradientDragging.current) {
+            cancelGradientDrag()
+            setIsDragging(false)
+        }
+    }, [activeTool, cancelGradientDrag])
 
     const handleWheel = useCallback((e: React.WheelEvent) => {
         if (layers.length === 0) return
@@ -1640,6 +1762,13 @@ export default function Canvas({
             })
         }
     }, [loadImage])
+
+    const gradientGuideScreen = gradientGuide ? {
+        startX: gradientGuide.start.x * transform.scale + transform.offsetX,
+        startY: gradientGuide.start.y * transform.scale + transform.offsetY,
+        endX: gradientGuide.end.x * transform.scale + transform.offsetX,
+        endY: gradientGuide.end.y * transform.scale + transform.offsetY,
+    } : null
 
     return (
         <div
@@ -1939,6 +2068,60 @@ export default function Canvas({
                                             pointerEvents: 'none'
                                         }}
                                     />
+                                )}
+
+                                {gradientGuideScreen && (
+                                    <>
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                left: gradientGuideScreen.startX,
+                                                top: gradientGuideScreen.startY,
+                                                width: Math.max(1, Math.hypot(
+                                                    gradientGuideScreen.endX - gradientGuideScreen.startX,
+                                                    gradientGuideScreen.endY - gradientGuideScreen.startY
+                                                )),
+                                                height: 1,
+                                                background: '#ffffff',
+                                                transform: `rotate(${Math.atan2(
+                                                    gradientGuideScreen.endY - gradientGuideScreen.startY,
+                                                    gradientGuideScreen.endX - gradientGuideScreen.startX
+                                                )}rad)`,
+                                                transformOrigin: '0 0',
+                                                boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.55)',
+                                                zIndex: 1100,
+                                                pointerEvents: 'none'
+                                            }}
+                                        />
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                left: gradientGuideScreen.startX - 4,
+                                                top: gradientGuideScreen.startY - 4,
+                                                width: 8,
+                                                height: 8,
+                                                borderRadius: '50%',
+                                                background: '#ffffff',
+                                                boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.7)',
+                                                zIndex: 1100,
+                                                pointerEvents: 'none'
+                                            }}
+                                        />
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                left: gradientGuideScreen.endX - 5,
+                                                top: gradientGuideScreen.endY - 5,
+                                                width: 10,
+                                                height: 10,
+                                                borderRadius: '50%',
+                                                background: 'var(--accent-active)',
+                                                boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.7)',
+                                                zIndex: 1100,
+                                                pointerEvents: 'none'
+                                            }}
+                                        />
+                                    </>
                                 )}
                             </div>
                         </div>

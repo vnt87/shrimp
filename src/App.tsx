@@ -36,6 +36,11 @@ export interface ToolOptions {
     bucketAffectedArea: 'similar' | 'selection'
     bucketSampleMerged: boolean
     bucketOpacity: number
+    // Gradient options
+    gradientType: 'linear' | 'radial'
+    gradientReverse: boolean
+    gradientOpacity: number
+    gradientAffectedArea: 'layer' | 'selection'
     // Picker options
     pickerTarget: 'fg' | 'bg'
     // Zoom options
@@ -70,6 +75,10 @@ const defaultToolOptions: ToolOptions = {
     bucketAffectedArea: 'similar',
     bucketSampleMerged: false,
     bucketOpacity: 100,
+    gradientType: 'linear',
+    gradientReverse: false,
+    gradientOpacity: 100,
+    gradientAffectedArea: 'layer',
     pickerTarget: 'fg',
     zoomDirection: 'in',
     pathMode: 'design',
@@ -107,7 +116,10 @@ export default function App() {
                     if (e.shiftKey) setActiveTool('eraser')
                     else setActiveTool('ellipse-select')
                     break
-                case 'g': setActiveTool('bucket'); break
+                case 'g':
+                    if (e.shiftKey) setActiveTool('gradient')
+                    else setActiveTool('bucket')
+                    break
                 case 'r': setActiveTool('rect-select'); break
                 case 'i': setActiveTool('picker'); break
                 case 't': setActiveTool('text'); break

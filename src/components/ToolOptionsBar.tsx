@@ -18,7 +18,8 @@ import {
     BoxSelect,
     PaintBucket,
     PenLine,
-    Trash2
+    Trash2,
+    Blend
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import { useEditor } from './EditorContext'
@@ -40,6 +41,7 @@ const toolLabels: Record<string, string> = {
     'pencil': 'Pencil',
     'eraser': 'Eraser',
     'bucket': 'Bucket Fill',
+    'gradient': 'Gradient',
     'picker': 'Color Picker',
     'text': 'Text',
     'zoom': 'Zoom',
@@ -194,6 +196,79 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 />
                 <label htmlFor="bucketSampleMerged">Sample Merged</label>
             </div>
+        </>
+    )
+
+    const renderGradientOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">Type</span>
+                <div style={{ display: 'flex', gap: 2 }}>
+                    <button
+                        className={`pref-btn ${toolOptions.gradientType === 'linear' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                        style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                        onClick={() => onToolOptionChange('gradientType', 'linear')}
+                        title="Linear Gradient"
+                    >
+                        Linear
+                    </button>
+                    <button
+                        className={`pref-btn ${toolOptions.gradientType === 'radial' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                        style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                        onClick={() => onToolOptionChange('gradientType', 'radial')}
+                        title="Radial Gradient"
+                    >
+                        Radial
+                    </button>
+                </div>
+            </div>
+
+            <div className="tool-options-divider" />
+
+            {renderSlider('gradientOpacity', 'Opacity', 0, 100, 1, '%')}
+
+            <div className="tool-options-divider" />
+
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">Direction</span>
+                <button
+                    className={`pref-btn ${toolOptions.gradientReverse ? 'pref-btn-secondary' : 'pref-btn-primary'}`}
+                    style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                    onClick={() => onToolOptionChange('gradientReverse', false)}
+                    title="Foreground to Background"
+                >
+                    {'FG->BG'}
+                </button>
+                <button
+                    className={`pref-btn ${toolOptions.gradientReverse ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                    style={{ height: 24, fontSize: 11, padding: '0 8px' }}
+                    onClick={() => onToolOptionChange('gradientReverse', true)}
+                    title="Background to Foreground"
+                >
+                    {'BG->FG'}
+                </button>
+            </div>
+
+            <div className="tool-options-divider" />
+
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">Area</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.gradientAffectedArea}
+                    onChange={(e) => onToolOptionChange('gradientAffectedArea', e.target.value as any)}
+                >
+                    <option value="layer">Whole Layer</option>
+                    <option value="selection">Within Selection</option>
+                </select>
+            </div>
+
+            <div className="tool-options-divider" />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+                <Blend size={13} />
+                Drag on canvas to apply gradient
+            </span>
         </>
     )
 
@@ -745,6 +820,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             case 'bucket':
             case 'wand-select':
                 return renderBucketOptions()
+            case 'gradient':
+                return renderGradientOptions()
             case 'text':
                 return renderTextOptions()
             case 'picker':
