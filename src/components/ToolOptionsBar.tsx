@@ -325,6 +325,55 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
+    const renderZoomOptions = () => {
+        const effectiveDirection = isCmdPressed
+            ? (toolOptions.zoomDirection === 'in' ? 'out' : 'in')
+            : (toolOptions.zoomDirection || 'in')
+
+        return (
+            <>
+                <div style={{ display: 'flex', alignItems: 'center', height: 24, background: '#333', borderRadius: 4, padding: 2 }}>
+                    <button
+                        className={effectiveDirection === 'in' ? 'tool-option-button active' : 'tool-option-button'}
+                        style={{
+                            height: '100%',
+                            padding: '0 8px',
+                            borderRadius: 2,
+                            border: 'none',
+                            background: effectiveDirection === 'in' ? '#5294e2' : 'transparent',
+                            color: effectiveDirection === 'in' ? 'white' : '#ccc',
+                            fontSize: 12,
+                            cursor: 'pointer'
+                        }}
+                        onClick={() => onToolOptionChange('zoomDirection', 'in')}
+                    >
+                        Zoom In
+                    </button>
+                    <button
+                        className={effectiveDirection === 'out' ? 'tool-option-button active' : 'tool-option-button'}
+                        style={{
+                            height: '100%',
+                            padding: '0 8px',
+                            borderRadius: 2,
+                            border: 'none',
+                            background: effectiveDirection === 'out' ? '#5294e2' : 'transparent',
+                            color: effectiveDirection === 'out' ? 'white' : '#ccc',
+                            fontSize: 12,
+                            cursor: 'pointer'
+                        }}
+                        onClick={() => onToolOptionChange('zoomDirection', 'out')}
+                    >
+                        Zoom Out
+                    </button>
+                </div>
+                <div className="tool-options-divider" />
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic', marginLeft: 4 }}>
+                    Hold Cmd/Ctrl to toggle
+                </span>
+            </>
+        )
+    }
+
     const renderToolSpecificOptions = () => {
         switch (activeTool) {
             case 'brush':
@@ -341,6 +390,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderPickerOptions()
             case 'crop':
                 return renderCropOptions()
+            case 'zoom':
+                return renderZoomOptions()
             case 'lasso-select':
             case 'rect-select':
             case 'ellipse-select':

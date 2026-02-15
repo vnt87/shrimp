@@ -23,32 +23,34 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
         <div className="toolbox">
             <div className="toolbox-handle" />
 
-            {toolGroups.map((group, gi) => (
-                <div key={gi}>
-                    {group.map((tool, ti) => {
-                        const Icon = tool.icon
-                        const isActive = activeTool === tool.id
-                        return (
-                            <div
-                                key={ti}
-                                className={`toolbox-item${isActive ? ' active' : ''}`}
-                                onClick={() => onToolSelect?.(tool.id)}
-                                onMouseEnter={(e) => {
-                                    setHoveredToolId(tool.id)
-                                    setHoveredRect(e.currentTarget.getBoundingClientRect())
-                                }}
-                                onMouseLeave={() => {
-                                    setHoveredToolId(null)
-                                    setHoveredRect(null)
-                                }}
-                            >
-                                <Icon size={20} />
-                            </div>
-                        )
-                    })}
-                    {gi < toolGroups.length - 1 && <div className="toolbox-divider" />}
-                </div>
-            ))}
+            <div className="toolbox-tools">
+                {toolGroups.map((group, gi) => (
+                    <div key={gi}>
+                        {group.map((tool, ti) => {
+                            const Icon = tool.icon
+                            const isActive = activeTool === tool.id
+                            return (
+                                <div
+                                    key={ti}
+                                    className={`toolbox-item${isActive ? ' active' : ''}`}
+                                    onClick={() => onToolSelect?.(tool.id)}
+                                    onMouseEnter={(e) => {
+                                        setHoveredToolId(tool.id)
+                                        setHoveredRect(e.currentTarget.getBoundingClientRect())
+                                    }}
+                                    onMouseLeave={() => {
+                                        setHoveredToolId(null)
+                                        setHoveredRect(null)
+                                    }}
+                                >
+                                    <Icon size={20} />
+                                </div>
+                            )
+                        })}
+                        {gi < toolGroups.length - 1 && <div className="toolbox-divider" />}
+                    </div>
+                ))}
+            </div>
 
             {/* Foreground/Background color swatches */}
             <div className="toolbox-colors" style={{ position: 'relative' }}>

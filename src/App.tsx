@@ -35,6 +35,8 @@ export interface ToolOptions {
     bucketOpacity: number
     // Picker options
     pickerTarget: 'fg' | 'bg'
+    // Zoom options
+    zoomDirection: 'in' | 'out'
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -60,6 +62,7 @@ const defaultToolOptions: ToolOptions = {
     bucketSampleMerged: false,
     bucketOpacity: 100,
     pickerTarget: 'fg',
+    zoomDirection: 'in',
 }
 
 export default function App() {

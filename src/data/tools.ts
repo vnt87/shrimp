@@ -3,7 +3,7 @@ import {
     Hand,
     Scissors,
     Crop,
-    Maximize2,
+    Search,
     Move,
     Type,
     Paintbrush,
@@ -77,7 +77,7 @@ export const toolGroups: ToolDefinition[][] = [
         { id: 'transform', icon: SquareDashedBottom, label: 'Transform' },
     ],
     [
-        { id: 'zoom', icon: Maximize2, label: 'Zoom' },
+        { id: 'zoom', icon: Search, label: 'Zoom' },
     ],
     [
         { id: 'navigate', icon: Hand, label: 'Navigate' },

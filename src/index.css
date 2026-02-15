@@ -666,11 +666,20 @@ body,
   flex-direction: column;
   align-items: center;
   padding-top: 6px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
-.toolbox::-webkit-scrollbar {
+.toolbox-tools {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.toolbox-tools::-webkit-scrollbar {
   display: none;
 }
 
@@ -745,8 +754,11 @@ body,
 }
 
 .toolbox-colors {
-  margin-top: auto;
+  margin-top: 0;
   margin-bottom: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-divider);
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;

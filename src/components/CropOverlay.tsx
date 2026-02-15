@@ -10,9 +10,10 @@ interface CropOverlayProps {
     offsetX: number
     offsetY: number
     toolOptions?: ToolOptions
+    zoomLevel?: number
 }
 
-export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY, toolOptions }: CropOverlayProps) {
+export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY, toolOptions, zoomLevel = 1 }: CropOverlayProps) {
     const { canvasSize } = useEditor()
     // Initialize with full canvas if no interaction yet? 
     // GIMP/Photoshop usually start with full selection handles.
@@ -71,8 +72,17 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY,
         e.preventDefault()
 
         const { x, y } = getClientPos(e)
-        const dx = (x - dragStart.current.x) / scale
-        const dy = (y - dragStart.current.y) / scale
+        // Use the passed scale for coordinate calculation.
+        // If parent is transformed, one pixel movement is 1/zoomLevel pixels in local space?
+        // Note: 'scale' prop is distinct from 'zoomLevel' in our new logic?
+        // In Canvas.tsx we pass scale={1} (because parent is transformed).
+        // So dx = (x - startX) / 1.
+        // But wait, if parent is zoomed 2x, moving mouse 10px means moving 5px in local space?
+        // Yes. So we need to divide by zoomLevel here too!
+        // We should use 'zoomLevel' for this delta calculation if 'scale' is kept as 1 (identity).
+        const effectiveScale = scale * zoomLevel
+        const dx = (x - dragStart.current.x) / effectiveScale
+        const dy = (y - dragStart.current.y) / effectiveScale
 
         let newX = dragStart.current.rectX
         let newY = dragStart.current.rectY
@@ -181,6 +191,9 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY,
     // Highlight Opacity
     const dimOpacity = toolOptions?.cropHighlightOpacity ? toolOptions.cropHighlightOpacity / 100 : 0.5
 
+    // Handle scale calculation
+    const handleScale = 1 / zoomLevel
+
     return (
         <div
             className="crop-overlay-container"
@@ -254,6 +267,8 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY,
                             backgroundColor: 'white',
                             border: '1px solid black',
                             cursor: `${h}-resize`,
+                            transform: `scale(${handleScale})`,
+                            transformOrigin: 'center',
                             ...getHandleStyle(h)
                         }}
                         onMouseDown={(e) => handleMouseDown(e, h)}
@@ -268,7 +283,9 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY,
                 top: screenY + screenH + 10,
                 display: 'flex',
                 gap: 8,
-                pointerEvents: 'auto'
+                pointerEvents: 'auto',
+                transform: `scale(${handleScale})`, // Scale action bar too?
+                transformOrigin: 'top left'
             }}>
                 <button
                     onClick={() => onCrop(rect)}
@@ -294,7 +311,9 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY,
                 padding: '2px 4px',
                 fontSize: 10,
                 borderRadius: 2,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                transform: `scale(${handleScale})`,
+                transformOrigin: 'bottom left'
             }}>
                 {Math.round(rect.width)} x {Math.round(rect.height)}
             </div>

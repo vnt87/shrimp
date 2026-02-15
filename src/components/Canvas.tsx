@@ -302,6 +302,12 @@ function BrushCursor({
     return <graphics ref={graphicsRef} draw={() => { }} />
 }
 
+// Wrapper to safely render TransformOverlay only when layerId is present
+function TransformOverlayWrapper({ layerId }: { layerId: string | null }) {
+    if (!layerId) return null
+    return <TransformOverlay layerId={layerId} />
+}
+
 /**
  * Inner Pixi scene that renders layers and selection overlay.
  * Must be a child of <Application> to use useApplication().
@@ -317,7 +323,7 @@ function PixiScene({
     toolOptions?: ToolOptions
     activeTool: string
 }) {
-    const { layers, canvasSize, selection } = useEditor()
+    const { layers, canvasSize, selection, activeLayerId } = useEditor()
     const { app } = useApplication()
 
     // Resize the renderer when the app's canvas parent changes
@@ -348,6 +354,11 @@ function PixiScene({
 
             {/* Brush Cursor Overlay */}
             <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} />
+
+            {/* Transform Overlay (Pixi) */}
+            {activeTool === 'transform' && (
+                <TransformOverlayWrapper layerId={activeLayerId} />
+            )}
         </pixiContainer>
     )
 }
@@ -1187,9 +1198,31 @@ export default function Canvas({
                 }
                 addTextLayer(defaultText, style, canvasX, canvasY)
             }
+        } else if (activeTool === 'zoom') {
+            const effectiveDirection = isCmdPressed
+                ? (toolOptions?.zoomDirection === 'in' ? 'out' : 'in')
+                : (toolOptions?.zoomDirection || 'in')
+
+            const zoomFactor = effectiveDirection === 'in' ? 2 : 0.5
+            const newScale = Math.min(Math.max(transform.scale * zoomFactor, 0.05), 20)
+
+            // Zoom centered on mouse position
+            // logic: mouseX = (clientX - left - newOffset) / newScale
+            // we want mouseX to remain the same in canvas coords?
+            // actually standard zoom:
+            // newOffset = mouse - (mouse - oldOffset) * (newScale / oldScale)
+            // mouse here is relative to viewport (clientX - rect.left)
+
+            const mouseX = e.clientX - rect.left
+            const mouseY = e.clientY - rect.top
+
+            const newOffsetX = mouseX - (mouseX - transform.offsetX) * (newScale / transform.scale)
+            const newOffsetY = mouseY - (mouseY - transform.offsetY) * (newScale / transform.scale)
+
+            setTransform({ offsetX: newOffsetX, offsetY: newOffsetY, scale: newScale })
         }
 
-    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer])
+    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer, isCmdPressed])
 
     const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
         if (!viewportRef.current) return
@@ -1468,20 +1501,26 @@ export default function Canvas({
                         >
                             <div
                                 className="viewport"
-                                ref={viewportRef}
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                                onMouseLeave={handleMouseUp}
                                 style={{
+                                    /* 
+                                     * Infinite Canvas Logic:
+                                     * The viewport/canvas fills the screen.
+                                     * We DO NOT transform this container.
+                                     * Instead, we transform the content inside (PixiScene) 
+                                     * and the HTML overlays.
+                                     */
+                                    width: '100%',
+                                    height: '100%',
                                     cursor: isPanning ? 'grab' :
                                         isSpaceHeld ? 'grab' :
                                             activeTool === 'move' ? 'default' :
                                                 activeTool === 'text' ? 'text' :
-                                                    activeTool === 'zoom' ? 'zoom-in' :
+                                                    activeTool === 'zoom' ? (
+                                                        (isCmdPressed
+                                                            ? (toolOptions?.zoomDirection === 'in' ? 'zoom-out' : 'zoom-in')
+                                                            : (toolOptions?.zoomDirection === 'out' ? 'zoom-out' : 'zoom-in'))
+                                                    ) :
                                                         'crosshair',
-                                    transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
-                                    transformOrigin: '0 0',
                                 }}
                             >
                                 <Application
@@ -1536,15 +1575,19 @@ export default function Canvas({
                                     </div>
                                 )}
 
-                                {/* React overlays (HTML) */}
+                                {/* React overlays (HTML) - now transformed to match Pixi */}
                                 <div
                                     className="overlays"
                                     style={{
                                         position: 'absolute',
                                         top: 0,
                                         left: 0,
-                                        width: canvasSize.width,
-                                        height: canvasSize.height,
+                                        width: '100%', // Fill the infinite canvas space? No, transformed.
+                                        // Wait, if we transform this container, its origin (0,0) moves.
+                                        // The content inside expects (0,0) to be the image (0,0).
+                                        // So we should just apply the transform here.
+                                        transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
+                                        transformOrigin: '0 0',
                                         pointerEvents: 'none', // Pass events to Pixi unless interacting with handles
                                     }}
                                 >
@@ -1556,76 +1599,73 @@ export default function Canvas({
                                                     onToolChange?.('move')
                                                 }}
                                                 onCancel={() => onToolChange?.('move')}
-                                                scale={transform.scale}
-                                                offsetX={transform.offsetX}
-                                                offsetY={transform.offsetY}
+                                                scale={1}
+                                                zoomLevel={transform.scale}
+                                                offsetX={0}
+                                                offsetY={0}
                                                 toolOptions={toolOptions}
                                             />
                                         </div>
                                     )}
 
-                                    {activeTool === 'transform' && activeLayerId && (
-                                        <div style={{ pointerEvents: 'auto' }}>
-                                            <TransformOverlay layerId={activeLayerId} />
-                                        </div>
-                                    )}
+
                                 </div>
-                            </div>
 
-                            {/* Scrollbars would go here if we implemented custom ones */}
+                                {/* Scrollbars would go here if we implemented custom ones */}
 
-                            {/* Context Menu */}
-                            {contextMenu && (
-                                <ContextMenu
-                                    x={contextMenu.x}
-                                    y={contextMenu.y}
-                                    onClose={() => setContextMenu(null)}
-                                    onSelect={(toolId) => onToolChange?.(toolId)}
-                                />
-                            )}
+                                {/* Context Menu */}
+                                {contextMenu && (
+                                    <ContextMenu
+                                        x={contextMenu.x}
+                                        y={contextMenu.y}
+                                        onClose={() => setContextMenu(null)}
+                                        onSelect={(toolId) => onToolChange?.(toolId)}
+                                    />
+                                )}
 
-                            {/* Render Guides */}
-                            {guides.map(guide => {
-                                const isHorizontal = guide.orientation === 'horizontal'
-                                const screenPos = guide.position * transform.scale + (isHorizontal ? transform.offsetY : transform.offsetX)
+                                {/* Render Guides */}
+                                {guides.map(guide => {
+                                    const isHorizontal = guide.orientation === 'horizontal'
+                                    const screenPos = guide.position * transform.scale + (isHorizontal ? transform.offsetY : transform.offsetX)
 
-                                return (
+                                    return (
+                                        <div
+                                            key={guide.id}
+                                            className="guide-line"
+                                            style={{
+                                                position: 'absolute',
+                                                left: isHorizontal ? 0 : screenPos,
+                                                top: isHorizontal ? screenPos : 0,
+                                                width: isHorizontal ? '100%' : '1px',
+                                                height: isHorizontal ? '1px' : '100%',
+                                                backgroundColor: '#00ffff',
+                                                cursor: isHorizontal ? 'ns-resize' : 'ew-resize',
+                                                zIndex: 1000,
+                                                pointerEvents: 'auto'
+                                            }}
+                                            onMouseDown={handleExistingGuideDragStart(guide.id)}
+                                        />
+                                    )
+                                })}
+
+                                {/* Render Temp Guide being dragged from ruler */}
+                                {tempGuide && (
                                     <div
-                                        key={guide.id}
-                                        className="guide-line"
+                                        className="guide-line-temp"
                                         style={{
                                             position: 'absolute',
-                                            left: isHorizontal ? 0 : screenPos,
-                                            top: isHorizontal ? screenPos : 0,
-                                            width: isHorizontal ? '100%' : '1px',
-                                            height: isHorizontal ? '1px' : '100%',
+                                            left: tempGuide.orientation === 'vertical' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().left || 0)) : 0,
+                                            top: tempGuide.orientation === 'horizontal' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().top || 0)) : 0,
+                                            width: tempGuide.orientation === 'horizontal' ? '100%' : '1px',
+                                            height: tempGuide.orientation === 'horizontal' ? '1px' : '100%',
                                             backgroundColor: '#00ffff',
-                                            cursor: isHorizontal ? 'ns-resize' : 'ew-resize',
-                                            zIndex: 1000,
-                                            pointerEvents: 'auto'
+                                            opacity: 0.5,
+                                            zIndex: 1001,
+                                            pointerEvents: 'none'
                                         }}
-                                        onMouseDown={handleExistingGuideDragStart(guide.id)}
                                     />
-                                )
-                            })}
-
-                            {/* Render Temp Guide being dragged from ruler */}
-                            {tempGuide && (
-                                <div
-                                    className="guide-line-temp"
-                                    style={{
-                                        position: 'absolute',
-                                        left: tempGuide.orientation === 'vertical' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().left || 0)) : 0,
-                                        top: tempGuide.orientation === 'horizontal' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().top || 0)) : 0,
-                                        width: tempGuide.orientation === 'horizontal' ? '100%' : '1px',
-                                        height: tempGuide.orientation === 'horizontal' ? '1px' : '100%',
-                                        backgroundColor: '#00ffff',
-                                        opacity: 0.5,
-                                        zIndex: 1001,
-                                        pointerEvents: 'none'
-                                    }}
-                                />
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
                 </>
