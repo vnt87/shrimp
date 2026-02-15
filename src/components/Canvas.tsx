@@ -323,18 +323,11 @@ function PixiScene({
     toolOptions?: ToolOptions
     activeTool: string
 }) {
-    const { layers, canvasSize, selection, activeLayerId } = useEditor()
-    const { app } = useApplication()
+    const { layers, selection, activeLayerId } = useEditor()
 
-    // Resize the renderer when the app's canvas parent changes
-    useEffect(() => {
-        if (app?.renderer) {
-            app.renderer.resize(
-                app.canvas.parentElement?.clientWidth || canvasSize.width,
-                app.canvas.parentElement?.clientHeight || canvasSize.height
-            )
-        }
-    }, [app, canvasSize])
+
+    // Manual resize removed to rely on Application resizeTo prop
+    // which now correctly receives the viewport element via callback ref.
 
     return (
         <pixiContainer
@@ -409,6 +402,67 @@ export default function Canvas({
         scale: 1,
     })
 
+    // Zoom Animation State
+    const animationFrameId = useRef<number | null>(null)
+    const activeAnimation = useRef<{
+        startTime: number,
+        startTransform: CanvasTransform,
+        targetTransform: CanvasTransform,
+        duration: number
+    } | null>(null)
+
+    const animateTo = useCallback((target: CanvasTransform, duration = 300) => {
+        if (animationFrameId.current) {
+            cancelAnimationFrame(animationFrameId.current)
+        }
+
+        activeAnimation.current = {
+            startTime: performance.now(),
+            startTransform: { ...transform }, // Capture current state (even if mid-animation)
+            targetTransform: target,
+            duration
+        }
+
+        const tick = (now: number) => {
+            if (!activeAnimation.current) return
+
+            const elapsed = now - activeAnimation.current.startTime
+            const progress = Math.min(elapsed / activeAnimation.current.duration, 1)
+
+            // Ease out cubic
+            const ease = 1 - Math.pow(1 - progress, 3)
+
+            const start = activeAnimation.current.startTransform
+            const end = activeAnimation.current.targetTransform
+
+            const current = {
+                scale: start.scale + (end.scale - start.scale) * ease,
+                offsetX: start.offsetX + (end.offsetX - start.offsetX) * ease,
+                offsetY: start.offsetY + (end.offsetY - start.offsetY) * ease
+            }
+
+            setTransform(current)
+
+            if (progress < 1) {
+                animationFrameId.current = requestAnimationFrame(tick)
+            } else {
+                activeAnimation.current = null
+                animationFrameId.current = null
+            }
+        }
+
+        animationFrameId.current = requestAnimationFrame(tick)
+    }, [transform])
+
+    // Cleanup animation on unmount
+    useEffect(() => {
+        return () => {
+            if (animationFrameId.current) {
+                cancelAnimationFrame(animationFrameId.current)
+            }
+        }
+    }, [])
+
     const { updateLayerTextStyle } = useEditor()
 
     useEffect(() => {
@@ -482,7 +536,7 @@ export default function Canvas({
     const currentLassoPath = useRef<{ x: number, y: number }[]>([])
     const isLassoing = useRef(false)
 
-    const viewportRef = useRef<HTMLDivElement>(null)
+    const [viewportRef, setViewportRef] = useState<HTMLDivElement | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Drawing state
@@ -851,7 +905,7 @@ export default function Canvas({
 
     // Fit image/canvas to viewport
     const fitToView = useCallback((w: number, h: number) => {
-        const viewport = viewportRef.current
+        const viewport = viewportRef
         if (!viewport) return
 
         const vw = viewport.clientWidth
@@ -1116,7 +1170,7 @@ export default function Canvas({
             handleDoubleClick()
             return
         }
-        if (!viewportRef.current) return
+        if (!viewportRef) return
 
         // Panning (Space held or Middle click)
         if (isSpaceHeld || e.button === 1) {
@@ -1134,7 +1188,7 @@ export default function Canvas({
             return
         }
 
-        const rect = viewportRef.current.getBoundingClientRect()
+        const rect = viewportRef.getBoundingClientRect()
         // Coordinates in canvas space
         const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
         const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
@@ -1204,31 +1258,24 @@ export default function Canvas({
                 : (toolOptions?.zoomDirection || 'in')
 
             const zoomFactor = effectiveDirection === 'in' ? 2 : 0.5
-            const newScale = Math.min(Math.max(transform.scale * zoomFactor, 0.05), 20)
+            const targetScale = Math.min(Math.max(transform.scale * zoomFactor, 0.05), 20)
 
-            // Zoom centered on mouse position
-            // logic: mouseX = (clientX - left - newOffset) / newScale
-            // we want mouseX to remain the same in canvas coords?
-            // actually standard zoom:
-            // newOffset = mouse - (mouse - oldOffset) * (newScale / oldScale)
-            // mouse here is relative to viewport (clientX - rect.left)
-
+            // Calculate target offset to keep mouse position stable
             const mouseX = e.clientX - rect.left
             const mouseY = e.clientY - rect.top
 
-            const newOffsetX = mouseX - (mouseX - transform.offsetX) * (newScale / transform.scale)
-            const newOffsetY = mouseY - (mouseY - transform.offsetY) * (newScale / transform.scale)
+            const targetOffsetX = mouseX - (mouseX - transform.offsetX) * (targetScale / transform.scale)
+            const targetOffsetY = mouseY - (mouseY - transform.offsetY) * (targetScale / transform.scale)
 
-            setTransform({ offsetX: newOffsetX, offsetY: newOffsetY, scale: newScale })
+            animateTo({ scale: targetScale, offsetX: targetOffsetX, offsetY: targetOffsetY })
         }
-
-    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer, isCmdPressed])
+    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer, isCmdPressed, viewportRef])
 
     const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
-        if (!viewportRef.current) return
+        if (!viewportRef) return
 
         // Cursor tracking
-        const rect = viewportRef.current.getBoundingClientRect()
+        const rect = viewportRef.getBoundingClientRect()
         const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
         const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
 
@@ -1250,7 +1297,7 @@ export default function Canvas({
 
         // Handle Guide Dragging (New or Existing)
         if (tempGuide || draggingGuideId) {
-            const rect = viewportRef.current.getBoundingClientRect()
+            const rect = viewportRef.getBoundingClientRect()
 
             if (tempGuide) {
                 // We are dragging a NEW guide from the ruler
@@ -1336,8 +1383,8 @@ export default function Canvas({
         }
 
         // Finish guide dragging
-        if (tempGuide && viewportRef.current) {
-            const rect = viewportRef.current.getBoundingClientRect()
+        if (tempGuide && viewportRef) {
+            const rect = viewportRef.getBoundingClientRect()
             // Check if we dropped within the viewport
             if (
                 e.clientX >= rect.left &&
@@ -1359,8 +1406,8 @@ export default function Canvas({
             setTempGuide(null)
         }
 
-        if (draggingGuideId && viewportRef.current) {
-            const rect = viewportRef.current.getBoundingClientRect()
+        if (draggingGuideId && viewportRef) {
+            const rect = viewportRef.getBoundingClientRect()
             // If dropped outside viewport (back to ruler roughly), remove it
             if (
                 e.clientX < rect.left ||
@@ -1394,7 +1441,7 @@ export default function Canvas({
         if (layers.length === 0) return
         e.preventDefault()
 
-        const viewport = viewportRef.current
+        const viewport = viewportRef
         if (!viewport) return
 
         const rect = viewport.getBoundingClientRect()
@@ -1470,13 +1517,13 @@ export default function Canvas({
                         </div>
 
                         <div
-                            ref={viewportRef}
+                            ref={setViewportRef}
                             className={`canvas-viewport ${isPanning ? 'panning-active' : isSpaceHeld ? 'panning-ready' : ''} ${activeTool === 'move' ? 'cursor-move' : ''} ${activeTool.includes('select') ? 'crosshair' : ''} ${activeTool === 'picker' ? 'cursor-picker' : ''}`}
                             onMouseDown={handleMouseDown}
                             onMouseMove={(e) => {
                                 handleMouseMove(e)
                                 if (activeTool === 'picker') {
-                                    const rect = viewportRef.current?.getBoundingClientRect()
+                                    const rect = viewportRef?.getBoundingClientRect()
                                     if (rect) {
                                         const x = (e.clientX - rect.left - transform.offsetX) / transform.scale
                                         const y = (e.clientY - rect.top - transform.offsetY) / transform.scale
@@ -1524,7 +1571,7 @@ export default function Canvas({
                                 }}
                             >
                                 <Application
-                                    resizeTo={viewportRef.current || undefined}
+                                    resizeTo={viewportRef || undefined}
                                     backgroundColor={0x505050}
                                     backgroundAlpha={0} // Transparent background so checkboard shows through
                                 >
@@ -1654,8 +1701,8 @@ export default function Canvas({
                                         className="guide-line-temp"
                                         style={{
                                             position: 'absolute',
-                                            left: tempGuide.orientation === 'vertical' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().left || 0)) : 0,
-                                            top: tempGuide.orientation === 'horizontal' ? (tempGuide.pos - (viewportRef.current?.getBoundingClientRect().top || 0)) : 0,
+                                            left: tempGuide.orientation === 'vertical' ? (tempGuide.pos - (viewportRef?.getBoundingClientRect()?.left || 0)) : 0,
+                                            top: tempGuide.orientation === 'horizontal' ? (tempGuide.pos - (viewportRef?.getBoundingClientRect()?.top || 0)) : 0,
                                             width: tempGuide.orientation === 'horizontal' ? '100%' : '1px',
                                             height: tempGuide.orientation === 'horizontal' ? '1px' : '100%',
                                             backgroundColor: '#00ffff',

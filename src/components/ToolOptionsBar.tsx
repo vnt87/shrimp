@@ -1,6 +1,16 @@
 import type { ToolOptions } from '../App'
 import React, { useState, useEffect } from 'react'
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Italic } from 'lucide-react'
+import {
+    Type,
+    Bold,
+    Italic,
+    AlignLeft,
+    AlignCenter,
+    AlignRight,
+    AlignJustify,
+    ZoomIn,
+    ZoomOut
+} from 'lucide-react'
 import FontSelector from './FontSelector'
 
 interface ToolOptionsBarProps {
@@ -332,7 +342,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
         return (
             <>
-                <div style={{ display: 'flex', alignItems: 'center', height: 24, background: '#333', borderRadius: 4, padding: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', height: 24, background: 'var(--bg-input)', borderRadius: 4, padding: 2 }}>
                     <button
                         className={effectiveDirection === 'in' ? 'tool-option-button active' : 'tool-option-button'}
                         style={{
@@ -340,14 +350,19 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                             padding: '0 8px',
                             borderRadius: 2,
                             border: 'none',
-                            background: effectiveDirection === 'in' ? '#5294e2' : 'transparent',
-                            color: effectiveDirection === 'in' ? 'white' : '#ccc',
+                            background: effectiveDirection === 'in' ? 'var(--accent-active)' : 'transparent',
+                            color: effectiveDirection === 'in' ? 'white' : 'var(--text-secondary)',
                             fontSize: 12,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
                         }}
                         onClick={() => onToolOptionChange('zoomDirection', 'in')}
+                        title="Zoom In"
                     >
-                        Zoom In
+                        <ZoomIn size={14} />
+                        <span>In</span>
                     </button>
                     <button
                         className={effectiveDirection === 'out' ? 'tool-option-button active' : 'tool-option-button'}
@@ -356,14 +371,19 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                             padding: '0 8px',
                             borderRadius: 2,
                             border: 'none',
-                            background: effectiveDirection === 'out' ? '#5294e2' : 'transparent',
-                            color: effectiveDirection === 'out' ? 'white' : '#ccc',
+                            background: effectiveDirection === 'out' ? 'var(--accent-active)' : 'transparent',
+                            color: effectiveDirection === 'out' ? 'white' : 'var(--text-secondary)',
                             fontSize: 12,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
                         }}
                         onClick={() => onToolOptionChange('zoomDirection', 'out')}
+                        title="Zoom Out"
                     >
-                        Zoom Out
+                        <ZoomOut size={14} />
+                        <span>Out</span>
                     </button>
                 </div>
                 <div className="tool-options-divider" />
