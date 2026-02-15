@@ -21,9 +21,24 @@ import { useTheme } from './ThemeContext'
 import { useEditor, type LayerFilter } from './EditorContext'
 import FiltersDialog from './FiltersDialog'
 
-const menuData: Record<string, string[]> = {
+import { toolGroups, MENU_TOOL_GROUPS } from '../data/tools'
+
+type MenuOption = string | { label: string; icon?: any; command?: string; shortcut?: string; disabled?: boolean; children?: MenuOption[] }
+
+const menuData: Record<string, MenuOption[]> = {
     File: ['New...', 'Open...', 'Open as Layers...', 'Export As PNG', 'Export As JPEG', 'Export As WebP', 'Close', 'Close All'],
-    Edit: ['Undo', 'Redo', '---', 'Cut', 'Copy', 'Paste', 'Clear', '---', 'Free Transform'],
+    Edit: [
+        'Undo', 'Redo', '---', 'Cut', 'Copy', 'Paste', 'Clear', '---', 'Free Transform',
+        '---',
+        ...MENU_TOOL_GROUPS.map(group => ({
+            label: group.label,
+            children: group.tools.map(tool => ({
+                label: tool.label,
+                icon: tool.icon,
+                command: `tool:${tool.id}`
+            }))
+        }))
+    ],
     Select: ['All', 'None', 'Invert'],
     View: ['Fit Image in Window', 'Zoom In', 'Zoom Out'],
     Image: ['Flatten Image', 'Merge Visible Layers', '---', 'Canvas Size...'],
@@ -174,10 +189,18 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         e.target.value = '' // Reset input
     }
 
-    const handleMenuAction = (option: string) => {
+    const handleMenuAction = (option: MenuOption) => {
         setActiveMenu(null)
 
-        switch (option) {
+        const command = typeof option === 'string' ? option : option.command || option.label
+
+        if (command.startsWith('tool:')) {
+            const toolId = command.split(':')[1]
+            onToolSelect?.(toolId)
+            return
+        }
+
+        switch (command) {
             case 'New...': setShowNewImage(true); break
             case 'Open...': handleFileOpen(); break
             case 'Export As PNG': exportImage('png'); break
@@ -276,29 +299,9 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                                 {item}
                                 {activeMenu === item && (
                                     <div className="header-menu-dropdown">
-                                        {menuData[item].map((option, idx) => {
-                                            if (option === '---') {
-                                                return <div key={idx} className="header-menu-dropdown-divider" style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
-                                            }
-                                            const disabled = isDisabled(option)
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    className={`header-menu-dropdown-item${disabled ? ' disabled' : ''}`}
-                                                    style={disabled ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleMenuAction(option)
-                                                    }}
-                                                >
-                                                    {option}
-                                                    {getShortcut(option) && <span className="shortcut">{getShortcut(option)}</span>}
-                                                    {['Open as Layers...', 'Blur', 'Sharpen', 'Noise'].includes(option) && (
-                                                        <ChevronRight size={12} className="submenu-arrow" />
-                                                    )}
-                                                </div>
-                                            )
-                                        })}
+                                        {menuData[item].map((option, idx) => (
+                                            <MenuItem key={idx} option={option} handleMenuAction={handleMenuAction} isDisabled={isDisabled} />
+                                        ))}
                                     </div>
                                 )}
                             </div>
@@ -401,4 +404,57 @@ function getShortcut(option: string): string {
         case 'None': return '⇧⌘A'
         default: return ''
     }
+}
+
+function MenuItem({ option, handleMenuAction, isDisabled }: { option: MenuOption, handleMenuAction: (opt: MenuOption) => void, isDisabled: (label: string) => boolean }) {
+    const [isOpen, setIsOpen] = useState(false)
+
+    if (option === '---') {
+        return <div className="header-menu-dropdown-divider" style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
+    }
+
+    const label = typeof option === 'string' ? option : option.label
+    const disabled = isDisabled(label)
+    const Icon = typeof option !== 'string' ? option.icon : null
+    const children = typeof option !== 'string' ? option.children : undefined
+    const hasSubmenu = !!children || ['Open as Layers...', 'Blur', 'Sharpen', 'Noise'].includes(label)
+
+    return (
+        <div
+            className={`header-menu-dropdown-item${disabled ? ' disabled' : ''}`}
+            style={{
+                ...((disabled ? { opacity: 0.4, pointerEvents: 'none' } : undefined) as any),
+                position: 'relative'
+            }}
+            onClick={(e) => {
+                if (children) return
+                e.stopPropagation()
+                handleMenuAction(option)
+            }}
+            onMouseEnter={() => setIsOpen(true)}
+            onMouseLeave={() => setIsOpen(false)}
+        >
+            {Icon && <Icon size={14} style={{ marginRight: 8 }} />}
+            {label}
+            {getShortcut(label) && <span className="shortcut">{getShortcut(label)}</span>}
+            {hasSubmenu && (
+                <ChevronRight size={12} className="submenu-arrow" style={{ marginLeft: 'auto' }} />
+            )}
+
+            {children && isOpen && (
+                <div
+                    className="header-menu-dropdown"
+                    style={{
+                        top: -4,
+                        left: '100%',
+                        marginLeft: -2, // Overlap slightly
+                    }}
+                >
+                    {children.map((child, idx) => (
+                        <MenuItem key={idx} option={child} handleMenuAction={handleMenuAction} isDisabled={isDisabled} />
+                    ))}
+                </div>
+            )}
+        </div>
+    )
 }

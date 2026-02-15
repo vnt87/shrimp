@@ -10,6 +10,7 @@ import CropOverlay from './CropOverlay'
 import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
+import ContextMenu from './ContextMenu'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics, Text })
@@ -209,7 +210,7 @@ function PixiLayerRecursive({ layer }: { layer: import('./EditorContext').Layer 
     }
 
     if (layer.type === 'text') {
-        const fontStatus = useGoogleFont(layer.textStyle?.fontFamily || 'Arial');
+        useGoogleFont(layer.textStyle?.fontFamily || 'Arial');
 
         return (
             <React.Fragment>
@@ -437,6 +438,7 @@ export default function Canvas({
     // Guide dragging state
     const [draggingGuideId, setDraggingGuideId] = useState<string | null>(null)
     const [tempGuide, setTempGuide] = useState<{ orientation: 'horizontal' | 'vertical', pos: number } | null>(null)
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
 
     // Selection state
     const isSelecting = useRef(false)
@@ -1357,43 +1359,87 @@ export default function Canvas({
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onWheel={handleWheel}
+                            onContextMenu={(e) => {
+                                e.preventDefault()
+                                setContextMenu({ x: e.clientX, y: e.clientY })
+                            }}
                         >
-                            {/* GPU-accelerated Pixi.js Application */}
-                            <Application
-                                resizeTo={viewportRef as any}
-                                backgroundAlpha={0}
-                                antialias
-                                autoDensity
-                                resolution={window.devicePixelRatio || 1}
+                            <div
+                                className="viewport"
+                                ref={viewportRef}
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}
+                                style={{
+                                    cursor: isPanning ? 'grab' :
+                                        isSpaceHeld ? 'grab' :
+                                            activeTool === 'move' ? 'default' :
+                                                activeTool === 'text' ? 'text' :
+                                                    activeTool === 'zoom' ? 'zoom-in' :
+                                                        'crosshair',
+                                    transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
+                                    transformOrigin: '0 0',
+                                }}
                             >
-                                <PixiScene
-                                    transform={transform}
-                                    cursorRef={cursorRef}
-                                    toolOptions={toolOptions}
-                                    activeTool={activeTool}
-                                />
-                                { /* Transform Overlay (must be inside Application for Pixi context) */}
-                                {activeTool === 'transform' && activeLayerId && (
-                                    <TransformOverlay layerId={activeLayerId} />
-                                )}
-                            </Application>
+                                <Application
+                                    resizeTo={viewportRef.current || undefined}
+                                    backgroundColor={0x505050}
+                                    backgroundAlpha={0} // Transparent background so checkboard shows through
+                                >
+                                    <PixiScene
+                                        transform={transform}
+                                        cursorRef={cursorRef}
+                                        toolOptions={toolOptions}
+                                        activeTool={activeTool}
+                                    />
+                                </Application>
 
-                            {/* Crop Overlay */}
-                            {activeTool === 'crop' && (
-                                <CropOverlay
-                                    onCrop={(rect) => {
-                                        cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
-                                        // Reset to move tool after crop
-                                        onToolChange?.('move')
+                                {/* React overlays (HTML) */}
+                                <div
+                                    className="overlays"
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: canvasSize.width,
+                                        height: canvasSize.height,
+                                        pointerEvents: 'none', // Pass events to Pixi unless interacting with handles
                                     }}
-                                    onCancel={() => {
-                                        // Reset to move tool on cancel
-                                        onToolChange?.('move')
-                                    }}
-                                    scale={transform.scale}
-                                    offsetX={transform.offsetX}
-                                    offsetY={transform.offsetY}
-                                    toolOptions={toolOptions}
+                                >
+                                    {activeTool === 'crop' && (
+                                        <div style={{ pointerEvents: 'auto' }}>
+                                            <CropOverlay
+                                                onCrop={(rect) => {
+                                                    cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
+                                                    onToolChange?.('move')
+                                                }}
+                                                onCancel={() => onToolChange?.('move')}
+                                                scale={transform.scale}
+                                                offsetX={transform.offsetX}
+                                                offsetY={transform.offsetY}
+                                                toolOptions={toolOptions}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {activeTool === 'transform' && activeLayerId && (
+                                        <div style={{ pointerEvents: 'auto' }}>
+                                            <TransformOverlay layerId={activeLayerId} />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Scrollbars would go here if we implemented custom ones */}
+
+                            {/* Context Menu */}
+                            {contextMenu && (
+                                <ContextMenu
+                                    x={contextMenu.x}
+                                    y={contextMenu.y}
+                                    onClose={() => setContextMenu(null)}
+                                    onSelect={(toolId) => onToolChange?.(toolId)}
                                 />
                             )}
 

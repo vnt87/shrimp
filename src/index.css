@@ -362,7 +362,7 @@ body,
   padding: 6px 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   color: var(--text-primary);
   font-size: var(--font-size-sm);
   cursor: pointer;
@@ -377,7 +377,7 @@ body,
 .header-menu-dropdown-item .shortcut {
   color: var(--text-secondary);
   font-size: 10px;
-  margin-left: 16px;
+  margin-left: auto;
 }
 
 .header-menu-dropdown-item:hover .shortcut {
@@ -385,7 +385,7 @@ body,
 }
 
 .header-menu-dropdown-item .submenu-arrow {
-  margin-left: 10px;
+  margin-left: auto;
   color: var(--text-secondary);
 }
 
@@ -2943,30 +2943,31 @@ body,
   background: rgba(255, 80, 80, 0.1);
   color: #ff5050;
 }
+
 /* Font Selector Styles */
 .font-option {
-    color: var(--text-primary);
+  color: var(--text-primary);
 }
 
 .font-option:hover {
-    background: var(--bg-hover);
+  background: var(--bg-hover);
 }
 
 .font-option.active {
-    background: var(--accent-primary);
-    color: white;
+  background: var(--accent-primary);
+  color: white;
 }
 
 .font-dropdown {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-main) transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-main) transparent;
 }
 
 .font-dropdown::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .font-dropdown::-webkit-scrollbar-thumb {
-    background: var(--border-main);
-    border-radius: 3px;
+  background: var(--border-main);
+  border-radius: 3px;
 }
