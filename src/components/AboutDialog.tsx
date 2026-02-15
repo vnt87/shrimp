@@ -7,7 +7,10 @@ const APP_VERSION = '0.1.0'
 export default function AboutDialog({ onClose }: { onClose: () => void }) {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose()
+            if (e.key === 'Escape') {
+                e.stopPropagation()
+                onClose()
+            }
         }
         document.addEventListener('keydown', onKey)
         return () => document.removeEventListener('keydown', onKey)

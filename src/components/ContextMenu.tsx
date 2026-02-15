@@ -19,9 +19,19 @@ export default function ContextMenu({ x, y, onClose, onSelect }: ContextMenuProp
             }
         }
 
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault()
+                event.stopPropagation()
+                onClose()
+            }
+        }
+
         document.addEventListener('mousedown', handleClickOutside)
+        document.addEventListener('keydown', handleKeyDown, { capture: true })
         return () => {
             document.removeEventListener('mousedown', handleClickOutside)
+            document.removeEventListener('keydown', handleKeyDown, { capture: true })
         }
     }, [onClose])
 

@@ -151,7 +151,10 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
     // Close on Escape
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose()
+            if (e.key === 'Escape') {
+                e.stopPropagation()
+                onClose()
+            }
         }
         document.addEventListener('keydown', onKey)
         return () => document.removeEventListener('keydown', onKey)

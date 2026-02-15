@@ -39,6 +39,17 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
         setDraftParams({ ...defaultParams[selectedType] })
     }, [selectedType])
 
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation()
+                onClose()
+            }
+        }
+        document.addEventListener('keydown', onKey)
+        return () => document.removeEventListener('keydown', onKey)
+    }, [onClose])
+
     const activeLayer = layers.find(l => l.id === activeLayerId)
 
     useEffect(() => {

@@ -98,6 +98,7 @@ export default function App() {
                 case 'i': setActiveTool('picker'); break
                 case 't': setActiveTool('text'); break
                 case 'z': setActiveTool('zoom'); break
+                case 'escape': setActiveTool('move'); break
                 case '[':
                     setToolOptions(prev => ({
                         ...prev,

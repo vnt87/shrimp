@@ -25,7 +25,10 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') handleCreate()
-        if (e.key === 'Escape') onClose()
+        if (e.key === 'Escape') {
+            e.stopPropagation()
+            onClose()
+        }
     }
 
     return (

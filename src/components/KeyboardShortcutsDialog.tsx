@@ -71,7 +71,10 @@ export default function KeyboardShortcutsDialog({ onClose }: { onClose: () => vo
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose()
+            if (e.key === 'Escape') {
+                e.stopPropagation()
+                onClose()
+            }
         }
         document.addEventListener('keydown', onKey)
         return () => document.removeEventListener('keydown', onKey)
