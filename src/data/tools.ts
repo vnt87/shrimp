@@ -4,7 +4,7 @@ import {
     ZoomIn,
     Move,
     Type,
-    Paintbrush,
+    Brush,
     Eraser,
     PaintBucket,
     Blend,
@@ -49,7 +49,7 @@ export const toolGroups: ToolDefinition[][] = [
         { id: 'crop', icon: Crop, label: 'Crop' },
     ],
     [
-        { id: 'brush', icon: Paintbrush, label: 'Paintbrush' },
+        { id: 'brush', icon: Brush, label: 'Brush' },
         { id: 'pencil', icon: Pencil, label: 'Pencil' },
     ],
     [

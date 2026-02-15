@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { useHistory } from '../hooks/useHistory'
 
 export interface LayerFilter {
@@ -67,6 +67,12 @@ export interface Guide {
     position: number // In canvas coordinates
 }
 
+export interface HistoryEntry {
+    index: number
+    label: string
+    isCurrent: boolean
+}
+
 export interface TransformData {
     x: number
     y: number
@@ -126,12 +132,16 @@ interface EditorContextType {
     mergeDown: () => void
     exportImage: (format?: string, quality?: number) => void
     newImage: (width: number, height: number, bgColor: string) => void
+    openImage: (name: string, canvas: HTMLCanvasElement) => void
 
     // History
     undo: () => void
     redo: () => void
     canUndo: boolean
     canRedo: boolean
+    historyEntries: HistoryEntry[]
+    historyCurrentIndex: number
+    restoreHistoryIndex: (index: number) => void
     addToHistory: () => void
     cropCanvas: (x: number, y: number, width: number, height: number, deletePixels?: boolean) => void
     closeImage: () => void
@@ -191,7 +201,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         redo,
         canUndo,
         canRedo,
-        clear: clearHistory
+        clear: clearHistory,
+        historyState: fullHistoryState
     } = useHistory<EditorState>(emptyState)
 
     // Derived state for easier usage
@@ -257,6 +268,152 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             }
         })
     }, [replaceHistoryState])
+
+    const restoreHistoryIndex = useCallback((targetIndex: number) => {
+        const total = fullHistoryState.past.length + 1 + fullHistoryState.future.length
+        if (targetIndex < 0 || targetIndex >= total) return
+
+        const currentIndex = fullHistoryState.past.length
+        const delta = targetIndex - currentIndex
+        if (delta === 0) return
+
+        if (delta < 0) {
+            for (let i = 0; i < -delta; i++) undo()
+        } else {
+            for (let i = 0; i < delta; i++) redo()
+        }
+    }, [fullHistoryState.past.length, fullHistoryState.future.length, undo, redo])
+
+    const historyEntries = useMemo<HistoryEntry[]>(() => {
+        const snapshots = [...fullHistoryState.past, fullHistoryState.present, ...fullHistoryState.future]
+        const currentIndex = fullHistoryState.past.length
+
+        const flattenLayers = (list: Layer[]): Layer[] => {
+            const out: Layer[] = []
+            const walk = (layersToWalk: Layer[]) => {
+                for (const layer of layersToWalk) {
+                    out.push(layer)
+                    if (layer.children?.length) walk(layer.children)
+                }
+            }
+            walk(list)
+            return out
+        }
+
+        const countLayers = (list: Layer[]): number => {
+            let count = 0
+            for (const layer of list) {
+                count++
+                if (layer.children?.length) count += countLayers(layer.children)
+            }
+            return count
+        }
+
+        const labelFor = (prev: EditorState | null, next: EditorState): string => {
+            if (!prev) return 'Initial state'
+
+            if (
+                prev.canvasSize.width !== next.canvasSize.width ||
+                prev.canvasSize.height !== next.canvasSize.height
+            ) {
+                return `Crop (${next.canvasSize.width}x${next.canvasSize.height})`
+            }
+
+            const prevFlatLayers = flattenLayers(prev.layers)
+            const nextFlatLayers = flattenLayers(next.layers)
+            const prevLayerMap = new Map(prevFlatLayers.map((l) => [l.id, l]))
+            const nextLayerMap = new Map(nextFlatLayers.map((l) => [l.id, l]))
+
+            const prevLayerCount = countLayers(prev.layers)
+            const nextLayerCount = countLayers(next.layers)
+            if (nextLayerCount > prevLayerCount) {
+                const added = nextFlatLayers.find((l) => !prevLayerMap.has(l.id))
+                return added ? `Layer added (${added.name})` : 'Layer added'
+            }
+            if (nextLayerCount < prevLayerCount) {
+                const removed = prevFlatLayers.find((l) => !nextLayerMap.has(l.id))
+                return removed ? `Layer deleted (${removed.name})` : 'Layer deleted'
+            }
+
+            if (prev.activeLayerId !== next.activeLayerId) {
+                const active = next.activeLayerId ? nextLayerMap.get(next.activeLayerId) : null
+                return active ? `Active layer changed (${active.name})` : 'Active layer changed'
+            }
+
+            if (!prev.activePath && next.activePath) return 'Path created'
+            if (prev.activePath && !next.activePath) return 'Path cleared'
+            if (prev.activePath && next.activePath) {
+                if (prev.activePath.closed !== next.activePath.closed) return next.activePath.closed ? 'Path closed' : 'Path opened'
+                if (prev.activePath.points.length !== next.activePath.points.length) {
+                    return next.activePath.points.length > prev.activePath.points.length
+                        ? `Path point added (${next.activePath.points.length} pts)`
+                        : `Path point removed (${next.activePath.points.length} pts)`
+                }
+                if (prev.activePath !== next.activePath) return 'Path edited'
+            }
+
+            if (!prev.selection && next.selection) return `Selection created (${next.selection.type})`
+            if (prev.selection && !next.selection) return 'Selection cleared'
+            if (prev.selection !== next.selection) {
+                return next.selection ? `Selection updated (${next.selection.type})` : 'Selection updated'
+            }
+
+            if (prev.guides.length !== next.guides.length) {
+                return next.guides.length > prev.guides.length
+                    ? `Guide added (${next.guides.length})`
+                    : `Guide removed (${next.guides.length})`
+            }
+            if (prev.guides !== next.guides) return 'Guide updated'
+
+            if (prev.layers !== next.layers) {
+                const changedLayerIds = new Set<string>()
+                for (const nextLayer of nextFlatLayers) {
+                    const prevLayer = prevLayerMap.get(nextLayer.id)
+                    if (!prevLayer) continue
+                    if (prevLayer !== nextLayer) changedLayerIds.add(nextLayer.id)
+                }
+
+                if (changedLayerIds.size === 1) {
+                    const changedId = [...changedLayerIds][0]
+                    const prevLayer = prevLayerMap.get(changedId)
+                    const nextLayer = nextLayerMap.get(changedId)
+                    if (prevLayer && nextLayer) {
+                        const nonDataChanged =
+                            prevLayer.name !== nextLayer.name ||
+                            prevLayer.visible !== nextLayer.visible ||
+                            prevLayer.locked !== nextLayer.locked ||
+                            prevLayer.opacity !== nextLayer.opacity ||
+                            prevLayer.blendMode !== nextLayer.blendMode ||
+                            prevLayer.x !== nextLayer.x ||
+                            prevLayer.y !== nextLayer.y ||
+                            prevLayer.type !== nextLayer.type ||
+                            prevLayer.expanded !== nextLayer.expanded ||
+                            prevLayer.text !== nextLayer.text ||
+                            prevLayer.textStyle !== nextLayer.textStyle ||
+                            prevLayer.children !== nextLayer.children ||
+                            prevLayer.filters !== nextLayer.filters
+
+                        if (!nonDataChanged && prevLayer.data !== nextLayer.data) {
+                            return `Paint stroke (${nextLayer.name})`
+                        }
+                    }
+                }
+
+                if (next.activeLayerId) {
+                    const active = nextLayerMap.get(next.activeLayerId)
+                    if (active) return `Layer content updated (${active.name})`
+                }
+                return 'Layer content updated'
+            }
+            return 'State updated'
+        }
+
+        return snapshots.map((snapshot, index) => ({
+            index,
+            label: labelFor(index > 0 ? snapshots[index - 1] : null, snapshot),
+            isCurrent: index === currentIndex
+        }))
+    }, [fullHistoryState])
 
     // --- Helpers for recursive layer operations ---
 
@@ -1298,6 +1455,31 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
     }, [clearHistory])
 
+    const openImage = useCallback((name: string, canvas: HTMLCanvasElement) => {
+        const layer: Layer = {
+            id: Math.random().toString(36).substr(2, 9),
+            name,
+            visible: true,
+            locked: false,
+            opacity: 100,
+            blendMode: 'normal',
+            data: canvas,
+            filters: [],
+            x: 0,
+            y: 0,
+            type: 'layer'
+        }
+
+        clearHistory({
+            layers: [layer],
+            activeLayerId: layer.id,
+            canvasSize: { width: canvas.width, height: canvas.height },
+            selection: null,
+            guides: [],
+            activePath: null
+        })
+    }, [clearHistory])
+
     // Explicit add to history for components that manipulate state externally?
     // Not really needed since we use the setters above.
     const addToHistory = useCallback(() => {
@@ -1343,12 +1525,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             mergeDown,
             exportImage,
             newImage,
+            openImage,
             // History
             closeImage,
             undo,
             redo,
             canUndo,
             canRedo,
+            historyEntries,
+            historyCurrentIndex: fullHistoryState.past.length,
+            restoreHistoryIndex,
             addToHistory,
             cropCanvas,
             // Layer management

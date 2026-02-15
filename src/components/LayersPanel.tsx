@@ -13,6 +13,8 @@ import {
     Trash2,
     Anchor,
     ChevronRight,
+    Undo2,
+    Redo2,
 } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 import { useEditor, Layer } from './EditorContext'
@@ -256,6 +258,9 @@ export default function LayersPanel() {
     const {
         layers,
         activeLayerId,
+        activePath,
+        setActivePath,
+        updatePath,
         toggleLayerLock,
         setLayerOpacity,
         setLayerBlendMode,
@@ -264,8 +269,16 @@ export default function LayersPanel() {
         duplicateLayer,
         createGroup,
         moveLayer,
-        selectedLayerIds
+        selectedLayerIds,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
+        historyEntries,
+        historyCurrentIndex,
+        restoreHistoryIndex
     } = useEditor()
+    const [activeTab, setActiveTab] = useState<'layers' | 'channels' | 'paths' | 'history'>('layers')
 
     // Determine active layer object for lock/opacity controls
     const findLayer = (list: Layer[], id: string): Layer | null => {
@@ -280,10 +293,22 @@ export default function LayersPanel() {
     }
 
     const activeLayer = activeLayerId ? findLayer(layers, activeLayerId) : null
+    const opacityValue = Math.min(100, Math.max(0, activeLayer?.opacity ?? 100))
+
+    const setOpacityValue = (value: number) => {
+        if (activeLayerId) {
+            setLayerOpacity(activeLayerId, Math.min(100, Math.max(0, value)))
+        }
+    }
 
     const handleOpacityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (activeLayerId) {
-            setLayerOpacity(activeLayerId, Number(e.target.value))
+        setOpacityValue(Number(e.target.value))
+    }
+
+    const handleOpacityInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const nextValue = Number(e.target.value)
+        if (!Number.isNaN(nextValue)) {
+            setOpacityValue(nextValue)
         }
     }
 
@@ -304,136 +329,294 @@ export default function LayersPanel() {
         }
     }
 
+    const togglePathClosed = () => {
+        if (!activePath) return
+        if (!activePath.closed && activePath.points.length < 3) return
+        updatePath({ ...activePath, closed: !activePath.closed })
+    }
+
     return (
         <div className="dialogue" style={{ flex: 1, overflow: 'hidden' }}>
             <div className="dialogue-header">
                 <div className="dialogue-tabs">
-                    <div className="dialogue-tab active">Layers</div>
-                    <div className="dialogue-tab inactive">Channels</div>
-                    <div className="dialogue-tab inactive">Paths</div>
-                    <div className="dialogue-tab inactive">Undo</div>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'layers' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('layers')}>Layers</button>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'channels' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('channels')}>Channels</button>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'paths' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('paths')}>Paths</button>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'history' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('history')}>History</button>
                 </div>
                 <div className="dialogue-more">
                     <MoreVertical size={16} />
                 </div>
             </div>
 
-            <div className="layers-blend-row">
-                <span className="dialogue-bar-label">Mode</span>
-                <select
-                    className="layers-dropdown"
-                    style={{ width: 161, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '2px 4px', fontSize: 12, cursor: 'pointer' }}
-                    value={activeLayer?.blendMode || 'normal'}
-                    onChange={(e) => activeLayerId && setLayerBlendMode(activeLayerId, e.target.value)}
-                    disabled={!activeLayerId}
-                >
-                    <option value="normal">Normal</option>
-                    <option value="multiply">Multiply</option>
-                    <option value="screen">Screen</option>
-                    <option value="overlay">Overlay</option>
-                    <option value="darken">Darken</option>
-                    <option value="lighten">Lighten</option>
-                    <option value="color-dodge">Color Dodge</option>
-                    <option value="color-burn">Color Burn</option>
-                    <option value="hard-light">Hard Light</option>
-                    <option value="soft-light">Soft Light</option>
-                    <option value="difference">Difference</option>
-                    <option value="exclusion">Exclusion</option>
-                    <option value="hue">Hue</option>
-                    <option value="saturation">Saturation</option>
-                    <option value="color">Color</option>
-                    <option value="luminosity">Luminosity</option>
-                </select>
-            </div>
-
-            <div className="dialogue-divider" />
-
-            <div className="layers-lock-row">
-                <span className="layers-lock-label">Lock</span>
-                <div
-                    className={`layers-lock-icon${activeLayer?.locked ? ' active' : ''}`}
-                    onClick={() => activeLayerId && toggleLayerLock(activeLayerId)}
-                >
-                    <Lock size={16} />
-                </div>
-
-                <span className="layers-opacity-label" style={{ marginLeft: 'auto' }}>Opacity</span>
-                <input
-                    type="range"
-                    className="layers-opacity-slider"
-                    min={0}
-                    max={100}
-                    value={activeLayer?.opacity ?? 100}
-                    onChange={handleOpacityChange}
-                    disabled={!activeLayerId}
-                />
-            </div>
-
-            <div className="dialogue-divider" />
-
-            <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
-                {layers.length === 0 && (
-                    <div style={{ padding: 10, color: '#888', textAlign: 'center' }}>
-                        No layers
+            {activeTab === 'layers' && (
+                <>
+                    <div className="layers-blend-row">
+                        <span className="dialogue-bar-label">Mode</span>
+                        <select
+                            className="layers-dropdown"
+                            style={{ width: 161, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '2px 4px', fontSize: 12, cursor: 'pointer' }}
+                            value={activeLayer?.blendMode || 'normal'}
+                            onChange={(e) => activeLayerId && setLayerBlendMode(activeLayerId, e.target.value)}
+                            disabled={!activeLayerId}
+                        >
+                            <option value="normal">Normal</option>
+                            <option value="multiply">Multiply</option>
+                            <option value="screen">Screen</option>
+                            <option value="overlay">Overlay</option>
+                            <option value="darken">Darken</option>
+                            <option value="lighten">Lighten</option>
+                            <option value="color-dodge">Color Dodge</option>
+                            <option value="color-burn">Color Burn</option>
+                            <option value="hard-light">Hard Light</option>
+                            <option value="soft-light">Soft Light</option>
+                            <option value="difference">Difference</option>
+                            <option value="exclusion">Exclusion</option>
+                            <option value="hue">Hue</option>
+                            <option value="saturation">Saturation</option>
+                            <option value="color">Color</option>
+                            <option value="luminosity">Luminosity</option>
+                        </select>
                     </div>
-                )}
-                {[...layers].map(layer => (
-                    <LayerItem
-                        key={layer.id}
-                        layer={layer}
-                        depth={0}
-                        onDragStart={handleDragStart}
-                        onDrop={handleDrop}
-                    />
-                ))}
-            </div>
 
-            <div className="dialogue-divider" />
+                    <div className="dialogue-divider" />
 
-            <div className="layer-search">
-                <div className="layer-search-input">
-                    <input type="text" placeholder="Layer Search" readOnly />
-                    <Search size={16} />
-                </div>
-            </div>
+                    <div className="layers-lock-row">
+                        <span className="layers-lock-label">Lock</span>
+                        <div
+                            className={`layers-lock-icon${activeLayer?.locked ? ' active' : ''}`}
+                            onClick={() => activeLayerId && toggleLayerLock(activeLayerId)}
+                        >
+                            <Lock size={16} />
+                        </div>
 
-            <div className="dialogue-divider" />
+                        <span className="layers-opacity-label" style={{ marginLeft: 'auto' }}>Opacity</span>
+                        <input
+                            type="range"
+                            className="layers-opacity-slider"
+                            min={0}
+                            max={100}
+                            value={opacityValue}
+                            style={{
+                                background: `linear-gradient(to right, var(--accent-active) 0%, var(--accent-active) ${opacityValue}%, var(--bg-input) ${opacityValue}%, var(--bg-input) 100%)`
+                            }}
+                            onChange={handleOpacityChange}
+                            disabled={!activeLayerId}
+                        />
+                        <input
+                            type="number"
+                            className="layers-opacity-input"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={opacityValue}
+                            onChange={handleOpacityInputChange}
+                            disabled={!activeLayerId}
+                        />
+                        <span className="layers-opacity-unit">%</span>
+                    </div>
 
-            <div className="dialogue-actions">
-                <div className="dialogue-actions-left">
-                    <div
-                        className="dialogue-action-btn"
-                        title="New Layer"
-                        onClick={() => addLayer('New Layer')}
-                    >
-                        <Plus size={16} />
+                    <div className="dialogue-divider" />
+
+                    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
+                        {layers.length === 0 && (
+                            <div style={{ padding: 10, color: '#888', textAlign: 'center' }}>
+                                No layers
+                            </div>
+                        )}
+                        {[...layers].map(layer => (
+                            <LayerItem
+                                key={layer.id}
+                                layer={layer}
+                                depth={0}
+                                onDragStart={handleDragStart}
+                                onDrop={handleDrop}
+                            />
+                        ))}
                     </div>
-                    <div
-                        className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
-                        title="Duplicate Layer"
-                        onClick={() => activeLayerId && duplicateLayer(activeLayerId)}
-                    >
-                        <Copy size={16} />
+
+                    <div className="dialogue-divider" />
+
+                    <div className="layer-search">
+                        <div className="layer-search-input">
+                            <input type="text" placeholder="Layer Search" readOnly />
+                            <Search size={16} />
+                        </div>
                     </div>
-                    <div
-                        className="dialogue-action-btn"
-                        title="New Group"
-                        onClick={() => createGroup(selectedLayerIds.length > 0 ? selectedLayerIds : undefined)}
-                    >
-                        <FolderPlus size={16} />
+
+                    <div className="dialogue-divider" />
+
+                    <div className="dialogue-actions">
+                        <div className="dialogue-actions-left">
+                            <div
+                                className="dialogue-action-btn"
+                                title="New Layer"
+                                onClick={() => addLayer('New Layer')}
+                            >
+                                <Plus size={16} />
+                            </div>
+                            <div
+                                className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
+                                title="Duplicate Layer"
+                                onClick={() => activeLayerId && duplicateLayer(activeLayerId)}
+                            >
+                                <Copy size={16} />
+                            </div>
+                            <div
+                                className="dialogue-action-btn"
+                                title="New Group"
+                                onClick={() => createGroup(selectedLayerIds.length > 0 ? selectedLayerIds : undefined)}
+                            >
+                                <FolderPlus size={16} />
+                            </div>
+                            <div
+                                className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
+                                title="Delete Layer"
+                                onClick={() => activeLayerId && deleteLayer(activeLayerId)}
+                            >
+                                <Trash2 size={16} />
+                            </div>
+                        </div>
+                        <div className="dialogue-actions-right">
+                            <div className="dialogue-action-btn"><Anchor size={16} /></div>
+                        </div>
                     </div>
-                    <div
-                        className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
-                        title="Delete Layer"
-                        onClick={() => activeLayerId && deleteLayer(activeLayerId)}
-                    >
-                        <Trash2 size={16} />
+                </>
+            )}
+
+            {activeTab === 'paths' && (
+                <>
+                    <div className="layers-blend-row" style={{ justifyContent: 'space-between' }}>
+                        <span className="dialogue-bar-label">Active Path</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                            {activePath ? `${activePath.points.length} pts` : 'None'}
+                        </span>
                     </div>
-                </div>
-                <div className="dialogue-actions-right">
-                    <div className="dialogue-action-btn"><Anchor size={16} /></div>
-                </div>
-            </div>
+
+                    <div className="dialogue-divider" />
+
+                    <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                            Status: {activePath ? (activePath.closed ? 'Closed' : 'Open') : 'No path'}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                                className={`dialogue-action-btn${!activePath ? ' disabled' : ''}`}
+                                onClick={togglePathClosed}
+                                disabled={!activePath || (!activePath.closed && activePath.points.length < 3)}
+                                title={activePath?.closed ? 'Open path' : 'Close path'}
+                                style={{ width: 'auto', padding: '0 8px' }}
+                            >
+                                {activePath?.closed ? 'Open' : 'Close'}
+                            </button>
+                            <button
+                                className={`dialogue-action-btn${!activePath ? ' disabled' : ''}`}
+                                onClick={() => setActivePath(null)}
+                                disabled={!activePath}
+                                title="Clear path"
+                                style={{ width: 'auto', padding: '0 8px' }}
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="dialogue-divider" />
+
+                    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
+                        {!activePath && (
+                            <div style={{ padding: 12, color: 'var(--text-secondary)', textAlign: 'center', fontSize: 12 }}>
+                                No active path. Use the Paths tool (`P`) to create one.
+                            </div>
+                        )}
+                        {activePath?.points.map((point, index) => (
+                            <div key={`${activePath.id}-${index}`} className="layer-row" style={{ cursor: 'default' }}>
+                                <div className="layer-info" style={{ gap: 8 }}>
+                                    <div className="layer-folder-icon">
+                                        <Anchor size={14} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <span className="layer-name">{`Point ${index + 1}`}</span>
+                                        <span className="layer-name muted" style={{ fontSize: 11 }}>
+                                            {`x:${Math.round(point.x)} y:${Math.round(point.y)} · ${point.type}`}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {activeTab === 'history' && (
+                <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px' }}>
+                        <span className="dialogue-bar-label">History Log</span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                                type="button"
+                                className={`dialogue-action-btn${!canUndo ? ' disabled' : ''}`}
+                                title="Undo"
+                                onClick={() => canUndo && undo()}
+                                disabled={!canUndo}
+                            >
+                                <Undo2 size={14} />
+                            </button>
+                            <button
+                                type="button"
+                                className={`dialogue-action-btn${!canRedo ? ' disabled' : ''}`}
+                                title="Redo"
+                                onClick={() => canRedo && redo()}
+                                disabled={!canRedo}
+                            >
+                                <Redo2 size={14} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="dialogue-divider" />
+
+                    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
+                        {[...historyEntries].reverse().map((entry) => (
+                            <div
+                                key={entry.index}
+                                className={`layer-row${entry.isCurrent ? ' selected' : ''}`}
+                                onDoubleClick={() => restoreHistoryIndex(entry.index)}
+                                title="Double click to restore this state"
+                                style={{ cursor: 'default' }}
+                            >
+                                <div className="layer-info" style={{ gap: 8 }}>
+                                    <div className="layer-folder-icon">
+                                        <Anchor size={14} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <span className="layer-name">{entry.label}</span>
+                                        <span className="layer-name muted" style={{ fontSize: 11 }}>
+                                            {entry.isCurrent ? 'Current state' : `Step ${entry.index + 1}`}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="dialogue-divider" />
+
+                    <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-secondary)' }}>
+                        Double-click any item to restore that state. Current: Step {historyCurrentIndex + 1}
+                    </div>
+                </>
+            )}
+
+            {(activeTab === 'channels') && (
+                <>
+                    <div className="dialogue-divider" />
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: 12, padding: 12 }}>
+                        Channels panel is not implemented yet.
+                    </div>
+                </>
+            )}
 
             <div className="dialogue-handle" style={{ marginBottom: 1 }} />
         </div>

@@ -1298,17 +1298,31 @@ body,
 .dialogue-tab {
   display: flex;
   align-items: center;
+  justify-content: center;
   height: 100%;
   padding: 0 8px;
   font-size: var(--font-size-sm);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--transition);
+  border: 1px solid transparent;
+  border-bottom: none;
+  transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.dialogue-tab-btn {
+  appearance: none;
+  background: none;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  border-radius: 0;
 }
 
 .dialogue-tab.active {
   background: var(--bg-tab-active);
   color: var(--text-active);
+  border-color: var(--border-main);
+  box-shadow: 0 1px 0 var(--bg-tab-active) inset;
   border-bottom: 2px solid var(--accent-active);
   margin-bottom: -2px;
 }
@@ -1316,6 +1330,11 @@ body,
 .dialogue-tab.inactive {
   background: var(--bg-tab-inactive);
   color: var(--text-secondary);
+}
+
+.dialogue-tab.inactive:hover {
+  background: var(--bg-layer-hover);
+  color: var(--text-primary);
 }
 
 .dialogue-tab+.dialogue-tab {
@@ -1642,11 +1661,35 @@ body,
 
 .layers-opacity-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
+  border: 1px solid var(--border-input);
   background: var(--text-primary);
   cursor: pointer;
+}
+
+.layers-opacity-input {
+  width: 42px;
+  height: 22px;
+  font-size: 11px;
+  text-align: center;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-input);
+  border-radius: 4px;
+  padding: 0 4px;
+  outline: none;
+}
+
+.layers-opacity-input:focus {
+  border-color: var(--accent-active);
+}
+
+.layers-opacity-unit {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-left: -2px;
 }
 
 .layers-opacity-dropdown {

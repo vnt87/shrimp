@@ -388,8 +388,7 @@ export default function Canvas({
         layers,
         activeLayerId,
         canvasSize,
-        setCanvasSize,
-        addLayer,
+        openImage,
         addTextLayer,
         updateLayerPosition,
         updateLayerData,
@@ -1145,17 +1144,11 @@ export default function Canvas({
                 ctx.drawImage(img, 0, 0)
             }
 
-            // If it's the first layer, set canvas size
-            if (layers.length === 0) {
-                setCanvasSize({ width: img.naturalWidth, height: img.naturalHeight })
-                fitToView(img.naturalWidth, img.naturalHeight)
-            }
-
-            // Create new layer WITH data atomically
-            addLayer(name, canvas)
+            openImage(name, canvas)
+            fitToView(img.naturalWidth, img.naturalHeight)
         }
         img.src = src
-    }, [layers.length, addLayer, setCanvasSize, fitToView])
+    }, [openImage, fitToView])
 
     const handleLoadSample = useCallback(() => {
         loadImage('/cathedral.jpg', 'cathedral.jpg')

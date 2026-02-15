@@ -75,6 +75,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         flattenImage, mergeDown,
         exportImage,
         closeImage,
+        openImage,
         addLayer, deleteLayer, duplicateLayer,
         activeLayerId, layers,
         swapColors
@@ -181,7 +182,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 canvas.height = img.height
                 const ctx = canvas.getContext('2d')
                 ctx?.drawImage(img, 0, 0)
-                addLayer(file.name, canvas)
+                openImage(file.name, canvas)
             }
             img.src = reader.result as string
         }
