@@ -1,7 +1,5 @@
 import {
     BoxSelect,
-    Hand,
-    Scissors,
     Crop,
     ZoomIn,
     Move,
@@ -9,19 +7,14 @@ import {
     Paintbrush,
     Eraser,
     PaintBucket,
-    Stamp,
-    Bandage,
+    Blend,
     PenTool,
     Pencil,
     Pipette,
     Wand2,
-    Blend,
     LassoSelect,
     CircleDashed,
     Scale3d,
-    Ruler,
-    AlignLeft,
-    Droplet,
     LucideIcon
 } from 'lucide-react'
 
@@ -46,24 +39,18 @@ export const toolGroups: ToolDefinition[][] = [
         { id: 'wand-select', icon: Wand2, label: 'Magic Wand' },
     ],
     [
-        { id: 'scissors', icon: Scissors, label: 'Scissors' },
         { id: 'paths', icon: PenTool, label: 'Paths' },
     ],
     [
         { id: 'picker', icon: Pipette, label: 'Color Picker' },
-        { id: 'measure', icon: Ruler, label: 'Measure' },
     ],
     [
         { id: 'move', icon: Move, label: 'Move' },
-        { id: 'align', icon: AlignLeft, label: 'Align' },
         { id: 'crop', icon: Crop, label: 'Crop' },
-        { id: 'clone', icon: Stamp, label: 'Clone' },
-        { id: 'heal', icon: Bandage, label: 'Heal' },
     ],
     [
         { id: 'brush', icon: Paintbrush, label: 'Paintbrush' },
         { id: 'pencil', icon: Pencil, label: 'Pencil' },
-        { id: 'blur', icon: Droplet, label: 'Blur/Sharpen' },
     ],
     [
         { id: 'eraser', icon: Eraser, label: 'Eraser' },
@@ -79,15 +66,12 @@ export const toolGroups: ToolDefinition[][] = [
     [
         { id: 'zoom', icon: ZoomIn, label: 'Zoom' },
     ],
-    [
-        { id: 'navigate', icon: Hand, label: 'Navigate' },
-    ],
 ]
 
 export const SELECTION_TOOLS = toolGroups[0]
 export const PAINT_TOOLS = [...toolGroups[4], ...toolGroups[5]]
 export const TRANSFORM_TOOLS = toolGroups[3]
-export const OTHER_TOOLS = [...toolGroups[1], ...toolGroups[2], ...toolGroups[6], ...toolGroups[7], ...toolGroups[8], ...toolGroups[9]]
+export const OTHER_TOOLS = [...toolGroups[1], ...toolGroups[2], ...toolGroups[6], ...toolGroups[7], ...toolGroups[8]]
 
 export const MENU_TOOL_GROUPS = [
     { label: 'Selection Tools', tools: SELECTION_TOOLS },
