@@ -107,6 +107,7 @@ interface EditorContextType {
     updateLayerText: (id: string, text: string) => void
     updateLayerTextStyle: (id: string, style: Partial<NonNullable<Layer['textStyle']>>, history?: boolean) => void
     addFilter: (layerId: string, filter: LayerFilter) => void
+    setLayerFilters: (layerId: string, filters: LayerFilter[], history?: boolean) => void
     removeFilter: (layerId: string, filterIndex: number) => void
     updateFilter: (layerId: string, filterIndex: number, params: Record<string, number>) => void
     toggleFilter: (layerId: string, filterIndex: number) => void
@@ -703,6 +704,27 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             }
         })
     }, [updateState])
+
+    const setLayerFilters = useCallback((layerId: string, filters: LayerFilter[], history: boolean = true) => {
+        const updater = (prevState: EditorState) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer) return {}
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, {
+                    filters: filters.map((filter) => ({
+                        ...filter,
+                        params: { ...filter.params }
+                    }))
+                })
+            }
+        }
+
+        if (history) {
+            updateState(updater)
+            return
+        }
+        replaceState(updater)
+    }, [replaceState, updateState])
 
     const removeFilter = useCallback((layerId: string, filterIndex: number) => {
         updateState(prevState => {
@@ -1622,6 +1644,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             updateLayerPosition,
             updateLayerText,
             addFilter,
+            setLayerFilters,
             removeFilter,
             setSelection: setSelectionWrapper,
             reorderLayers,

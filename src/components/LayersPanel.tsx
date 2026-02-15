@@ -15,9 +15,12 @@ import {
     ChevronRight,
     Undo2,
     Redo2,
+    SlidersHorizontal,
 } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
-import { useEditor, Layer } from './EditorContext'
+import { useEditor, Layer, type LayerFilter } from './EditorContext'
+import FiltersDialog from './FiltersDialog'
+import { getFilterCatalogEntry, isSupportedFilterType } from '../data/filterCatalog'
 
 // --- Layer Thumbnail ---
 function LayerThumbnail({ layer }: { layer: Layer }) {
@@ -271,6 +274,8 @@ export default function LayersPanel() {
         setPathVisibility,
         setPathLocked,
         toggleLayerLock,
+        toggleFilter,
+        removeFilter,
         setLayerOpacity,
         setLayerBlendMode,
         addLayer,
@@ -290,6 +295,8 @@ export default function LayersPanel() {
     const [activeTab, setActiveTab] = useState<'layers' | 'channels' | 'paths' | 'history'>('layers')
     const [renamingPathId, setRenamingPathId] = useState<string | null>(null)
     const [renamingPathValue, setRenamingPathValue] = useState('')
+    const [showFiltersDialog, setShowFiltersDialog] = useState(false)
+    const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
 
     // Determine active layer object for lock/opacity controls
     const findLayer = (list: Layer[], id: string): Layer | null => {
@@ -310,6 +317,11 @@ export default function LayersPanel() {
         if (activeLayerId) {
             setLayerOpacity(activeLayerId, Math.min(100, Math.max(0, value)))
         }
+    }
+
+    const openFiltersDialog = (initialType: LayerFilter['type'] = 'blur') => {
+        setInitialFilterType(initialType)
+        setShowFiltersDialog(true)
     }
 
     const handleOpacityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -444,6 +456,68 @@ export default function LayersPanel() {
                             disabled={!activeLayerId}
                         />
                         <span className="layers-opacity-unit">%</span>
+                    </div>
+
+                    <div className="dialogue-divider" />
+
+                    <div className="layers-filters-panel">
+                        <div className="layers-filters-header">
+                            <div className="layers-filters-title">
+                                <SlidersHorizontal size={14} />
+                                <span>Filters</span>
+                            </div>
+                            <button
+                                type="button"
+                                className="panel-icon-btn"
+                                title="Add filter"
+                                onClick={() => openFiltersDialog()}
+                                disabled={!activeLayerId}
+                            >
+                                <Plus size={14} />
+                            </button>
+                        </div>
+
+                        {!activeLayer ? (
+                            <div className="layers-filters-empty">Select a layer to manage filters.</div>
+                        ) : activeLayer.filters.length === 0 ? (
+                            <div className="layers-filters-empty">No filters on this layer.</div>
+                        ) : (
+                            <div className="layers-filters-list">
+                                {activeLayer.filters.map((filter, idx) => {
+                                    const label = isSupportedFilterType(filter.type)
+                                        ? getFilterCatalogEntry(filter.type).label
+                                        : filter.type
+                                    return (
+                                        <div key={idx} className="layers-filter-row">
+                                            <button
+                                                type="button"
+                                                className={`layers-filter-visibility${filter.enabled ? '' : ' off'}`}
+                                                onClick={() => activeLayerId && toggleFilter(activeLayerId, idx)}
+                                                title={filter.enabled ? 'Disable filter' : 'Enable filter'}
+                                            >
+                                                {filter.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="layers-filter-name"
+                                                title="Open filter dialog with this filter type"
+                                                onClick={() => openFiltersDialog(filter.type)}
+                                            >
+                                                {label}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="layers-filter-remove"
+                                                title="Remove filter"
+                                                onClick={() => activeLayerId && removeFilter(activeLayerId, idx)}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <div className="dialogue-divider" />
@@ -739,6 +813,12 @@ export default function LayersPanel() {
             )}
 
             <div className="dialogue-handle" style={{ marginBottom: 1 }} />
+            {showFiltersDialog && (
+                <FiltersDialog
+                    initialFilterType={initialFilterType}
+                    onClose={() => setShowFiltersDialog(false)}
+                />
+            )}
         </div>
     )
 }

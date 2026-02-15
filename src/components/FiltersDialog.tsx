@@ -1,238 +1,211 @@
-import { useState, useEffect, useRef } from 'react'
-import { X, SlidersHorizontal, Eye, EyeOff, Trash2, Check } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X, SlidersHorizontal, Check } from 'lucide-react'
 import { useEditor, type LayerFilter } from './EditorContext'
+import {
+    buildPreviewFilterStack,
+    FILTER_CATALOG,
+    formatSliderValue,
+    getDefaultFilterParams,
+    getFilterCatalogEntry,
+    isSupportedFilterType,
+    type SupportedFilterType
+} from '../data/filterCatalog'
 
 interface FiltersDialogProps {
     initialFilterType?: LayerFilter['type']
     onClose: () => void
 }
 
-const filterTypes: { id: LayerFilter['type']; label: string }[] = [
-    { id: 'blur', label: 'Blur' },
-    { id: 'brightness', label: 'Brightness' },
-    { id: 'hue-saturation', label: 'Hue / Sat' },
-    { id: 'noise', label: 'Noise' },
-    { id: 'color-matrix', label: 'Color Balance' },
-]
+function cloneFilters(filters: LayerFilter[]): LayerFilter[] {
+    return filters.map((filter) => ({
+        ...filter,
+        params: { ...filter.params }
+    }))
+}
 
-const defaultParams: Record<LayerFilter['type'], Record<string, number>> = {
-    'blur': { strength: 4, quality: 4 },
-    'brightness': { value: 1 },
-    'hue-saturation': { hue: 0, saturation: 1 },
-    'noise': { noise: 0.5 },
-    'color-matrix': { contrast: 1, brightness: 1 },
-    'custom': {}
+function normalizeFilterType(type: LayerFilter['type']): SupportedFilterType {
+    return isSupportedFilterType(type) ? type : 'blur'
 }
 
 export default function FiltersDialog({ initialFilterType = 'blur', onClose }: FiltersDialogProps) {
-    const { activeLayerId, layers, addFilter, removeFilter, toggleFilter } = useEditor()
-    const [selectedType, setSelectedType] = useState<LayerFilter['type']>(initialFilterType)
-    const [position, setPosition] = useState({ x: 0, y: 0 })
-    const isDragging = useRef(false)
-    const dragStart = useRef({ x: 0, y: 0 })
+    const { activeLayerId, layers, setLayerFilters } = useEditor()
+    const [selectedType, setSelectedType] = useState<SupportedFilterType>(() => normalizeFilterType(initialFilterType))
+    const [hasSnapshot, setHasSnapshot] = useState(false)
 
-    // Draft params for the new filter we might add
-    const [draftParams, setDraftParams] = useState<Record<string, number>>({ ...defaultParams[initialFilterType] })
+    const committedRef = useRef(false)
+    const originalLayerIdRef = useRef<string | null>(null)
+    const originalFiltersRef = useRef<LayerFilter[]>([])
 
-    // Update draft params when switching types
+    const [draftParams, setDraftParams] = useState<Record<string, number>>(
+        () => getDefaultFilterParams(normalizeFilterType(initialFilterType))
+    )
+
+    const activeLayer = layers.find((layer) => layer.id === activeLayerId)
+    const selectedEntry = getFilterCatalogEntry(selectedType)
+
     useEffect(() => {
-        setDraftParams({ ...defaultParams[selectedType] })
-    }, [selectedType])
+        if (!hasSnapshot && activeLayerId && activeLayer) {
+            originalLayerIdRef.current = activeLayerId
+            originalFiltersRef.current = cloneFilters(activeLayer.filters)
+            setHasSnapshot(true)
+        }
+    }, [activeLayer, activeLayerId, hasSnapshot])
+
+    useEffect(() => {
+        if (!hasSnapshot) return
+        const trackedLayerId = originalLayerIdRef.current
+        if (!trackedLayerId) return
+        const trackedLayerExists = layers.some((layer) => layer.id === trackedLayerId)
+        if (!trackedLayerExists) {
+            onClose()
+        }
+    }, [hasSnapshot, layers, onClose])
+
+    const restoreOriginalFilters = useCallback(() => {
+        if (committedRef.current) return
+        if (!originalLayerIdRef.current) return
+        setLayerFilters(originalLayerIdRef.current, originalFiltersRef.current, false)
+    }, [setLayerFilters])
+
+    const handleClose = useCallback(() => {
+        restoreOriginalFilters()
+        onClose()
+    }, [onClose, restoreOriginalFilters])
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 e.stopPropagation()
-                onClose()
+                handleClose()
             }
         }
         document.addEventListener('keydown', onKey)
         return () => document.removeEventListener('keydown', onKey)
-    }, [onClose])
-
-    const activeLayer = layers.find(l => l.id === activeLayerId)
+    }, [handleClose])
 
     useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isDragging.current) return
-            const dx = e.clientX - dragStart.current.x
-            const dy = e.clientY - dragStart.current.y
-            setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }))
-            dragStart.current = { x: e.clientX, y: e.clientY }
-        }
+        if (!hasSnapshot) return
+        if (committedRef.current) return
+        if (!originalLayerIdRef.current) return
 
-        const handleMouseUp = () => {
-            isDragging.current = false
-        }
+        const previewFilters = buildPreviewFilterStack(
+            originalFiltersRef.current,
+            selectedType,
+            draftParams
+        )
+        setLayerFilters(originalLayerIdRef.current, previewFilters, false)
+    }, [draftParams, hasSnapshot, selectedType, setLayerFilters])
 
-        window.addEventListener('mousemove', handleMouseMove)
-        window.addEventListener('mouseup', handleMouseUp)
+    useEffect(() => {
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove)
-            window.removeEventListener('mouseup', handleMouseUp)
+            restoreOriginalFilters()
         }
-    }, [])
+    }, [restoreOriginalFilters])
 
     if (!activeLayer) return null
 
     const handleApply = () => {
-        if (!activeLayerId) return
-        addFilter(activeLayerId, {
-            type: selectedType,
-            enabled: true,
-            params: draftParams
-        })
+        if (!originalLayerIdRef.current) return
+        const nextFilters = buildPreviewFilterStack(
+            originalFiltersRef.current,
+            selectedType,
+            draftParams
+        )
+        setLayerFilters(originalLayerIdRef.current, nextFilters, true)
+        committedRef.current = true
         onClose()
     }
 
     const updateParam = (key: string, value: number) => {
-        setDraftParams(prev => ({ ...prev, [key]: value }))
+        setDraftParams((prev) => ({ ...prev, [key]: value }))
     }
 
-    const renderSlider = (label: string, key: string, min: number, max: number, step: number = 0.01, displayScale: number = 1) => (
-        <div className="filter-slider-group" key={key}>
-            <div className="filter-slider-header">
-                <span className="slider-label">{label}</span>
-                <span className="slider-value">{Math.round((draftParams[key] ?? 0) * displayScale * 10) / 10}</span>
-            </div>
-            <input
-                type="range"
-                min={min}
-                max={max}
-                step={step}
-                value={draftParams[key] ?? 0}
-                onChange={(e) => updateParam(key, Number(e.target.value))}
-            />
-        </div>
-    )
+    const handleSelectType = (type: SupportedFilterType) => {
+        setSelectedType(type)
+        setDraftParams(getDefaultFilterParams(type))
+    }
 
-    const renderParams = () => {
-        switch (selectedType) {
-            case 'blur':
-                return (
-                    <>
-                        {renderSlider('Strength', 'strength', 0, 40, 1)}
-                        {renderSlider('Quality', 'quality', 1, 10, 1)}
-                    </>
-                )
-            case 'brightness':
-                return (
-                    <>
-                        {renderSlider('Brightness', 'value', 0, 2, 0.05, 100)}
-                    </>
-                )
-            case 'hue-saturation':
-                return (
-                    <>
-                        {renderSlider('Hue', 'hue', -180, 180, 1)}
-                        {renderSlider('Saturation', 'saturation', 0, 5, 0.1)}
-                    </>
-                )
-            case 'noise':
-                return (
-                    <>
-                        {renderSlider('Amount', 'noise', 0, 1, 0.01, 100)}
-                    </>
-                )
-            case 'color-matrix':
-                return (
-                    <>
-                        {renderSlider('Contrast', 'contrast', 0, 2, 0.1)}
-                        {renderSlider('Brightness', 'brightness', 0, 2, 0.05)}
-                    </>
-                )
-            default:
-                return null
+    const sliderRows = useMemo(() => selectedEntry.sliders.map((slider) => {
+        const value = draftParams[slider.key] ?? selectedEntry.defaultParams[slider.key] ?? 0
+        return {
+            ...slider,
+            value
         }
-    }
+    }), [draftParams, selectedEntry])
 
     return (
-        <div className="dialog-overlay">
+        <div className="filters-dock-container">
             <div
-                className="filters-dialog dialogue"
-                style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+                className="filters-dialog filters-docked dialogue"
             >
                 <div
                     className="dialogue-header"
-                    onMouseDown={(e) => {
-                        isDragging.current = true
-                        dragStart.current = { x: e.clientX, y: e.clientY }
-                    }}
-                    style={{ cursor: 'move' }}
                 >
                     <span className="dialogue-title">
                         <SlidersHorizontal size={14} className="icon-blue" />
                         Filters
                     </span>
-                    <div className="dialogue-close" onClick={onClose}>
+                    <div className="dialogue-close" onClick={handleClose}>
                         <X size={14} />
                     </div>
                 </div>
 
                 <div className="filters-content">
-                    {/* Left: Filter Type Selection */}
                     <div className="filters-sidebar">
-                        {filterTypes.map(ft => (
+                        {FILTER_CATALOG.map((filter) => (
                             <div
-                                key={ft.id}
-                                className={`filter-type-item ${selectedType === ft.id ? 'active' : ''}`}
-                                onClick={() => setSelectedType(ft.id)}
+                                key={filter.id}
+                                className={`filter-type-item ${selectedType === filter.id ? 'active' : ''}`}
+                                onClick={() => handleSelectType(filter.id)}
                             >
-                                {ft.label}
+                                {filter.label}
                             </div>
                         ))}
                     </div>
 
-                    {/* Right: Params & Preview */}
                     <div className="filters-main">
                         <div className="filters-params-area">
-                            <h3>{filterTypes.find(t => t.id === selectedType)?.label} Settings</h3>
-                            {renderParams()}
+                            <h3>{selectedEntry.label} Settings</h3>
+                            {sliderRows.map((slider) => (
+                                <div className="filter-slider-group" key={slider.key}>
+                                    <div className="filter-slider-header">
+                                        <span className="slider-label">{slider.label}</span>
+                                        <span className="slider-value">
+                                            {formatSliderValue(slider.value, slider.displayScale ?? 1)}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={slider.min}
+                                        max={slider.max}
+                                        step={slider.step ?? 0.01}
+                                        value={slider.value}
+                                        onChange={(e) => updateParam(slider.key, Number(e.target.value))}
+                                    />
+                                </div>
+                            ))}
                         </div>
 
-                        {/* Existing Filters List on Layer */}
-                        <div className="filters-existing-list">
-                            <div className="filters-list-header">
-                                <span>Active Filters ({activeLayer.filters.length})</span>
+                        <div className="filters-preview-panel">
+                            <div className="filters-preview-header">Live Preview</div>
+                            <p className="filters-preview-text">
+                                Changes are previewed directly on the canvas. Use Add Filter to commit or Close/Esc to discard.
+                            </p>
+                            <div className="filters-preview-pill">{selectedEntry.label}</div>
+                            <div className="filters-preview-values">
+                                {sliderRows.map((slider) => (
+                                    <div key={slider.key} className="preview-value-row">
+                                        <span>{slider.label}</span>
+                                        <span>{formatSliderValue(slider.value, slider.displayScale ?? 1)}</span>
+                                    </div>
+                                ))}
                             </div>
-                            {activeLayer.filters.length === 0 ? (
-                                <div className="empty-filters">No filters applied to active layer</div>
-                            ) : (
-                                <div className="filters-list">
-                                    {activeLayer.filters.map((filter, idx) => (
-                                        <div key={idx} className="filter-item">
-                                            <div className="filter-item-info">
-                                                <div className="filter-stripe"></div>
-                                                <span className="filter-name">
-                                                    {filterTypes.find(t => t.id === filter.type)?.label || filter.type}
-                                                </span>
-                                            </div>
-                                            <div className="filter-actions">
-                                                <button
-                                                    className={`filter-action-btn ${filter.enabled ? '' : 'disabled'}`}
-                                                    onClick={() => activeLayerId && toggleFilter(activeLayerId, idx)}
-                                                    title={filter.enabled ? "Disable" : "Enable"}
-                                                >
-                                                    {filter.enabled ? <Eye size={12} /> : <EyeOff size={12} />}
-                                                </button>
-                                                <button
-                                                    className="filter-action-btn danger"
-                                                    onClick={() => activeLayerId && removeFilter(activeLayerId, idx)}
-                                                    title="Remove"
-                                                >
-                                                    <Trash2 size={12} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="dialogue-footer">
-                    <button className="pref-btn pref-btn-secondary" onClick={onClose}>Close</button>
+                    <button className="pref-btn pref-btn-secondary" onClick={handleClose}>Close</button>
                     <button className="pref-btn pref-btn-primary" onClick={handleApply}>
                         <Check size={14} style={{ marginRight: 4 }} />
                         Add Filter

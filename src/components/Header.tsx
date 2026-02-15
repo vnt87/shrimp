@@ -22,6 +22,7 @@ import { useEditor, type LayerFilter } from './EditorContext'
 import FiltersDialog from './FiltersDialog'
 
 import { MENU_TOOL_GROUPS } from '../data/tools'
+import { FILTER_CATALOG, isSupportedFilterType } from '../data/filterCatalog'
 
 type MenuOption = string | { label: string; icon?: any; command?: string; shortcut?: string; disabled?: boolean; children?: MenuOption[] }
 
@@ -44,7 +45,10 @@ const menuData: Record<string, MenuOption[]> = {
     Image: ['Flatten Image', 'Merge Visible Layers', '---', 'Canvas Size...'],
     Layer: ['New Layer', 'Duplicate Layer', 'Delete Layer', '---', 'Merge Down'],
     Colors: ['Brightness-Contrast...', 'Hue-Saturation...', 'Desaturate...', 'Invert Colors'],
-    Filters: ['Blur', 'Sharpen', 'Noise'],
+    Filters: FILTER_CATALOG.map((filter) => ({
+        label: filter.menuLabel,
+        command: `filter:${filter.id}`
+    })),
     Windows: ['Toolbox', 'Layers', 'Brushes'],
     Help: ['Keyboard Shortcuts', 'About', 'Github Source'],
 }
@@ -201,6 +205,14 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             return
         }
 
+        if (command.startsWith('filter:')) {
+            const filterType = command.split(':')[1] as LayerFilter['type']
+            if (!isSupportedFilterType(filterType)) return
+            setInitialFilterType(filterType)
+            setShowFilters(true)
+            return
+        }
+
         switch (command) {
             case 'New...': setShowNewImage(true); break
             case 'Open...': handleFileOpen(); break
@@ -238,21 +250,6 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             case 'Invert Colors':
                 // No direct filter for this yet, maybe color matrix?
                 // For now, let's use color-matrix as a placeholder or skip
-                break
-            case 'Blur':
-                setInitialFilterType('blur')
-                setShowFilters(true)
-                break
-            case 'Sharpen':
-                // Sharpen is usually a convolution matrix. 
-                // We'll map it to 'color-matrix' for now or 'custom' if we had it.
-                // Let's just open 'color-matrix' as it's the closest "advanced" filter
-                setInitialFilterType('color-matrix')
-                setShowFilters(true)
-                break
-            case 'Noise':
-                setInitialFilterType('noise')
-                setShowFilters(true)
                 break
             case 'About': setShowAbout(true); break
             case 'Github Source':
@@ -418,7 +415,7 @@ function MenuItem({ option, handleMenuAction, isDisabled }: { option: MenuOption
     const disabled = isDisabled(label)
     const Icon = typeof option !== 'string' ? option.icon : null
     const children = typeof option !== 'string' ? option.children : undefined
-    const hasSubmenu = !!children || ['Open as Layers...', 'Blur', 'Sharpen', 'Noise'].includes(label)
+    const hasSubmenu = !!children
 
     return (
         <div
