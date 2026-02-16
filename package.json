@@ -14,6 +14,7 @@
         "@pixi/react": "^8.0.5",
         "idb-keyval": "^6.2.2",
         "lucide-react": "^0.468.0",
+        "pixi-filters": "^6.1.5",
         "pixi.js": "^8.16.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0"

@@ -5,7 +5,7 @@ import { createVectorPath, duplicatePath as duplicateVectorPath } from '../path/
 import type { VectorPath } from '../path/types'
 
 export interface LayerFilter {
-    type: 'blur' | 'brightness' | 'hue-saturation' | 'noise' | 'color-matrix' | 'custom'
+    type: 'blur' | 'brightness' | 'hue-saturation' | 'noise' | 'color-matrix' | 'pixelate' | 'glitch' | 'old-film' | 'adjustment' | 'ascii' | 'dot' | 'emboss' | 'cross-hatch' | 'bulge-pinch' | 'twist' | 'reflection' | 'shockwave' | 'crt' | 'rgb-split' | 'bloom' | 'godray' | 'tilt-shift' | 'zoom-blur' | 'motion-blur' | 'custom'
     enabled: boolean
     params: Record<string, number>
 }

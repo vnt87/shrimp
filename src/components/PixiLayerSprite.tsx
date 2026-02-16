@@ -8,6 +8,27 @@ import {
     NoiseFilter,
     type Filter
 } from 'pixi.js'
+import {
+    PixelateFilter,
+    GlitchFilter,
+    AdjustmentFilter,
+    OldFilmFilter,
+    AsciiFilter,
+    DotFilter,
+    EmbossFilter,
+    CrossHatchFilter,
+    BulgePinchFilter,
+    TwistFilter,
+    ReflectionFilter,
+    ShockwaveFilter,
+    CRTFilter,
+    RGBSplitFilter,
+    AdvancedBloomFilter,
+    GodrayFilter,
+    TiltShiftFilter,
+    ZoomBlurFilter,
+    MotionBlurFilter
+} from 'pixi-filters'
 import type { Layer, LayerFilter, TransformData } from './EditorContext'
 
 // Register the Sprite component with @pixi/react
@@ -72,6 +93,147 @@ function createPixiFilter(filter: LayerFilter): Filter | null {
             if (filter.params.brightness != null) cm.brightness(filter.params.brightness, false)
             return cm
         }
+        case 'pixelate':
+            // @ts-ignore
+            return new PixelateFilter(filter.params.size ?? 10)
+        case 'glitch':
+            // @ts-ignore
+            return new GlitchFilter({
+                slices: filter.params.slices ?? 5,
+                offset: filter.params.offset ?? 100,
+                direction: filter.params.direction ?? 0,
+                fillMode: filter.params.fillMode ?? 0,
+                seed: filter.params.seed ?? 0,
+                average: false,
+                minSize: 8,
+                sampleSize: 512,
+            })
+        case 'old-film':
+            // @ts-ignore
+            return new OldFilmFilter({
+                sepia: filter.params.sepia ?? 0.3,
+                noise: filter.params.noise ?? 0.3,
+                noiseSize: filter.params.noiseSize ?? 1.0,
+                scratch: filter.params.scratch ?? 0.5,
+                scratchDensity: filter.params.scratchDensity ?? 0.3,
+                scratchWidth: filter.params.scratchWidth ?? 1.0,
+                vignetting: filter.params.vignetting ?? 0.3,
+                vignettingAlpha: filter.params.vignettingAlpha ?? 1.0,
+                vignettingBlur: filter.params.vignettingBlur ?? 0.3,
+            })
+        case 'adjustment':
+            // @ts-ignore
+            return new AdjustmentFilter({
+                gamma: filter.params.gamma ?? 1,
+                contrast: filter.params.contrast ?? 1,
+                saturation: filter.params.saturation ?? 1,
+                brightness: filter.params.brightness ?? 1,
+                red: filter.params.red ?? 1,
+                green: filter.params.green ?? 1,
+                blue: filter.params.blue ?? 1,
+                alpha: filter.params.alpha ?? 1,
+            })
+        case 'ascii':
+            // @ts-ignore
+            return new AsciiFilter({ size: filter.params.size ?? 8 })
+        case 'dot':
+            // @ts-ignore
+            return new DotFilter({
+                scale: filter.params.scale ?? 1,
+                angle: filter.params.angle ?? 5,
+            })
+        case 'emboss':
+            // @ts-ignore
+            return new EmbossFilter({ strength: filter.params.strength ?? 5 })
+        case 'cross-hatch':
+            // @ts-ignore
+            return new CrossHatchFilter()
+        case 'bulge-pinch':
+            // @ts-ignore
+            return new BulgePinchFilter({
+                radius: filter.params.radius ?? 100,
+                strength: filter.params.strength ?? 1,
+                center: { x: filter.params.centerX ?? 0.5, y: filter.params.centerY ?? 0.5 },
+            })
+        case 'twist':
+            // @ts-ignore
+            return new TwistFilter({
+                radius: filter.params.radius ?? 200,
+                angle: filter.params.angle ?? 4,
+                offset: { x: filter.params.offsetX ?? 400, y: filter.params.offsetY ?? 300 },
+            })
+        case 'reflection':
+            // @ts-ignore
+            return new ReflectionFilter({
+                mirror: (filter.params.mirror ?? 1) > 0.5,
+                boundary: filter.params.boundary ?? 0.5,
+                amplitude: [0, filter.params.amplitude ?? 20],
+                waveLength: [30, filter.params.waveLength ?? 100],
+                alpha: [1, 1],
+                time: 0 // We might need to animate this later
+            })
+        case 'shockwave':
+            // @ts-ignore
+            return new ShockwaveFilter({
+                center: { x: filter.params.centerX ?? 400, y: filter.params.centerY ?? 300 },
+                radius: filter.params.radius ?? 160,
+                wavelength: filter.params.wavelength ?? 65,
+                amplitude: filter.params.amplitude ?? 105,
+                speed: filter.params.speed ?? 500,
+                time: filter.params.time ?? 0
+            })
+        case 'crt':
+            // @ts-ignore
+            return new CRTFilter({
+                curvature: filter.params.curvature ?? 1,
+                lineWidth: filter.params.lineWidth ?? 1,
+                lineContrast: filter.params.lineContrast ?? 0.25,
+                noise: filter.params.noise ?? 0.3,
+                noiseSize: filter.params.noiseSize ?? 1,
+            })
+        case 'rgb-split':
+            // @ts-ignore
+            return new RGBSplitFilter({
+                red: { x: filter.params.redX ?? -10, y: filter.params.redY ?? 0 },
+                green: { x: filter.params.greenX ?? 0, y: filter.params.greenY ?? 10 },
+                blue: { x: filter.params.blueX ?? 0, y: filter.params.blueY ?? 0 },
+            })
+        case 'bloom':
+            // @ts-ignore
+            return new AdvancedBloomFilter({
+                threshold: filter.params.threshold ?? 0.5,
+                bloomScale: filter.params.bloomScale ?? 1.0,
+                brightness: filter.params.brightness ?? 1.0,
+                blur: filter.params.blur ?? 8,
+                quality: filter.params.quality ?? 4,
+            })
+        case 'godray':
+            // @ts-ignore
+            return new GodrayFilter({
+                angle: filter.params.angle ?? 30,
+                gain: filter.params.gain ?? 0.5,
+                lacunarity: filter.params.lacunarity ?? 2.5,
+            })
+        case 'tilt-shift':
+            // @ts-ignore
+            return new TiltShiftFilter({
+                blur: filter.params.blur ?? 15,
+                gradientBlur: filter.params.gradientBlur ?? 600,
+            })
+        case 'zoom-blur':
+            // @ts-ignore
+            return new ZoomBlurFilter({
+                strength: filter.params.strength ?? 0.1,
+                center: { x: filter.params.centerX ?? 400, y: filter.params.centerY ?? 300 },
+                innerRadius: filter.params.innerRadius ?? 0,
+            })
+        case 'motion-blur':
+            // @ts-ignore
+            return new MotionBlurFilter({
+                velocity: { x: filter.params.velocityX ?? 0, y: filter.params.velocityY ?? 0 },
+                kernelSize: filter.params.kernelSize ?? 15,
+                offset: filter.params.offset ?? 0,
+            })
         default:
             return null
     }
