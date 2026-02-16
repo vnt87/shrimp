@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLanguage } from '../i18n/LanguageContext'
 import { X, SlidersHorizontal, Check } from 'lucide-react'
 import { useEditor, type LayerFilter } from './EditorContext'
 import {
@@ -28,6 +29,7 @@ function normalizeFilterType(type: LayerFilter['type']): SupportedFilterType {
 }
 
 export default function FiltersDialog({ initialFilterType = 'blur', onClose }: FiltersDialogProps) {
+    const { t } = useLanguage()
     const { activeLayerId, layers, setLayerFilters } = useEditor()
     const [selectedType, setSelectedType] = useState<SupportedFilterType>(() => normalizeFilterType(initialFilterType))
     const [hasSnapshot, setHasSnapshot] = useState(false)
@@ -143,7 +145,7 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                 >
                     <span className="dialogue-title">
                         <SlidersHorizontal size={14} className="icon-blue" />
-                        Adjustment Layers
+                        {t('filters.adjustmentLayers')}
                     </span>
                     <div className="dialogue-close" onClick={handleClose}>
                         <X size={14} />
@@ -158,18 +160,18 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                                 className={`filter-type-item ${selectedType === filter.id ? 'active' : ''}`}
                                 onClick={() => handleSelectType(filter.id)}
                             >
-                                {filter.label}
+                                {t(filter.label as any)}
                             </div>
                         ))}
                     </div>
 
                     <div className="filters-main">
                         <div className="filters-params-area">
-                            <h3>{selectedEntry.label} Adjustments</h3>
+                            <h3>{t(selectedEntry.label as any)} {t('filters.adjustments')}</h3>
                             {sliderRows.map((slider) => (
                                 <div className="filter-slider-group" key={slider.key}>
                                     <div className="filter-slider-header">
-                                        <span className="slider-label">{slider.label}</span>
+                                        <span className="slider-label">{t(slider.label as any)}</span>
                                         <span className="slider-value">
                                             {formatSliderValue(slider.value, slider.displayScale ?? 1)}
                                         </span>
@@ -187,15 +189,15 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                         </div>
 
                         <div className="filters-preview-panel">
-                            <div className="filters-preview-header">Live Preview</div>
+                            <div className="filters-preview-header">{t('filters.livePreview')}</div>
                             <p className="filters-preview-text">
-                                Changes are previewed directly on the canvas. Use Add Adjustment to commit or Close/Esc to discard.
+                                {t('filters.previewText')}
                             </p>
-                            <div className="filters-preview-pill">{selectedEntry.label}</div>
+                            <div className="filters-preview-pill">{t(selectedEntry.label as any)}</div>
                             <div className="filters-preview-values">
                                 {sliderRows.map((slider) => (
                                     <div key={slider.key} className="preview-value-row">
-                                        <span>{slider.label}</span>
+                                        <span>{t(slider.label as any)}</span>
                                         <span>{formatSliderValue(slider.value, slider.displayScale ?? 1)}</span>
                                     </div>
                                 ))}
@@ -205,10 +207,10 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                 </div>
 
                 <div className="dialogue-footer">
-                    <button className="pref-btn pref-btn-secondary" onClick={handleClose}>Close</button>
+                    <button className="pref-btn pref-btn-secondary" onClick={handleClose}>{t('filters.close')}</button>
                     <button className="pref-btn pref-btn-primary" onClick={handleApply}>
                         <Check size={14} style={{ marginRight: 4 }} />
-                        Add Adjustment
+                        {t('filters.addAdjustment')}
                     </button>
                 </div>
             </div>

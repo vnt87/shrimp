@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { MENU_TOOL_GROUPS, type ToolDefinition } from '../data/tools'
 import { ChevronRight } from 'lucide-react'
+import { useLanguage } from '../i18n/LanguageContext'
+import { TranslationKey } from '../i18n/en'
 
 interface ContextMenuProps {
     x: number
@@ -11,6 +13,7 @@ interface ContextMenuProps {
 
 export default function ContextMenu({ x, y, onClose, onSelect }: ContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null)
+    const { t } = useLanguage()
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -59,7 +62,7 @@ export default function ContextMenu({ x, y, onClose, onSelect }: ContextMenuProp
     return (
         <div ref={menuRef} style={style} className="context-menu" onContextMenu={(e) => e.preventDefault()}>
             {MENU_TOOL_GROUPS.map((group, idx) => (
-                <ContextSubMenu key={idx} label={group.label} tools={group.tools} onSelect={onSelect} onClose={onClose} />
+                <ContextSubMenu key={idx} label={t(group.label as TranslationKey)} tools={group.tools} onSelect={onSelect} onClose={onClose} />
             ))}
         </div>
     )
@@ -67,6 +70,7 @@ export default function ContextMenu({ x, y, onClose, onSelect }: ContextMenuProp
 
 function ContextSubMenu({ label, tools, onSelect, onClose }: { label: string, tools: ToolDefinition[], onSelect: (id: string) => void, onClose: () => void }) {
     const [isOpen, setIsOpen] = useState(false)
+    const { t } = useLanguage()
 
     return (
         <div
@@ -92,7 +96,7 @@ function ContextSubMenu({ label, tools, onSelect, onClose }: { label: string, to
                                 }}
                             >
                                 <Icon size={14} />
-                                <span>{tool.label}</span>
+                                <span>{t(tool.label as TranslationKey)}</span>
                             </div>
                         )
                     })}

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useTheme } from './ThemeContext'
 import {
     X,
     Cpu,
     Palette,
     FileInput,
     MousePointer2,
-    Image,
+    Image as ImageIcon,
     Grid3X3,
     Layout,
     Paintbrush,
@@ -20,62 +19,27 @@ import {
     Magnet,
     Gamepad2,
     Joystick,
-    FolderOpen,
+    FolderOpen as Folder, // Map FolderOpen to Folder for now if needed, or just import Folder
     ChevronDown,
     ChevronRight,
+    Keyboard, // Added
+    Search // Added
 } from 'lucide-react'
+import { useEditor } from './EditorContext'
+import { useTheme } from './ThemeContext'
+import { useLanguage } from '../i18n/LanguageContext'
+
+// ── Icons ───────────────────────────────────────────────────────
+// Fix icon mapping
+const MousePointer = MousePointer2
 
 // ── Sidebar tree structure ──────────────────────────────────────
 interface SidebarItem {
     id: string
     label: string
-    icon: React.ReactNode
+    icon?: React.ReactNode // Made icon optional for children
     children?: SidebarItem[]
 }
-
-const sidebarTree: SidebarItem[] = [
-    { id: 'system-resources', label: 'System Resources', icon: <Cpu size={14} /> },
-    { id: 'color-management', label: 'Color Management', icon: <Palette size={14} /> },
-    { id: 'import-export', label: 'Image Import & Export', icon: <FileInput size={14} /> },
-    { id: 'tool-options', label: 'Tool Options', icon: <MousePointer2 size={14} /> },
-    {
-        id: 'default-image', label: 'Default Image', icon: <Image size={14} />,
-        children: [
-            { id: 'default-grid', label: 'Default Grid', icon: <Grid3X3 size={14} /> },
-        ],
-    },
-    {
-        id: 'interface', label: 'Interface', icon: <Layout size={14} />,
-        children: [
-            { id: 'theme', label: 'Theme', icon: <Paintbrush size={14} /> },
-            { id: 'icon-theme', label: 'Icon Theme', icon: <Paintbrush size={14} /> },
-            { id: 'toolbox', label: 'Toolbox', icon: <Wrench size={14} /> },
-            { id: 'dialog-defaults', label: 'Dialog Defaults', icon: <MessageSquare size={14} /> },
-            { id: 'help-system', label: 'Help System', icon: <HelpCircle size={14} /> },
-        ],
-    },
-    {
-        id: 'display', label: 'Display', icon: <Monitor size={14} />,
-        children: [
-            { id: 'window-management', label: 'Window Management', icon: <AppWindow size={14} /> },
-        ],
-    },
-    {
-        id: 'image-windows', label: 'Image Windows', icon: <Image size={14} />,
-        children: [
-            { id: 'appearance', label: 'Appearance', icon: <Eye size={14} /> },
-            { id: 'title-status', label: 'Title & Status', icon: <Type size={14} /> },
-            { id: 'snapping', label: 'Snapping', icon: <Magnet size={14} /> },
-        ],
-    },
-    {
-        id: 'input-devices', label: 'Input Devices', icon: <Gamepad2 size={14} />,
-        children: [
-            { id: 'input-controllers', label: 'Input Controllers', icon: <Joystick size={14} /> },
-        ],
-    },
-    { id: 'folders', label: 'Folders', icon: <FolderOpen size={14} /> },
-]
 
 // ── Preference state ────────────────────────────────────────────
 interface PrefsState {
@@ -132,21 +96,76 @@ const defaultPrefs: PrefsState = {
     canvasPadding: 'From theme',
 }
 
+interface PreferencesDialogProps {
+    open: boolean
+    onClose: () => void
+}
+
 // ── Component ───────────────────────────────────────────────────
-export default function PreferencesDialog({ onClose }: { onClose: () => void }) {
-    const [activeItem, setActiveItem] = useState('system-resources')
+export default function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
+    const { t } = useLanguage() // Added
+    const [activeItem, setActiveItem] = useState<string>('System Resources') // Changed initial state and type
     const [expanded, setExpanded] = useState<Record<string, boolean>>({
-        'default-image': true,
-        interface: true,
-        display: true,
-        'image-windows': true,
-        'input-devices': true,
+        'Default Image': true, // Updated to match new IDs
+        'Interface': true, // Updated to match new IDs
+        'Display': true, // Updated to match new IDs
+        'Image Windows': true, // Updated to match new IDs
+        'Input Devices': true, // Updated to match new IDs
     })
     const { theme: currentTheme } = useTheme()
     const [prefs, setPrefs] = useState<PrefsState>(() => ({
         ...defaultPrefs,
         uiTheme: currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1),
     }))
+
+    // Generate sidebar tree with translated labels
+    const sidebarTree: SidebarItem[] = [
+        {
+            label: t('dialog.preferences.sidebar.system_resources'), icon: <Cpu size={14} />, id: 'System Resources', children: [
+                { label: t('dialog.preferences.sidebar.resource_consumption'), id: 'Resource Consumption' },
+                { label: t('dialog.preferences.sidebar.color_management'), id: 'Color Management' },
+                { label: t('dialog.preferences.sidebar.image_import_export'), id: 'Image Import & Export' },
+            ]
+        },
+        {
+            label: t('dialog.preferences.sidebar.tool_options'), icon: <MousePointer size={14} />, id: 'Tool Options', children: [
+                { label: t('dialog.preferences.sidebar.general'), id: 'Tool Options General' },
+                { label: t('dialog.preferences.sidebar.snapping'), id: 'Snapping' },
+                { label: t('dialog.preferences.sidebar.default_image'), id: 'Default Image' },
+                { label: t('dialog.preferences.sidebar.default_grid'), id: 'Default Grid' },
+            ]
+        },
+        {
+            label: t('dialog.preferences.sidebar.interface'), icon: <Layout size={14} />, id: 'Interface', children: [
+                { label: t('dialog.preferences.sidebar.theme'), id: 'Theme' },
+                { label: t('dialog.preferences.sidebar.icon_theme'), id: 'Icon Theme' },
+                { label: t('dialog.preferences.sidebar.toolbox'), id: 'Toolbox' },
+                { label: t('dialog.preferences.sidebar.dialog_defaults'), id: 'Dialog Defaults' },
+                { label: t('dialog.preferences.sidebar.help_system'), id: 'Help System' },
+            ]
+        },
+        {
+            label: t('dialog.preferences.sidebar.display'), icon: <Monitor size={14} />, id: 'Display', children: [
+                { label: t('dialog.preferences.sidebar.window_management'), id: 'Window Management' },
+            ]
+        },
+        {
+            label: t('dialog.preferences.sidebar.image_windows'), icon: <ImageIcon size={14} />, id: 'Image Windows', children: [
+                { label: t('dialog.preferences.sidebar.appearance'), id: 'Appearance' },
+                { label: t('dialog.preferences.sidebar.title_status'), id: 'Title & Status' },
+            ]
+        },
+        {
+            label: t('dialog.preferences.sidebar.input_devices'), icon: <Keyboard size={14} />, id: 'Input Devices', children: [
+                { label: t('dialog.preferences.sidebar.input_controllers'), id: 'Input Controllers' },
+            ]
+        },
+        {
+            label: t('dialog.preferences.sidebar.folders'), icon: <Folder size={14} />, id: 'Folders', children: [
+                { label: t('dialog.preferences.sidebar.data'), id: 'Data' },
+            ]
+        }
+    ]
 
     // Close on Escape
     useEffect(() => {
@@ -202,7 +221,7 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
                     ) : (
                         <span style={{ width: 12, display: 'inline-block' }} />
                     )}
-                    <span className="pref-sidebar-icon">{item.icon}</span>
+                    {item.icon && <span className="pref-sidebar-icon">{item.icon}</span>} {/* Render icon only if present */}
                     <span className="pref-sidebar-label">{item.label}</span>
                 </div>
                 {hasChildren && isExpanded && item.children!.map((child) => renderSidebarItem(child, depth + 1))}
@@ -213,15 +232,15 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
     // ── Content pages ───────────────────────────────────────────
     const renderContent = () => {
         switch (activeItem) {
-            case 'system-resources':
+            case 'System Resources': // Updated ID
                 return <SystemResourcesPage prefs={prefs} update={update} />
-            case 'color-management':
+            case 'Color Management': // Updated ID
                 return <ColorManagementPage prefs={prefs} update={update} />
-            case 'theme':
+            case 'Theme': // Updated ID
                 return <ThemePage prefs={prefs} update={update} />
-            case 'toolbox':
+            case 'Toolbox': // Updated ID
                 return <ToolboxPage prefs={prefs} update={update} />
-            case 'display':
+            case 'Display': // Updated ID
                 return <DisplayPage prefs={prefs} update={update} />
             default:
                 return <PlaceholderPage title={getPageTitle()} />
@@ -255,11 +274,19 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
 
                 {/* Footer */}
                 <div className="pref-footer">
-                    <button className="pref-btn pref-btn-secondary">Help</button>
+                    <button className="pref-btn pref-btn-secondary">
+                        {t('dialog.preferences.help')}
+                    </button>
                     <div className="pref-footer-right">
-                        <button className="pref-btn pref-btn-secondary" onClick={() => setPrefs({ ...defaultPrefs })}>Reset</button>
-                        <button className="pref-btn pref-btn-primary" onClick={onClose}>OK</button>
-                        <button className="pref-btn pref-btn-secondary" onClick={onClose}>Cancel</button>
+                        <button className="pref-btn pref-btn-secondary" onClick={() => setPrefs({ ...defaultPrefs })}>
+                            {t('dialog.preferences.reset')}
+                        </button>
+                        <button className="pref-btn pref-btn-primary" onClick={onClose}>
+                            {t('dialog.preferences.ok')}
+                        </button>
+                        <button className="pref-btn pref-btn-secondary" onClick={onClose}>
+                            {t('dialog.preferences.cancel')}
+                        </button>
                     </div>
                 </div>
             </div>

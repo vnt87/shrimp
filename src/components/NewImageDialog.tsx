@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useLanguage } from '../i18n/LanguageContext'
 import { useEditor } from './EditorContext'
 
 interface NewImageDialogProps {
@@ -40,6 +41,7 @@ const PRESETS = [
 
 export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
     const { newImage } = useEditor()
+    const { t } = useLanguage()
     const [width, setWidth] = useState(1920)
     const [height, setHeight] = useState(1080)
     const [bgType, setBgType] = useState<'white' | 'transparent' | 'custom'>('white')
@@ -74,13 +76,13 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
         <div className="dialog-overlay" onClick={onClose} onKeyDown={handleKeyDown}>
             <div className="dialog-content" onClick={e => e.stopPropagation()} style={{ width: 420 }}>
                 <div className="dialog-header">
-                    <span>Create a New Image</span>
+                    <span>{t('dialog.new_image.title')}</span>
                     <button className="dialog-close-btn" onClick={onClose}>×</button>
                 </div>
                 <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '16px 20px' }}>
                     {/* Preset Dimensions */}
                     <div>
-                        <span style={{ display: 'block', fontSize: 11, marginBottom: 8, color: 'var(--text-secondary)' }}>Preset Sizes</span>
+                        <span style={{ display: 'block', fontSize: 11, marginBottom: 8, color: 'var(--text-secondary)' }}>{t('dialog.new_image.preset_sizes')}</span>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {PRESETS.map(group => (
                                 <div key={group.label}>
@@ -113,7 +115,7 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
                     {/* Dimensions */}
                     <div style={{ display: 'flex', gap: 12 }}>
                         <label style={{ flex: 1 }}>
-                            <span style={{ display: 'block', fontSize: 11, marginBottom: 4, color: 'var(--text-secondary)' }}>Width (px)</span>
+                            <span style={{ display: 'block', fontSize: 11, marginBottom: 4, color: 'var(--text-secondary)' }}>{t('dialog.new_image.width')}</span>
                             <input
                                 type="number"
                                 value={width}
@@ -128,7 +130,7 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
                             />
                         </label>
                         <label style={{ flex: 1 }}>
-                            <span style={{ display: 'block', fontSize: 11, marginBottom: 4, color: 'var(--text-secondary)' }}>Height (px)</span>
+                            <span style={{ display: 'block', fontSize: 11, marginBottom: 4, color: 'var(--text-secondary)' }}>{t('dialog.new_image.height')}</span>
                             <input
                                 type="number"
                                 value={height}
@@ -146,7 +148,7 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
 
                     {/* Background */}
                     <div>
-                        <span style={{ display: 'block', fontSize: 11, marginBottom: 6, color: 'var(--text-secondary)' }}>Background</span>
+                        <span style={{ display: 'block', fontSize: 11, marginBottom: 6, color: 'var(--text-secondary)' }}>{t('dialog.new_image.background')}</span>
                         <div className="segmented-control">
                             {(['white', 'transparent', 'custom'] as const).map(opt => (
                                 <button
@@ -155,7 +157,7 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
                                     className={`segmented-btn ${bgType === opt ? 'active' : ''}`}
                                     style={{ flex: 1, textTransform: 'capitalize' }}
                                 >
-                                    {opt}
+                                    {t(`dialog.new_image.background.${opt}` as any)}
                                 </button>
                             ))}
                         </div>
@@ -179,7 +181,7 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
                                 color: 'var(--text-primary)', cursor: 'pointer'
                             }}
                         >
-                            Cancel
+                            {t('dialog.new_image.cancel')}
                         </button>
                         <button
                             onClick={handleCreate}
@@ -189,7 +191,7 @@ export default function NewImageDialog({ open, onClose }: NewImageDialogProps) {
                                 color: '#fff', cursor: 'pointer', fontWeight: 600
                             }}
                         >
-                            Create
+                            {t('dialog.new_image.create')}
                         </button>
                     </div>
                 </div>

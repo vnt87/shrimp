@@ -1,10 +1,13 @@
 import { useEffect } from 'react'
+import { useLanguage } from '../i18n/LanguageContext'
 import { X, Github, ExternalLink, FileText } from 'lucide-react'
 import ShrimpIcon from './ShrimpIcon'
 
 const APP_VERSION = '0.1.0'
 
 export default function AboutDialog({ onClose }: { onClose: () => void }) {
+    const { t } = useLanguage()
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -21,7 +24,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
             <div className="about-dialog" onClick={(e) => e.stopPropagation()}>
                 {/* Title bar */}
                 <div className="about-titlebar">
-                    <span className="about-titlebar-text">About SHRIMP</span>
+                    <span className="about-titlebar-text">{t('dialog.about.title')}</span>
                     <div className="about-titlebar-close" onClick={onClose}>
                         <X size={14} />
                     </div>
@@ -33,20 +36,20 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
                         <ShrimpIcon size={48} />
                     </div>
 
-                    <h1 className="about-app-name">SHRIMP</h1>
-                    <span className="about-version">Version {APP_VERSION}</span>
+                    <h1 className="about-app-name">WebGIMP</h1>
+                    <span className="about-version">{t('dialog.about.version')} {APP_VERSION}</span>
                     <div className="about-tagline">
                         <div style={{ marginBottom: '4px' }}>
                             <strong>S</strong>imple <strong>H</strong>i-<strong>R</strong>es <strong>I</strong>mage <strong>M</strong>anipulation <strong>P</strong>rogram
                         </div>
-                        <div>A web-based image editor inspired by GIMP</div>
+                        <div>{t('dialog.about.tagline.sub')}</div>
                     </div>
 
                     <div className="about-divider" />
 
                     <div className="about-info-grid">
                         <div className="about-info-row">
-                            <span className="about-info-label">Author</span>
+                            <span className="about-info-label">{t('dialog.about.author')}</span>
                             <a
                                 className="about-info-link"
                                 href="https://namvu.net"
@@ -59,7 +62,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
                         </div>
 
                         <div className="about-info-row">
-                            <span className="about-info-label">GitHub</span>
+                            <span className="about-info-label">{t('dialog.about.github')}</span>
                             <a
                                 className="about-info-link"
                                 href="https://github.com/vnt87/shrimp"
@@ -73,14 +76,14 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
                         </div>
 
                         <div className="about-info-row">
-                            <span className="about-info-label">Changelog</span>
+                            <span className="about-info-label">{t('dialog.about.changelog')}</span>
                             <a
                                 className="about-info-link about-info-link--muted"
                                 href="#"
                                 onClick={(e) => e.preventDefault()}
                             >
                                 <FileText size={13} />
-                                Coming soon
+                                {t('dialog.about.coming_soon')}
                             </a>
                         </div>
                     </div>
@@ -88,7 +91,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
 
                 {/* Footer */}
                 <div className="about-footer">
-                    <button className="pref-btn pref-btn-primary" onClick={onClose}>Close</button>
+                    <button className="pref-btn pref-btn-primary" onClick={onClose}>{t('dialog.about.close')}</button>
                 </div>
             </div>
         </div>

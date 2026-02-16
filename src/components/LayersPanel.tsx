@@ -21,6 +21,8 @@ import { useEditor, Layer, type LayerFilter } from './EditorContext'
 import PanelMenu from './PanelMenu'
 import FiltersDialog from './FiltersDialog'
 import { getFilterCatalogEntry, isSupportedFilterType } from '../data/filterCatalog'
+import { useLanguage } from '../i18n/LanguageContext'
+import { TranslationKey } from '../i18n/en'
 
 // --- Layer Thumbnail ---
 function LayerThumbnail({ layer }: { layer: Layer }) {
@@ -293,6 +295,7 @@ export default function LayersPanel() {
         restoreHistoryIndex
     } = useEditor()
     const [activeTab, setActiveTab] = useState<'layers' | 'channels' | 'paths' | 'history'>('layers')
+    const { t } = useLanguage()
     const [renamingPathId, setRenamingPathId] = useState<string | null>(null)
     const [renamingPathValue, setRenamingPathValue] = useState('')
     const [showFiltersDialog, setShowFiltersDialog] = useState(false)
@@ -381,10 +384,10 @@ export default function LayersPanel() {
         <div className="dialogue" style={{ flex: 1, overflow: 'hidden' }}>
             <div className="dialogue-header">
                 <div className="dialogue-tabs">
-                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'layers' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('layers')}>Layers</button>
-                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'channels' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('channels')}>Channels</button>
-                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'paths' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('paths')}>Paths</button>
-                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'history' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('history')}>History</button>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'layers' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('layers')}>{t('layers.tab.layers')}</button>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'channels' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('channels')}>{t('layers.tab.channels')}</button>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'paths' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('paths')}>{t('layers.tab.paths')}</button>
+                    <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'history' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('history')}>{t('layers.tab.history')}</button>
                 </div>
                 <PanelMenu panelId="layers" />
             </div>
@@ -393,7 +396,7 @@ export default function LayersPanel() {
                 activeTab === 'layers' && (
                     <>
                         <div className="layers-blend-row">
-                            <span className="dialogue-bar-label">Mode</span>
+                            <span className="dialogue-bar-label">{t('layers.mode')}</span>
                             <select
                                 className="layers-dropdown"
                                 style={{ width: 161, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '2px 4px', fontSize: 12, cursor: 'pointer' }}
@@ -401,29 +404,29 @@ export default function LayersPanel() {
                                 onChange={(e) => activeLayerId && setLayerBlendMode(activeLayerId, e.target.value)}
                                 disabled={!activeLayerId}
                             >
-                                <option value="normal">Normal</option>
-                                <option value="multiply">Multiply</option>
-                                <option value="screen">Screen</option>
-                                <option value="overlay">Overlay</option>
-                                <option value="darken">Darken</option>
-                                <option value="lighten">Lighten</option>
-                                <option value="color-dodge">Color Dodge</option>
-                                <option value="color-burn">Color Burn</option>
-                                <option value="hard-light">Hard Light</option>
-                                <option value="soft-light">Soft Light</option>
-                                <option value="difference">Difference</option>
-                                <option value="exclusion">Exclusion</option>
-                                <option value="hue">Hue</option>
-                                <option value="saturation">Saturation</option>
-                                <option value="color">Color</option>
-                                <option value="luminosity">Luminosity</option>
+                                <option value="normal">{t('layers.blend.normal')}</option>
+                                <option value="multiply">{t('layers.blend.multiply')}</option>
+                                <option value="screen">{t('layers.blend.screen')}</option>
+                                <option value="overlay">{t('layers.blend.overlay')}</option>
+                                <option value="darken">{t('layers.blend.darken')}</option>
+                                <option value="lighten">{t('layers.blend.lighten')}</option>
+                                <option value="color-dodge">{t('layers.blend.color_dodge')}</option>
+                                <option value="color-burn">{t('layers.blend.color_burn')}</option>
+                                <option value="hard-light">{t('layers.blend.hard_light')}</option>
+                                <option value="soft-light">{t('layers.blend.soft_light')}</option>
+                                <option value="difference">{t('layers.blend.difference')}</option>
+                                <option value="exclusion">{t('layers.blend.exclusion')}</option>
+                                <option value="hue">{t('layers.blend.hue')}</option>
+                                <option value="saturation">{t('layers.blend.saturation')}</option>
+                                <option value="color">{t('layers.blend.color')}</option>
+                                <option value="luminosity">{t('layers.blend.luminosity')}</option>
                             </select>
                         </div>
 
                         <div className="dialogue-divider" />
 
                         <div className="layers-lock-row">
-                            <span className="layers-lock-label">Lock</span>
+                            <span className="layers-lock-label">{t('layers.lock')}</span>
                             <div
                                 className={`layers-lock-icon${activeLayer?.locked ? ' active' : ''}`}
                                 onClick={() => activeLayerId && toggleLayerLock(activeLayerId)}
@@ -431,7 +434,7 @@ export default function LayersPanel() {
                                 <Lock size={16} />
                             </div>
 
-                            <span className="layers-opacity-label" style={{ marginLeft: 'auto' }}>Opacity</span>
+                            <span className="layers-opacity-label" style={{ marginLeft: 'auto' }}>{t('layers.opacity')}</span>
                             <input
                                 type="range"
                                 className="layers-opacity-slider"
@@ -463,12 +466,12 @@ export default function LayersPanel() {
                             <div className="layers-filters-header">
                                 <div className="layers-filters-title">
                                     <SlidersHorizontal size={14} />
-                                    <span>Adjustments</span>
+                                    <span>{t('layers.adjustments')}</span>
                                 </div>
                                 <button
                                     type="button"
                                     className="panel-icon-btn"
-                                    title="Add adjustment"
+                                    title={t('layers.add_adjustment')}
                                     onClick={() => openFiltersDialog()}
                                     disabled={!activeLayerId}
                                 >
@@ -477,9 +480,9 @@ export default function LayersPanel() {
                             </div>
 
                             {!activeLayer ? (
-                                <div className="layers-filters-empty">Select a layer to manage adjustments.</div>
+                                <div className="layers-filters-empty">{t('layers.select_layer_to_manage')}</div>
                             ) : activeLayer.filters.length === 0 ? (
-                                <div className="layers-filters-empty">No adjustments on this layer.</div>
+                                <div className="layers-filters-empty">{t('layers.empty_adjustments')}</div>
                             ) : (
                                 <div className="layers-filters-list">
                                     {activeLayer.filters.map((filter, idx) => {
@@ -492,22 +495,22 @@ export default function LayersPanel() {
                                                     type="button"
                                                     className={`layers-filter-visibility${filter.enabled ? '' : ' off'}`}
                                                     onClick={() => activeLayerId && toggleFilter(activeLayerId, idx)}
-                                                    title={filter.enabled ? 'Disable adjustment' : 'Enable adjustment'}
+                                                    title={filter.enabled ? t('layers.disable_adjustment') : t('layers.enable_adjustment')}
                                                 >
                                                     {filter.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     className="layers-filter-name"
-                                                    title="Open adjustment dialog with this filter type"
+                                                    title={t('layers.adjustments.open_dialog')}
                                                     onClick={() => openFiltersDialog(filter.type)}
                                                 >
-                                                    {label}
+                                                    {t(label as any)}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     className="layers-filter-remove"
-                                                    title="Remove adjustment"
+                                                    title={t('layers.remove_adjustment')}
                                                     onClick={() => activeLayerId && removeFilter(activeLayerId, idx)}
                                                 >
                                                     <Trash2 size={14} />
@@ -524,7 +527,7 @@ export default function LayersPanel() {
                         <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
                             {layers.length === 0 && (
                                 <div style={{ padding: 10, color: '#888', textAlign: 'center' }}>
-                                    No layers
+                                    {t('layers.no_layers')}
                                 </div>
                             )}
                             {[...layers].map(layer => (
@@ -542,7 +545,7 @@ export default function LayersPanel() {
 
                         <div className="layer-search">
                             <div className="layer-search-input">
-                                <input type="text" placeholder="Layer Search" readOnly />
+                                <input type="text" placeholder={t('layers.search_placeholder')} readOnly />
                                 <Search size={16} />
                             </div>
                         </div>
@@ -553,28 +556,28 @@ export default function LayersPanel() {
                             <div className="dialogue-actions-left">
                                 <div
                                     className="dialogue-action-btn"
-                                    title="New Layer"
-                                    onClick={() => addLayer('New Layer')}
+                                    title={t('layers.btn.new')}
+                                    onClick={() => addLayer(t('menu.layer.new'))}
                                 >
                                     <Plus size={16} />
                                 </div>
                                 <div
                                     className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
-                                    title="Duplicate Layer"
+                                    title={t('layers.btn.duplicate')}
                                     onClick={() => activeLayerId && duplicateLayer(activeLayerId)}
                                 >
                                     <Copy size={16} />
                                 </div>
                                 <div
                                     className="dialogue-action-btn"
-                                    title="New Group"
+                                    title={t('layers.btn.new_group')}
                                     onClick={() => createGroup(selectedLayerIds.length > 0 ? selectedLayerIds : undefined)}
                                 >
                                     <FolderPlus size={16} />
                                 </div>
                                 <div
                                     className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
-                                    title="Delete Layer"
+                                    title={t('layers.btn.delete')}
                                     onClick={() => activeLayerId && deleteLayer(activeLayerId)}
                                 >
                                     <Trash2 size={16} />
@@ -592,7 +595,7 @@ export default function LayersPanel() {
                 activeTab === 'paths' && (
                     <>
                         <div className="layers-blend-row" style={{ justifyContent: 'space-between' }}>
-                            <span className="dialogue-bar-label">Paths</span>
+                            <span className="dialogue-bar-label">{t('layers.tab.paths')}</span>
                             <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                                 {paths.length}
                             </span>
@@ -606,23 +609,23 @@ export default function LayersPanel() {
                                     type="button"
                                     className="panel-btn panel-btn-secondary"
                                     onClick={() => createPath()}
-                                    title="Create empty path"
+                                    title={t('layers.paths.new')}
                                 >
-                                    New
+                                    {t('layers.paths.new')}
                                 </button>
                                 <button
                                     type="button"
                                     className="panel-btn panel-btn-secondary"
                                     onClick={() => activePathId && deletePath(activePathId)}
                                     disabled={!activePathId}
-                                    title="Delete active path"
+                                    title={t('layers.paths.delete')}
                                 >
-                                    Delete
+                                    {t('layers.paths.delete')}
                                 </button>
                             </div>
 
                             <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                                Status: {activePath ? (activePath.closed ? 'Closed' : 'Open') : 'No active path'}
+                                {t('layers.paths.status')}: {activePath ? (activePath.closed ? t('layers.paths.closed') : t('layers.paths.open')) : t('layers.paths.no_active')}
                             </div>
 
                             <div className="panel-inline-actions">
@@ -631,15 +634,15 @@ export default function LayersPanel() {
                                     className="panel-btn panel-btn-secondary"
                                     onClick={togglePathClosed}
                                     disabled={!activePath || (!activePath.closed && activePath.nodes.length < 3)}
-                                    title={activePath?.closed ? 'Open path' : 'Close path'}
+                                    title={activePath?.closed ? t('tooloptions.path.open_path' as TranslationKey) || 'Open path' : t('tooloptions.path.close_path' as TranslationKey) || 'Close path'}
                                 >
-                                    {activePath?.closed ? 'Open' : 'Close'}
+                                    {activePath?.closed ? t('layers.paths.open') : t('layers.paths.closed')}
                                 </button>
                             </div>
 
                             {selectedNode && (
                                 <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                                    {`Selected: x:${Math.round(selectedNode.x)} y:${Math.round(selectedNode.y)} · ${selectedNode.type}`}
+                                    {`${t('layers.paths.selected')}: x:${Math.round(selectedNode.x)} y:${Math.round(selectedNode.y)} · ${selectedNode.type}`}
                                 </div>
                             )}
                         </div>
@@ -649,7 +652,7 @@ export default function LayersPanel() {
                         <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
                             {paths.length === 0 && (
                                 <div style={{ padding: 12, color: 'var(--text-secondary)', textAlign: 'center', fontSize: 12 }}>
-                                    No saved paths. Use the Paths tool (`P`) to create one.
+                                    {t('layers.paths.empty_hint')}
                                 </div>
                             )}
                             {paths.map((path) => (
@@ -691,7 +694,7 @@ export default function LayersPanel() {
                                                 </span>
                                             )}
                                             <span className="layer-name muted" style={{ fontSize: 11 }}>
-                                                {`${path.closed ? 'closed' : 'open'} · ${path.nodes.length} pts${path.locked ? ' · locked' : ''}`}
+                                                {`${path.closed ? t('layers.paths.closed') : t('layers.paths.open')} · ${path.nodes.length} ${t('layers.paths.pts')}${path.locked ? ` · ${t('layers.paths.locked')}` : ''}`}
                                             </span>
                                         </div>
                                     </div>
@@ -699,7 +702,7 @@ export default function LayersPanel() {
                                     <div className="layer-status" style={{ display: 'flex', gap: 4 }}>
                                         <div
                                             className="layer-status-icon"
-                                            title={path.visible ? 'Hide path' : 'Show path'}
+                                            title={path.visible ? t('layers.paths.hide') : t('layers.paths.show')}
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 setPathVisibility(path.id, !path.visible)
@@ -709,7 +712,7 @@ export default function LayersPanel() {
                                         </div>
                                         <div
                                             className={`layer-status-icon${path.locked ? ' active' : ''}`}
-                                            title={path.locked ? 'Unlock path' : 'Lock path'}
+                                            title={path.locked ? t('layers.paths.unlock') : t('layers.paths.lock')}
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 setPathLocked(path.id, !path.locked)
@@ -719,7 +722,7 @@ export default function LayersPanel() {
                                         </div>
                                         <div
                                             className="layer-status-icon"
-                                            title="Duplicate path"
+                                            title={t('layers.paths.duplicate')}
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 duplicateVectorPath(path.id)
@@ -729,7 +732,7 @@ export default function LayersPanel() {
                                         </div>
                                         <div
                                             className="layer-status-icon"
-                                            title="Delete path"
+                                            title={t('layers.paths.delete_tooltip')}
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 deletePath(path.id)
@@ -749,12 +752,12 @@ export default function LayersPanel() {
                 activeTab === 'history' && (
                     <>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px' }}>
-                            <span className="dialogue-bar-label">History Log</span>
+                            <span className="dialogue-bar-label">{t('layers.history.log')}</span>
                             <div className="panel-inline-actions">
                                 <button
                                     type="button"
                                     className="panel-icon-btn"
-                                    title="Undo"
+                                    title={t('layers.history.undo')}
                                     onClick={() => canUndo && undo()}
                                     disabled={!canUndo}
                                 >
@@ -763,7 +766,7 @@ export default function LayersPanel() {
                                 <button
                                     type="button"
                                     className="panel-icon-btn"
-                                    title="Redo"
+                                    title={t('layers.history.redo')}
                                     onClick={() => canRedo && redo()}
                                     disabled={!canRedo}
                                 >
@@ -780,7 +783,7 @@ export default function LayersPanel() {
                                     key={entry.index}
                                     className={`layer-row${entry.isCurrent ? ' selected' : ''}`}
                                     onDoubleClick={() => restoreHistoryIndex(entry.index)}
-                                    title="Double click to restore this state"
+                                    title={t('layers.history.restore_hint')}
                                     style={{ cursor: 'default' }}
                                 >
                                     <div className="layer-info" style={{ gap: 8 }}>
@@ -790,7 +793,7 @@ export default function LayersPanel() {
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                             <span className="layer-name">{entry.label}</span>
                                             <span className="layer-name muted" style={{ fontSize: 11 }}>
-                                                {entry.isCurrent ? 'Current state' : `Step ${entry.index + 1}`}
+                                                {entry.isCurrent ? t('layers.history.current') : `${t('layers.history.step')} ${entry.index + 1}`}
                                             </span>
                                         </div>
                                     </div>

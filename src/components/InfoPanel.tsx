@@ -1,5 +1,6 @@
 import { useEditor } from './EditorContext'
-import { Droplet, MousePointer2 } from 'lucide-react'
+import { MousePointer2, Droplet } from 'lucide-react'
+import { useLanguage } from '../i18n/LanguageContext'
 
 interface InfoPanelProps {
     cursorPos: { x: number; y: number } | null
@@ -8,6 +9,7 @@ interface InfoPanelProps {
 
 export default function InfoPanel({ cursorPos, colorUnderCursor }: InfoPanelProps) {
     const { canvasSize } = useEditor()
+    const { t } = useLanguage()
 
     // Helper to convert hex to RGB
     const hexToRgb = (hex: string) => {
@@ -28,11 +30,11 @@ export default function InfoPanel({ cursorPos, colorUnderCursor }: InfoPanelProp
                 <MousePointer2 size={14} />
                 <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ width: 60 }}>
-                        <span style={{ fontWeight: 600, marginRight: 4 }}>X:</span>
+                        <span style={{ fontWeight: 600, marginRight: 4 }}>{t('info.x')}</span>
                         {cursorPos ? Math.round(cursorPos.x) : '-'}
                     </div>
                     <div style={{ width: 60 }}>
-                        <span style={{ fontWeight: 600, marginRight: 4 }}>Y:</span>
+                        <span style={{ fontWeight: 600, marginRight: 4 }}>{t('info.y')}</span>
                         {cursorPos ? Math.round(cursorPos.y) : '-'}
                     </div>
                 </div>
@@ -42,11 +44,11 @@ export default function InfoPanel({ cursorPos, colorUnderCursor }: InfoPanelProp
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 22 }}>
                 <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ width: 60 }}>
-                        <span style={{ fontWeight: 600, marginRight: 4 }}>W:</span>
+                        <span style={{ fontWeight: 600, marginRight: 4 }}>{t('info.w')}</span>
                         {canvasSize.width}
                     </div>
                     <div style={{ width: 60 }}>
-                        <span style={{ fontWeight: 600, marginRight: 4 }}>H:</span>
+                        <span style={{ fontWeight: 600, marginRight: 4 }}>{t('info.h')}</span>
                         {canvasSize.height}
                     </div>
                 </div>
@@ -74,9 +76,9 @@ export default function InfoPanel({ cursorPos, colorUnderCursor }: InfoPanelProp
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, fontFamily: 'monospace', opacity: 0.8 }}>
-                        <span>R:{rgb ? rgb.r.toString().padStart(3) : '---'}</span>
-                        <span>G:{rgb ? rgb.g.toString().padStart(3) : '---'}</span>
-                        <span>B:{rgb ? rgb.b.toString().padStart(3) : '---'}</span>
+                        <span>{t('info.r')}{rgb ? rgb.r.toString().padStart(3) : '---'}</span>
+                        <span>{t('info.g')}{rgb ? rgb.g.toString().padStart(3) : '---'}</span>
+                        <span>{t('info.b')}{rgb ? rgb.b.toString().padStart(3) : '---'}</span>
                     </div>
                 </div>
             </div>

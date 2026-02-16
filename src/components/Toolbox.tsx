@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useEditor } from './EditorContext'
 import ColorPickerDialog from './ColorPickerDialog'
 import Tooltip from './Tooltip'
-import { toolGroups, getToolLabel } from '../data/tools'
+import { toolGroups } from '../data/tools'
+import { useLanguage } from '../i18n/LanguageContext'
+import { TranslationKey } from '../i18n/en'
 import {
     ArrowUpDown,
     RotateCcw,
@@ -15,9 +17,27 @@ interface ToolboxProps {
 
 export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxProps) {
     const { foregroundColor, backgroundColor, setForegroundColor, setBackgroundColor, swapColors, resetColors } = useEditor()
+    const { t } = useLanguage()
     const [colorPickerTarget, setColorPickerTarget] = useState<'fg' | 'bg' | null>(null)
     const [hoveredToolId, setHoveredToolId] = useState<string | null>(null)
     const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null)
+
+    const shortcuts: Record<string, string> = {
+        'rect-select': 'R', 'ellipse-select': 'E', 'move': 'V', 'crop': 'C',
+        'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
+        'gradient': 'Shift+G',
+        'picker': 'I', 'text': 'T', 'zoom': 'Z', 'paths': 'P',
+    }
+
+    const getToolTipLabel = (toolId: string): string => {
+        const flatTools = toolGroups.flat()
+        const tool = flatTools.find(t => t.id === toolId)
+        if (!tool) return ''
+
+        const label = t(tool.label as TranslationKey)
+        const shortcut = shortcuts[toolId]
+        return shortcut ? `${label} (${shortcut})` : label
+    }
 
     return (
         <div className="toolbox">
@@ -59,20 +79,20 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                         className="toolbox-color-fg"
                         style={{ backgroundColor: foregroundColor, cursor: 'pointer' }}
                         onClick={() => setColorPickerTarget(colorPickerTarget === 'fg' ? null : 'fg')}
-                        title="Foreground Color"
+                        title={t('toolbox.fg_title')}
                     />
                     <div
                         className="toolbox-color-bg"
                         style={{ backgroundColor: backgroundColor, cursor: 'pointer' }}
                         onClick={() => setColorPickerTarget(colorPickerTarget === 'bg' ? null : 'bg')}
-                        title="Background Color"
+                        title={t('toolbox.bg_title')}
                     />
                 </div>
                 <div className="toolbox-color-actions">
-                    <span style={{ cursor: 'pointer' }} onClick={resetColors} title="Reset to Default Colors (D)">
+                    <span style={{ cursor: 'pointer' }} onClick={resetColors} title={t('toolbox.reset_title')}>
                         <RotateCcw size={12} />
                     </span>
-                    <span style={{ cursor: 'pointer' }} onClick={swapColors} title="Swap Colors (X)">
+                    <span style={{ cursor: 'pointer' }} onClick={swapColors} title={t('toolbox.swap_title')}>
                         <ArrowUpDown size={12} />
                     </span>
                 </div>
@@ -80,7 +100,7 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                 {/* Color Picker Dialog */}
                 {colorPickerTarget && (
                     <ColorPickerDialog
-                        title={colorPickerTarget === 'fg' ? 'Foreground Color' : 'Background Color'}
+                        title={colorPickerTarget === 'fg' ? t('toolbox.fg_title') : t('toolbox.bg_title')}
                         color={colorPickerTarget === 'fg' ? foregroundColor : backgroundColor}
                         onChange={(c) => colorPickerTarget === 'fg' ? setForegroundColor(c) : setBackgroundColor(c)}
                         onClose={() => setColorPickerTarget(null)}
@@ -89,7 +109,7 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
             </div>
 
             <Tooltip
-                text={hoveredToolId ? `${getToolLabel(hoveredToolId)} ` : ''}
+                text={hoveredToolId ? `${getToolTipLabel(hoveredToolId)} ` : ''}
                 visible={!!hoveredToolId}
                 targetRect={hoveredRect}
                 offset={10}

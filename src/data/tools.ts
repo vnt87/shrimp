@@ -34,38 +34,38 @@ export const shortcuts: Record<string, string> = {
 // Tool groups with dividers between them
 export const toolGroups: ToolDefinition[][] = [
     [
-        { id: 'rect-select', icon: BoxSelect, label: 'Rect Select' },
-        { id: 'ellipse-select', icon: CircleDashed, label: 'Ellipse Select' },
-        { id: 'lasso-select', icon: LassoSelect, label: 'Lasso Select' },
-        { id: 'wand-select', icon: Wand2, label: 'Magic Wand' },
+        { id: 'rect-select', icon: BoxSelect, label: 'tool.rect_select' },
+        { id: 'ellipse-select', icon: CircleDashed, label: 'tool.ellipse_select' },
+        { id: 'lasso-select', icon: LassoSelect, label: 'tool.lasso_select' },
+        { id: 'wand-select', icon: Wand2, label: 'tool.wand_select' },
     ],
     [
-        { id: 'paths', icon: PenTool, label: 'Paths' },
+        { id: 'paths', icon: PenTool, label: 'tool.paths' },
     ],
     [
-        { id: 'picker', icon: Pipette, label: 'Color Picker' },
+        { id: 'picker', icon: Pipette, label: 'tool.picker' },
     ],
     [
-        { id: 'move', icon: Move, label: 'Move' },
-        { id: 'crop', icon: Crop, label: 'Crop' },
+        { id: 'move', icon: Move, label: 'tool.move' },
+        { id: 'crop', icon: Crop, label: 'tool.crop' },
     ],
     [
-        { id: 'brush', icon: Brush, label: 'Brush' },
-        { id: 'pencil', icon: Pencil, label: 'Pencil' },
+        { id: 'brush', icon: Brush, label: 'tool.brush' },
+        { id: 'pencil', icon: Pencil, label: 'tool.pencil' },
     ],
     [
-        { id: 'eraser', icon: Eraser, label: 'Eraser' },
-        { id: 'bucket', icon: PaintBucket, label: 'Bucket Fill' },
-        { id: 'gradient', icon: Contrast, label: 'Gradient' },
+        { id: 'eraser', icon: Eraser, label: 'tool.eraser' },
+        { id: 'bucket', icon: PaintBucket, label: 'tool.bucket' },
+        { id: 'gradient', icon: Contrast, label: 'tool.gradient' },
     ],
     [
-        { id: 'text', icon: Type, label: 'Text' },
+        { id: 'text', icon: Type, label: 'tool.text' },
     ],
     [
-        { id: 'transform', icon: Scale3d, label: 'Transform' },
+        { id: 'transform', icon: Scale3d, label: 'tool.transform' },
     ],
     [
-        { id: 'zoom', icon: ZoomIn, label: 'Zoom' },
+        { id: 'zoom', icon: ZoomIn, label: 'tool.zoom' },
     ],
 ]
 
@@ -75,10 +75,10 @@ export const TRANSFORM_TOOLS = toolGroups[3]
 export const OTHER_TOOLS = [...toolGroups[1], ...toolGroups[2], ...toolGroups[6], ...toolGroups[7], ...toolGroups[8]]
 
 export const MENU_TOOL_GROUPS = [
-    { label: 'Selection Tools', tools: SELECTION_TOOLS },
-    { label: 'Paint Tools', tools: PAINT_TOOLS },
-    { label: 'Transform Tools', tools: TRANSFORM_TOOLS },
-    { label: 'Other Tools', tools: OTHER_TOOLS },
+    { label: 'toolgroup.selection', tools: SELECTION_TOOLS },
+    { label: 'toolgroup.paint', tools: PAINT_TOOLS },
+    { label: 'toolgroup.transform', tools: TRANSFORM_TOOLS },
+    { label: 'toolgroup.other', tools: OTHER_TOOLS },
 ]
 
 export function getToolLabel(toolId: string): string {

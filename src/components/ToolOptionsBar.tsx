@@ -22,9 +22,8 @@ import {
     Blend
 } from 'lucide-react'
 import FontSelector from './FontSelector'
-import { useEditor } from './EditorContext'
-import { usePresets } from './PresetsContext'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
+import { useLanguage } from '../i18n/LanguageContext'
 
 interface ToolOptionsBarProps {
     activeTool: string
@@ -32,23 +31,8 @@ interface ToolOptionsBarProps {
     onToolOptionChange: <K extends keyof ToolOptions>(key: K, value: ToolOptions[K]) => void
 }
 
-const toolLabels: Record<string, string> = {
-    'move': 'Move',
-    'crop': 'Crop',
-    'rect-select': 'Rectangle Select',
-    'ellipse-select': 'Ellipse Select',
-    'lasso-select': 'Lasso Select',
-    'wand-select': 'Magic Wand',
-    'brush': 'Paintbrush',
-    'pencil': 'Pencil',
-    'eraser': 'Eraser',
-    'bucket': 'Bucket Fill',
-    'gradient': 'Gradient',
-    'picker': 'Color Picker',
-    'text': 'Text',
-    'zoom': 'Zoom',
-    'paths': 'Paths',
-}
+import { useEditor } from './EditorContext'
+import { usePresets } from './PresetsContext'
 
 export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionChange }: ToolOptionsBarProps) {
     const {
@@ -58,13 +42,38 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         addLayer,
         deletePath,
         foregroundColor,
-        backgroundColor, // Add this
+        backgroundColor,
         canvasSize,
         layers
     } = useEditor()
+    const { t } = useLanguage()
+
+    const toolLabels: Record<string, string> = {
+        'move': t('tool.move'),
+        'crop': t('tool.crop'),
+        'rect-select': t('tool.rect_select'),
+        'ellipse-select': t('tool.ellipse_select'),
+        'lasso-select': t('tool.lasso_select'),
+        'wand-select': t('tool.wand_select'),
+        'brush': t('tool.brush'),
+        'pencil': t('tool.pencil'),
+        'eraser': t('tool.eraser'),
+        'bucket': t('tool.bucket'),
+        'gradient': t('tool.gradient'),
+        'picker': t('tool.picker'),
+        'text': t('tool.text'),
+        'zoom': t('tool.zoom'),
+        'paths': t('tool.paths'),
+    }
 
     const label = toolLabels[activeTool] || activeTool
     const [isCmdPressed, setIsCmdPressed] = useState(false)
+
+    const {
+        brushPresets, addBrushPreset,
+        gradientPresets, addGradientPreset,
+        textStylePresets, addTextStylePreset
+    } = usePresets()
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,10 +141,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
-    const { brushPresets, addBrushPreset } = usePresets()
-
     const handleSaveBrushPreset = () => {
-        const name = prompt('Enter preset name:', `Brush ${brushPresets.length + 1}`)
+        const name = prompt(t('tooloptions.enter_preset_name'), `Brush ${brushPresets.length + 1}`)
         if (name) {
             addBrushPreset({
                 name,
@@ -164,7 +171,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     }}
                     value=""
                 >
-                    <option value="" disabled>Presets</option>
+                    <option value="" disabled>{t('tooloptions.presets')}</option>
                     {brushPresets.map(preset => (
                         <option key={preset.id} value={preset.id}>{preset.name}</option>
                     ))}
@@ -173,66 +180,66 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className="pref-btn pref-btn-secondary"
                     style={{ height: 24, fontSize: 12, padding: '0 6px' }}
                     onClick={handleSaveBrushPreset}
-                    title="Save current settings as preset"
+                    title={t('tooloptions.save_brush_preset_hint')}
                 >
                     +
                 </button>
             </div>
             <div className="tool-options-divider" />
-            {renderSlider('brushSize', 'Size', 1, 200, 1, 'px')}
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
             <div className="tool-options-divider" />
-            {renderSlider('brushOpacity', 'Opacity', 1, 100, 1, '%')}
+            {renderSlider('brushOpacity', t('tooloptions.opacity'), 1, 100, 1, '%')}
             <div className="tool-options-divider" />
-            {renderSlider('brushHardness', 'Hardness', 0, 100, 1, '%')}
+            {renderSlider('brushHardness', t('tooloptions.hardness'), 0, 100, 1, '%')}
         </>
     )
 
     const renderEraserOptions = () => (
         <>
-            {renderSlider('brushSize', 'Size', 1, 200, 1, 'px')}
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
             <div className="tool-options-divider" />
-            {renderSlider('brushOpacity', 'Opacity', 1, 100, 1, '%')}
+            {renderSlider('brushOpacity', t('tooloptions.opacity'), 1, 100, 1, '%')}
         </>
     )
 
     const renderBucketOptions = () => (
         <>
-            {renderSlider('fillThreshold', 'Threshold', 0, 255, 1, '')}
+            {renderSlider('fillThreshold', t('tooloptions.threshold'), 0, 255, 1, '')}
             <div className="tool-options-divider" />
-            {renderSlider('bucketOpacity', 'Opacity', 0, 100, 1, '%')}
+            {renderSlider('bucketOpacity', t('tooloptions.opacity'), 0, 100, 1, '%')}
             <div className="tool-options-divider" />
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="slider-label">Fill</span>
+                <span className="slider-label">{t('tooloptions.fill_type')}</span>
                 <div style={{ display: 'flex', gap: 2 }}>
                     <button
                         className={`pref-btn ${toolOptions.bucketFillType === 'fg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                         style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                         onClick={() => onToolOptionChange('bucketFillType', 'fg')}
-                        title="FG Color Fill"
+                        title={t('tooloptions.fill_fg_hint')}
                     >
-                        FG
+                        {t('tooloptions.fill_fg')}
                     </button>
                     <button
                         className={`pref-btn ${toolOptions.bucketFillType === 'bg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                         style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                         onClick={() => onToolOptionChange('bucketFillType', 'bg')}
-                        title="BG Color Fill"
+                        title={t('tooloptions.fill_bg_hint')}
                     >
-                        BG
+                        {t('tooloptions.fill_bg')}
                     </button>
                 </div>
             </div>
             <div className="tool-options-divider" />
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="slider-label">Area</span>
+                <span className="slider-label">{t('tooloptions.area')}</span>
                 <select
                     className="tool-options-select"
                     style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
                     value={toolOptions.bucketAffectedArea}
                     onChange={(e) => onToolOptionChange('bucketAffectedArea', e.target.value as any)}
                 >
-                    <option value="similar">Similar Colors</option>
-                    <option value="selection">Whole Selection</option>
+                    <option value="similar">{t('tooloptions.area.similar')}</option>
+                    <option value="selection">{t('tooloptions.area.selection')}</option>
                 </select>
             </div>
             <div className="tool-options-divider" />
@@ -243,20 +250,18 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     checked={toolOptions.bucketSampleMerged}
                     onChange={(e) => onToolOptionChange('bucketSampleMerged', e.target.checked)}
                 />
-                <label htmlFor="bucketSampleMerged">Sample Merged</label>
+                <label htmlFor="bucketSampleMerged">{t('tooloptions.sample_merged')}</label>
             </div>
         </>
     )
 
-    const { gradientPresets, addGradientPreset } = usePresets()
-
     const handleSaveGradientPreset = () => {
-        const name = prompt('Enter preset name:', `Gradient ${gradientPresets.length + 1}`)
+        const name = prompt(t('tooloptions.enter_preset_name'), `Gradient ${gradientPresets.length + 1}`)
         if (name) {
             // Placeholder: In a real app we'd grab the actual stops from a gradient editor
-            // For now, we'll just save a basic linear gradient defined by current colors if possible, 
-            // but since we don't have a gradient editor yet, we can't really save *new* custom gradients 
-            // other than what's hardcoded or FG/BG. 
+            // For now, we'll just save a basic linear gradient defined by current colors if possible,
+            // but since we don't have a gradient editor yet, we can't really save *new* custom gradients
+            // other than what's hardcoded or FG/BG.
             // Let's just save the current type for now as a "setting" preset
             addGradientPreset({
                 name,
@@ -282,7 +287,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     }}
                     value=""
                 >
-                    <option value="" disabled>Presets</option>
+                    <option value="" disabled>{t('tooloptions.presets')}</option>
                     {gradientPresets.map(preset => (
                         <option key={preset.id} value={preset.id}>{preset.name}</option>
                     ))}
@@ -291,79 +296,79 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className="pref-btn pref-btn-secondary"
                     style={{ height: 24, fontSize: 12, padding: '0 6px' }}
                     onClick={handleSaveGradientPreset}
-                    title="Save current gradient"
+                    title={t('tooloptions.gradient.save_hint')}
                 >
                     +
                 </button>
             </div>
             <div className="tool-options-divider" />
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="slider-label">Type</span>
+                <span className="slider-label">{t('tooloptions.gradient.type')}</span>
                 <div style={{ display: 'flex', gap: 2 }}>
                     <button
                         className={`pref-btn ${toolOptions.gradientType === 'linear' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                         style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                         onClick={() => onToolOptionChange('gradientType', 'linear')}
-                        title="Linear Gradient"
+                        title={t('tooloptions.gradient.linear_hint')}
                     >
-                        Linear
+                        {t('tooloptions.gradient.linear')}
                     </button>
                     <button
                         className={`pref-btn ${toolOptions.gradientType === 'radial' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                         style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                         onClick={() => onToolOptionChange('gradientType', 'radial')}
-                        title="Radial Gradient"
+                        title={t('tooloptions.gradient.radial_hint')}
                     >
-                        Radial
+                        {t('tooloptions.gradient.radial')}
                     </button>
                 </div>
             </div>
 
             <div className="tool-options-divider" />
 
-            {renderSlider('gradientOpacity', 'Opacity', 0, 100, 1, '%')}
+            {renderSlider('gradientOpacity', t('tooloptions.opacity'), 0, 100, 1, '%')}
 
             <div className="tool-options-divider" />
 
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="slider-label">Direction</span>
+                <span className="slider-label">{t('tooloptions.gradient.direction')}</span>
                 <button
                     className={`pref-btn ${toolOptions.gradientReverse ? 'pref-btn-secondary' : 'pref-btn-primary'}`}
                     style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                     onClick={() => onToolOptionChange('gradientReverse', false)}
-                    title="Foreground to Background"
+                    title={t('tooloptions.gradient.fg_bg_hint')}
                 >
-                    {'FG->BG'}
+                    {t('tooloptions.gradient.fg_bg')}
                 </button>
                 <button
                     className={`pref-btn ${toolOptions.gradientReverse ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                     style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                     onClick={() => onToolOptionChange('gradientReverse', true)}
-                    title="Background to Foreground"
+                    title={t('tooloptions.gradient.bg_fg_hint')}
                 >
-                    {'BG->FG'}
+                    {t('tooloptions.gradient.bg_fg')}
                 </button>
             </div>
 
             <div className="tool-options-divider" />
 
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="slider-label">Area</span>
+                <span className="slider-label">{t('tooloptions.area')}</span>
                 <select
                     className="tool-options-select"
                     style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
                     value={toolOptions.gradientAffectedArea}
                     onChange={(e) => onToolOptionChange('gradientAffectedArea', e.target.value as any)}
                 >
-                    <option value="layer">Whole Layer</option>
-                    <option value="selection">Within Selection</option>
+                    <option value="layer">{t('tooloptions.area.layer')}</option>
+                    <option value="selection">{t('tooloptions.area.within_selection')}</option>
                 </select>
             </div>
 
             <div className="tool-options-divider" />
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
                 <Blend size={13} />
-                Drag on canvas to apply gradient
+                {t('tooloptions.gradient.hint')}
             </span>
         </>
     )
@@ -377,7 +382,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     checked={toolOptions.cropDeletePixels}
                     onChange={(e) => onToolOptionChange('cropDeletePixels', e.target.checked)}
                 />
-                <label htmlFor="cropDeletePixels">Delete cropped pixels</label>
+                <label htmlFor="cropDeletePixels">{t('tooloptions.crop.delete_pixels')}</label>
             </div>
             <div className="tool-options-divider" />
 
@@ -388,12 +393,12 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     checked={toolOptions.cropFixedRatio}
                     onChange={(e) => onToolOptionChange('cropFixedRatio', e.target.checked)}
                 />
-                <label htmlFor="cropFixedRatio">Fixed Aspect Ratio</label>
+                <label htmlFor="cropFixedRatio">{t('tooloptions.crop.fixed_ratio')}</label>
             </div>
 
             {toolOptions.cropFixedRatio && (
                 <div className="tool-options-slider-group" style={{ marginLeft: 8 }}>
-                    <span className="slider-label">Ratio</span>
+                    <span className="slider-label">{t('tooloptions.crop.ratio')}</span>
                     <input
                         type="number"
                         className="tool-options-number-input"
@@ -408,22 +413,22 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
             <div className="tool-options-divider" />
 
-            {renderSlider('cropHighlightOpacity', 'Highlight', 0, 100, 1, '%')}
+            {renderSlider('cropHighlightOpacity', t('tooloptions.crop.highlight'), 0, 100, 1, '%')}
 
             <div className="tool-options-divider" />
 
             <div className="tool-options-slider-group">
-                <span className="slider-label">Guides</span>
+                <span className="slider-label">{t('tooloptions.crop.guides')}</span>
                 <select
                     className="tool-options-select"
                     style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
                     value={toolOptions.cropGuides}
                     onChange={(e) => onToolOptionChange('cropGuides', e.target.value as any)}
                 >
-                    <option value="none">No guides</option>
-                    <option value="center">Center lines</option>
-                    <option value="thirds">Rule of thirds</option>
-                    <option value="fifth">Rule of fifths</option>
+                    <option value="none">{t('tooloptions.crop.guides.none')}</option>
+                    <option value="center">{t('tooloptions.crop.guides.center')}</option>
+                    <option value="thirds">{t('tooloptions.crop.guides.thirds')}</option>
+                    <option value="fifth">{t('tooloptions.crop.guides.fifths')}</option>
                 </select>
             </div>
         </>
@@ -437,38 +442,36 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         return (
             <>
                 <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="slider-label">Target</span>
+                    <span className="slider-label">{t('tooloptions.picker.target')}</span>
                     <div style={{ display: 'flex', gap: 2 }}>
                         <button
                             className={`pref-btn ${effectiveTarget === 'fg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                             style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                             onClick={() => onToolOptionChange('pickerTarget', 'fg')}
-                            title="Set Foreground Color"
+                            title={t('tooloptions.picker.set_fg_hint')}
                         >
-                            Set FG
+                            {t('tooloptions.picker.set_fg')}
                         </button>
                         <button
                             className={`pref-btn ${effectiveTarget === 'bg' ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                             style={{ height: 24, fontSize: 11, padding: '0 8px' }}
                             onClick={() => onToolOptionChange('pickerTarget', 'bg')}
-                            title="Set Background Color"
+                            title={t('tooloptions.picker.set_bg_hint')}
                         >
-                            Set BG
+                            {t('tooloptions.picker.set_bg')}
                         </button>
                     </div>
                 </div>
                 <div className="tool-options-divider" />
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic', marginLeft: 4 }}>
-                    Hold Cmd/Ctrl to toggle
+                    {t('tooloptions.picker.toggle_hint')}
                 </span>
             </>
         )
     }
 
-    const { textStylePresets, addTextStylePreset } = usePresets()
-
     const handleSaveTextPreset = () => {
-        const name = prompt('Enter preset name:', `Text Style ${textStylePresets.length + 1}`)
+        const name = prompt(t('tooloptions.enter_preset_name'), `Text Style ${textStylePresets.length + 1}`)
         if (name) {
             addTextStylePreset({
                 name,
@@ -504,7 +507,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     }}
                     value=""
                 >
-                    <option value="" disabled>Presets</option>
+                    <option value="" disabled>{t('tooloptions.presets')}</option>
                     {textStylePresets.map(preset => (
                         <option key={preset.id} value={preset.id}>{preset.name}</option>
                     ))}
@@ -513,16 +516,16 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className="pref-btn pref-btn-secondary"
                     style={{ height: 24, fontSize: 12, padding: '0 6px' }}
                     onClick={handleSaveTextPreset}
-                    title="Save text style"
+                    title={t('tooloptions.text.save_hint')}
                 >
                     +
                 </button>
             </div>
             <div className="tool-options-divider" />
-            {renderSlider('fontSize', 'Size', 8, 200, 1, 'px')}
+            {renderSlider('fontSize', t('tooloptions.size'), 8, 200, 1, 'px')}
             <div className="tool-options-divider" />
             <div className="tool-options-slider-group">
-                <span className="slider-label">Color</span>
+                <span className="slider-label">{t('tooloptions.text.color')}</span>
                 <input
                     type="color"
                     className="tool-options-color"
@@ -534,14 +537,14 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className="pref-btn pref-btn-secondary"
                     style={{ height: 24, fontSize: 10, padding: '0 6px', minWidth: 'auto' }}
                     onClick={() => onToolOptionChange('textColor', foregroundColor)}
-                    title="Use foreground color"
+                    title={t('tooloptions.text.use_fg_hint')}
                 >
                     FG
                 </button>
             </div>
             <div className="tool-options-divider" />
             <div className="tool-options-slider-group">
-                <span className="slider-label">Font</span>
+                <span className="slider-label">{t('tooloptions.text.font')}</span>
                 <FontSelector
                     value={toolOptions.fontFamily}
                     onChange={(font) => onToolOptionChange('fontFamily', font)}
@@ -552,10 +555,10 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             {/* Alignment */}
             <div className="tool-options-group" style={{ display: 'flex', gap: 2 }}>
                 {[
-                    { value: 'left', icon: AlignLeft, label: 'Left' },
-                    { value: 'center', icon: AlignCenter, label: 'Center' },
-                    { value: 'right', icon: AlignRight, label: 'Right' },
-                    { value: 'justify', icon: AlignJustify, label: 'Justified' }
+                    { value: 'left', icon: AlignLeft, label: t('tooloptions.text.align.left') },
+                    { value: 'center', icon: AlignCenter, label: t('tooloptions.text.align.center') },
+                    { value: 'right', icon: AlignRight, label: t('tooloptions.text.align.right') },
+                    { value: 'justify', icon: AlignJustify, label: t('tooloptions.text.align.justify') }
                 ].map(align => (
                     <button
                         key={align.value}
@@ -577,7 +580,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className={`pref-btn ${toolOptions.textBold ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                     style={{ width: 28, minWidth: 28, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => onToolOptionChange('textBold', !toolOptions.textBold)}
-                    title="Bold"
+                    title={t('tooloptions.text.bold')}
                 >
                     <Bold size={14} />
                 </button>
@@ -585,7 +588,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className={`pref-btn ${toolOptions.textItalic ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                     style={{ width: 28, minWidth: 28, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => onToolOptionChange('textItalic', !toolOptions.textItalic)}
-                    title="Italic"
+                    title={t('tooloptions.text.italic')}
                 >
                     <Italic size={14} />
                 </button>
@@ -593,7 +596,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className={`pref-btn ${toolOptions.textUnderline ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                     style={{ width: 28, minWidth: 28, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => onToolOptionChange('textUnderline', !toolOptions.textUnderline)}
-                    title="Underline"
+                    title={t('tooloptions.text.underline')}
                 >
                     <Underline size={14} />
                 </button>
@@ -601,7 +604,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     className={`pref-btn ${toolOptions.textStrikethrough ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                     style={{ width: 28, minWidth: 28, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => onToolOptionChange('textStrikethrough', !toolOptions.textStrikethrough)}
-                    title="Strikethrough"
+                    title={t('tooloptions.text.strikethrough')}
                 >
                     <Strikethrough size={14} />
                 </button>
@@ -609,11 +612,11 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
             <div className="tool-options-divider" />
 
-            {renderSlider('textLetterSpacing', 'Spacing', -10, 50, 1, 'px')}
+            {renderSlider('textLetterSpacing', t('tooloptions.text.spacing'), -10, 50, 1, 'px')}
 
             <div className="tool-options-divider" />
 
-            {renderSlider('textLineHeight', 'Line H', 0.5, 3, 0.1, '×')}
+            {renderSlider('textLineHeight', t('tooloptions.text.line_height'), 0.5, 3, 0.1, '×')}
         </>
     )
 
@@ -641,10 +644,10 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                             gap: 4
                         }}
                         onClick={() => onToolOptionChange('zoomDirection', 'in')}
-                        title="Zoom In"
+                        title={t('tooloptions.zoom.in_hint')}
                     >
                         <ZoomIn size={14} />
-                        <span>In</span>
+                        <span>{t('tooloptions.zoom.in')}</span>
                     </button>
                     <button
                         className={effectiveDirection === 'out' ? 'tool-option-button active' : 'tool-option-button'}
@@ -662,15 +665,15 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                             gap: 4
                         }}
                         onClick={() => onToolOptionChange('zoomDirection', 'out')}
-                        title="Zoom Out"
+                        title={t('tooloptions.zoom.out_hint')}
                     >
                         <ZoomOut size={14} />
-                        <span>Out</span>
+                        <span>{t('tooloptions.zoom.out')}</span>
                     </button>
                 </div>
                 <div className="tool-options-divider" />
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic', marginLeft: 4 }}>
-                    Hold Cmd/Ctrl to toggle
+                    {t('tooloptions.picker.toggle_hint')}
                 </span>
             </>
         )
@@ -700,8 +703,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             color: foregroundColor
         })
         if (!canvas) return
-        const count = layers.filter((layer) => layer.name.startsWith('Path Fill')).length + 1
-        addLayer(`Path Fill ${count}`, canvas)
+        const count = layers.filter((layer) => layer.name.startsWith(t('tooloptions.path.fill_name'))).length + 1
+        addLayer(`${t('tooloptions.path.fill_name')} ${count}`, canvas)
     }
 
     const handleStrokePath = () => {
@@ -714,8 +717,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             lineWidth: toolOptions.brushSize
         })
         if (!canvas) return
-        const count = layers.filter((layer) => layer.name.startsWith('Path Stroke')).length + 1
-        addLayer(`Path Stroke ${count}`, canvas)
+        const count = layers.filter((layer) => layer.name.startsWith(t('tooloptions.path.stroke_name'))).length + 1
+        addLayer(`${t('tooloptions.path.stroke_name')} ${count}`, canvas)
     }
 
     const canSelectFromPath = !!activePath && activePath.nodes.length >= 2
@@ -728,14 +731,14 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             <div className="tool-options-group">
                 <div style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
                     {[
-                        { mode: 'design', icon: PenTool, label: 'Design' },
-                        { mode: 'edit', icon: MousePointer2, label: 'Edit' },
-                        { mode: 'move', icon: MoveIcon, label: 'Move' }
-                    ].map(({ mode, icon: Icon, label }) => (
+                        { mode: 'design', icon: PenTool, label: t('tooloptions.path.mode.design'), hint: t('tooloptions.path.mode.design_hint') },
+                        { mode: 'edit', icon: MousePointer2, label: t('tooloptions.path.mode.edit'), hint: t('tooloptions.path.mode.edit_hint') },
+                        { mode: 'move', icon: MoveIcon, label: t('tooloptions.path.mode.move'), hint: t('tooloptions.path.mode.move_hint') }
+                    ].map(({ mode, icon: Icon, label, hint }) => (
                         <button
                             key={mode}
                             onClick={() => onToolOptionChange('pathMode', mode as any)}
-                            title={`${label} Mode`}
+                            title={hint}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -765,7 +768,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 <button
                     className={`pref-btn ${toolOptions.pathPolygonal ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
                     onClick={() => onToolOptionChange('pathPolygonal', !toolOptions.pathPolygonal)}
-                    title="Polygonal (Straight lines)"
+                    title={t('tooloptions.path.polygonal_hint')}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -778,7 +781,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     }}
                 >
                     <Hexagon size={14} />
-                    <span>Polygonal</span>
+                    <span>{t('tooloptions.path.polygonal')}</span>
                 </button>
             </div>
 
@@ -788,7 +791,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 <div style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: 4, padding: 2, gap: 1 }}>
                     <button
                         onClick={handleSelectionFromPath}
-                        title={canSelectFromPath ? 'Selection from Path' : 'Need an active path with at least 2 points'}
+                        title={canSelectFromPath ? t('tooloptions.path.selection_hint') : t('tooloptions.path.selection_error')}
                         style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: canSelectFromPath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: canSelectFromPath ? 'pointer' : 'default', opacity: canSelectFromPath ? 1 : 0.5 }}
                         disabled={!canSelectFromPath}
                     >
@@ -796,7 +799,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     </button>
                     <button
                         onClick={handleFillPath}
-                        title={canFillPath ? 'Fill Path (new layer)' : 'Fill requires an active closed path (3+ points)'}
+                        title={canFillPath ? t('tooloptions.path.fill_hint') : t('tooloptions.path.fill_error')}
                         style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: canFillPath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: canFillPath ? 'pointer' : 'default', opacity: canFillPath ? 1 : 0.5 }}
                         disabled={!canFillPath}
                     >
@@ -804,7 +807,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     </button>
                     <button
                         onClick={handleStrokePath}
-                        title={canStrokePath ? 'Stroke Path (new layer)' : 'Need an active path with at least 2 points'}
+                        title={canStrokePath ? t('tooloptions.path.stroke_hint') : t('tooloptions.path.stroke_error')}
                         style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: 'transparent', color: canStrokePath ? 'var(--text-primary)' : 'var(--text-disabled)', cursor: canStrokePath ? 'pointer' : 'default', opacity: canStrokePath ? 1 : 0.5 }}
                         disabled={!canStrokePath}
                     >
@@ -816,7 +819,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
                 <button
                     onClick={() => activePathId && deletePath(activePathId)}
-                    title={canDeleteActivePath ? 'Delete Active Path' : 'No active path'}
+                    title={canDeleteActivePath ? t('tooloptions.path.delete_hint') : t('layers.paths.no_active')}
                     style={{
                         height: 24,
                         width: 28,
@@ -866,13 +869,13 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 // Maybe add antialiasing toggle later
                 return (
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                        Selection tools
+                        {t('tooloptions.selection_tools')}
                     </span>
                 )
             default:
                 return (
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                        No options for this tool
+                        {t('tooloptions.no_options')}
                     </span>
                 )
         }
