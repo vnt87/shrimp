@@ -99,31 +99,44 @@ export default function HistogramPanel() {
                         </div>
 
                         {/* Charts */}
-                        <div className="histogram-chart" style={{ mixBlendMode: 'screen' }}>
+                        <div className="histogram-chart" style={{ backgroundColor: '#0a0a0a', mixBlendMode: 'normal' }}>
                             <svg viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
                                 {histogramData && activeChannels.includes('r') && (
                                     <path
                                         d={generateHistogramPath(histogramData.r, chartW, chartH, maxValue)}
-                                        fill="rgba(255, 0, 0, 0.5)"
+                                        fill="rgba(255, 0, 0, 0.4)"
+                                        stroke="rgba(255, 100, 100, 0.8)"
+                                        strokeWidth="1"
+                                        style={{ mixBlendMode: 'screen' }}
                                     />
                                 )}
                                 {histogramData && activeChannels.includes('g') && (
                                     <path
                                         d={generateHistogramPath(histogramData.g, chartW, chartH, maxValue)}
-                                        fill="rgba(60, 255, 60, 0.7)"
+                                        fill="rgba(0, 255, 0, 0.4)"
+                                        stroke="rgba(100, 255, 100, 0.8)"
+                                        strokeWidth="1"
                                         style={{ mixBlendMode: 'screen' }}
                                     />
                                 )}
                                 {histogramData && activeChannels.includes('b') && (
                                     <path
                                         d={generateHistogramPath(histogramData.b, chartW, chartH, maxValue)}
-                                        fill="rgba(60, 60, 255, 0.7)"
+                                        fill="rgba(0, 0, 255, 0.4)"
+                                        stroke="rgba(100, 100, 255, 0.8)"
+                                        strokeWidth="1"
                                         style={{ mixBlendMode: 'screen' }}
                                     />
                                 )}
-                                {/* Luminance (active by default if RGB are all active or inactive? Logic can vary) */}
-                                {/* For now let's show Luminance if it's explicitly selected or maybe as a background? */}
-                                {/* Typically Apps show RGB + Gray using logic. Let's just stick to RGB for now based on activeChannels */}
+                                {histogramData && activeChannels.includes('lum') && (
+                                    <path
+                                        d={generateHistogramPath(histogramData.lum, chartW, chartH, maxValue)}
+                                        fill="rgba(255, 255, 255, 0.2)"
+                                        stroke="rgba(255, 255, 255, 0.6)"
+                                        strokeWidth="1"
+                                        style={{ mixBlendMode: 'screen' }}
+                                    />
+                                )}
                             </svg>
                         </div>
 

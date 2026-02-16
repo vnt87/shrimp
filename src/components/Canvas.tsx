@@ -543,8 +543,8 @@ function HistogramExtractor({
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const textureRef = useRef<import('pixi.js').RenderTexture | null>(null)
 
-    // Init worker
     useEffect(() => {
+        console.log('[Histogram] V1.3 initializing...')
         // @ts-ignore
         workerRef.current = new HistogramWorker()
         if (workerRef.current) {
@@ -555,20 +555,8 @@ function HistogramExtractor({
                 processingRef.current = false
             }
         }
-        return () => {
-            workerRef.current?.terminate()
-        }
+        return () => workerRef.current?.terminate()
     }, [setHistogramData])
-
-    // Cleanup texture
-    useEffect(() => {
-        return () => {
-            if (textureRef.current) {
-                textureRef.current.destroy(true)
-                textureRef.current = null
-            }
-        }
-    }, [])
 
     const triggerUpdate = useCallback(() => {
         if (!app || !app.renderer || !activeDocumentId || layers.length === 0) {
@@ -578,38 +566,29 @@ function HistogramExtractor({
 
         if (processingRef.current) return
 
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current)
-        }
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
 
-        // Make the callback async to handle extract.pixels promise
         timeoutRef.current = setTimeout(async () => {
             if (!app || !app.renderer) return
-
             processingRef.current = true
 
             try {
-                // Downsample strategy: Render to a small texture
-                const size = 128 // 128x128 is enough for histogram
+                const size = 128
                 if (!textureRef.current) {
                     textureRef.current = RenderTexture.create({ width: size, height: size })
                 }
 
-                // Scaled render to fit stage into 128x128
                 const scale = size / Math.max(app.renderer.width, app.renderer.height, 1)
                 const matrix = new Matrix().scale(scale, scale)
 
                 app.renderer.render({
                     container: app.stage,
                     target: textureRef.current!,
-                    // @ts-ignore - matrix/transform property in v8
+                    // @ts-ignore
                     transform: matrix
                 })
 
-                // Extract pixels (Async in PixiJS v8)
                 const result = await app.renderer.extract.pixels(textureRef.current!)
-
-                // Robust extraction: result could be a raw array or an object { pixels, ... }
                 const pixels = (result as any).pixels || result
 
                 if (pixels && (pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray)) {
@@ -617,20 +596,16 @@ function HistogramExtractor({
                         pixels,
                         width: size,
                         height: size
-                    }, [pixels.buffer]) // Transfer buffer
+                    }, [pixels.buffer])
                 }
             } catch (err) {
                 console.error('[Histogram] Extraction failed', err)
             } finally {
                 processingRef.current = false
             }
-        }, 200) // Debounce 200ms
+        }, 200)
     }, [app, activeDocumentId, layers, setHistogramData])
 
-    // Trigger on relevant changes
-    // We strictly depend on layers and activeDocumentId. 
-    // Ideally we'd depend on a "version" or "dirty" flag to avoid deep diffing,
-    // but React's reference equality on `layers` might be enough *if* immutable updates are used correctly.
     useEffect(() => {
         triggerUpdate()
     }, [triggerUpdate, layers, activeDocumentId])

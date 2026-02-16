@@ -83,7 +83,7 @@ export interface HistogramData {
 
 // --- Multi-Document Types ---
 
-export type ChannelType = 'r' | 'g' | 'b'
+export type ChannelType = 'r' | 'g' | 'b' | 'lum'
 
 export interface EditorContent {
     layers: Layer[]
