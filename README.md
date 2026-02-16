@@ -17,7 +17,9 @@ Inpspirations:
 
 -   **Layer Management**: Create, delete, and organize layers.
 -   **Tools**: Selection, Paint, Transform, Paths, and more.
--   **Filters**: Apply various effects like Blur, Enhance, Distort.
+-   **Adjustment Layers**: Non-destructive effects powered by [PixiJS Filters](https://github.com/pixijs/filters), including Glitch, Pixelate, Old Film, and more.
+-   **Multi-Document Support**: Open and edit multiple images simultaneously in tabs.
+-   **Auto-Save**: State is persistently saved via IndexedDB, allowing you to resume work after closing the browser.
 -   **History**: Robust Undo/Redo functionality.
 -   **Theme**: Dark mode interface optimized for creative work.
 
@@ -27,6 +29,8 @@ Inpspirations:
 -   **Build Tool**: [Vite](https://vitejs.dev/)
 -   **Language**: [TypeScript](https://www.typescriptlang.org/)
 -   **Styling**: CSS (Custom Design System)
+-   **Rendering Engine**: [PixiJS](https://pixijs.com/) (v8)
+-   **State Persistence**: [idb-keyval](https://github.com/jakearchibald/idb-keyval) (IndexedDB)
 -   **Icons**: [Lucide React](https://lucide.dev/)
 
 ## Folder Structure
@@ -94,6 +98,12 @@ The output will be in the `dist/` directory.
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
+
+## Credits
+
+-   **[PixiJS](https://pixijs.com/)**: For the powerful 2D rendering engine.
+-   **[pixi-filters](https://github.com/pixijs/filters)**: For the amazing collection of visual effects.
+-   **[Lucide](https://lucide.dev/)**: For the beautiful icon set.
 
 ## License
 
