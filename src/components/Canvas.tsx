@@ -654,6 +654,7 @@ export default function Canvas({
         setViewportSize,
         cloneSource,
         setCloneSource,
+        brushEngine,
         activeDocumentId,
         // documents // unused
         setHistogramData,
@@ -912,6 +913,22 @@ export default function Canvas({
         }
     }, [viewportRef])
 
+    // Sync Brush Engine Settings
+    useEffect(() => {
+        if (!brushEngine) return
+
+        brushEngine.configureBrush({
+            color: {
+                r: parseInt(foregroundColor.slice(1, 3), 16),
+                g: parseInt(foregroundColor.slice(3, 5), 16),
+                b: parseInt(foregroundColor.slice(5, 7), 16)
+            },
+            opacity: (toolOptions?.brushOpacity ?? 100) / 100,
+            radius: (toolOptions?.brushSize ?? 10) / 2, // Radius vs Diameter
+            hardness: (toolOptions?.brushHardness ?? 100) / 100
+        })
+    }, [brushEngine, foregroundColor, toolOptions])
+
     // Drawing state
     const isDrawing = useRef(false)
     const lastDrawPoint = useRef<{ x: number; y: number } | null>(null)
@@ -953,6 +970,23 @@ export default function Canvas({
 
         if (!ctx) return
 
+        // Adjust coordinates relative to destination layer position
+        const lx = canvasX - layerX
+        const ly = canvasY - layerY
+
+        // Delegate to BrushEngine for brush tool
+        if (activeTool === 'brush') {
+            brushEngine.continueStroke({
+                x: lx,
+                y: ly,
+                pressure: 0.5, // Todo: Get from pointer event if possible
+                time: Date.now()
+            })
+            // Update lastDrawPoint for continuity if needed
+            lastDrawPoint.current = { x: canvasX, y: canvasY }
+            return
+        }
+
         ctx.save()
 
         const size = toolOptions?.brushSize ?? 10
@@ -988,8 +1022,7 @@ export default function Canvas({
         }
 
         // Adjust coordinates relative to destination layer position
-        const lx = canvasX - layerX
-        const ly = canvasY - layerY
+        // (lx, ly calculated above)
 
         if (isClone && cloneSource) {
             // Clone Stamp Implementation
@@ -1769,6 +1802,20 @@ export default function Canvas({
             isDrawing.current = true
             lastDrawPoint.current = null
 
+            // Start Stroke for Brush Engine
+            if (activeTool === 'brush' && activeLayerId) {
+                const layer = layers.find(l => l.id === activeLayerId)
+                if (layer && layer.data) {
+                    brushEngine.setSurface(layer.data)
+                    brushEngine.startStroke({
+                        x: (canvasX - layer.x),
+                        y: (canvasY - layer.y),
+                        pressure: 0.5,
+                        time: Date.now()
+                    })
+                }
+            }
+
             let cloneSourceCanvas: HTMLCanvasElement | undefined
             if (activeTool === 'clone') {
                 if (toolOptions?.cloneSampleMode === 'all' && pixiAppRef.current && layersContainerRef.current) {
@@ -2085,10 +2132,20 @@ export default function Canvas({
 
         // Finish drawing stroke
         if (isDrawing.current && activeLayerId) {
-            const layer = layers.find(l => l.id === activeLayerId)
-            if (layer && layer.data) {
-                // Commit final state to history
-                updateLayerData(activeLayerId, layer.data, true)
+
+            if (activeTool === 'brush') {
+                brushEngine.endStroke()
+                // Force update layer data
+                const layer = layers.find(l => l.id === activeLayerId)
+                if (layer && layer.data) {
+                    updateLayerData(activeLayerId, layer.data, true)
+                }
+            } else {
+                const layer = layers.find(l => l.id === activeLayerId)
+                if (layer && layer.data) {
+                    // Commit final state to history
+                    updateLayerData(activeLayerId, layer.data, true)
+                }
             }
             isDrawing.current = false
             lastDrawPoint.current = null

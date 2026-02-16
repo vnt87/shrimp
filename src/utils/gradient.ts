@@ -1,3 +1,6 @@
+import { GradientResource } from '../types/gradient'
+import { generateGradientLUT } from './gradientMath'
+
 export type GradientType = 'linear' | 'radial'
 export type GradientAffectedArea = 'layer' | 'selection'
 
@@ -19,6 +22,7 @@ interface RenderGradientParams {
     type: GradientType
     affectedArea: GradientAffectedArea
     selectionContains?: (canvasX: number, canvasY: number) => boolean
+    gradientResource?: GradientResource | null
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
@@ -44,6 +48,9 @@ export function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
     return cloned
 }
 
+// Cache LUTs to avoid re-generating for the same gradient during drag
+const LUT_CACHE = new Map<string, Uint8ClampedArray>();
+
 export function renderGradientToLayer(params: RenderGradientParams): HTMLCanvasElement {
     const {
         baseCanvas,
@@ -57,7 +64,8 @@ export function renderGradientToLayer(params: RenderGradientParams): HTMLCanvasE
         opacity,
         type,
         affectedArea,
-        selectionContains
+        selectionContains,
+        gradientResource
     } = params
 
     const output = cloneCanvas(baseCanvas)
@@ -67,14 +75,27 @@ export function renderGradientToLayer(params: RenderGradientParams): HTMLCanvasE
     const imageData = ctx.getImageData(0, 0, output.width, output.height)
     const data = imageData.data
 
-    const [fgR, fgG, fgB] = hexToRgb(foregroundColor)
-    const [bgR, bgG, bgB] = hexToRgb(backgroundColor)
     const toolAlpha = clamp01(opacity / 100)
-
     const dx = end.x - start.x
     const dy = end.y - start.y
     const lenSq = dx * dx + dy * dy
     const radius = Math.sqrt(lenSq)
+
+    // Prepared colors for fallback (simple 2-color)
+    const [fgR, fgG, fgB] = hexToRgb(foregroundColor)
+    const [bgR, bgG, bgB] = hexToRgb(backgroundColor)
+
+    // LUT Preparation
+    let lut: Uint8ClampedArray | null = null;
+    let lutSize = 0;
+
+    if (gradientResource) {
+        if (!LUT_CACHE.has(gradientResource.id)) {
+            LUT_CACHE.set(gradientResource.id, generateGradientLUT(gradientResource));
+        }
+        lut = LUT_CACHE.get(gradientResource.id)!;
+        lutSize = lut.length / 4;
+    }
 
     for (let y = 0; y < output.height; y++) {
         for (let x = 0; x < output.width; x++) {
@@ -106,10 +127,22 @@ export function renderGradientToLayer(params: RenderGradientParams): HTMLCanvasE
 
             if (reverse) t = 1 - t
 
-            const srcR = Math.round(mix(fgR, bgR, t))
-            const srcG = Math.round(mix(fgG, bgG, t))
-            const srcB = Math.round(mix(fgB, bgB, t))
-            const srcA = toolAlpha
+            let srcR, srcG, srcB, srcA;
+
+            if (lut) {
+                // LUT Lookup
+                const lutIndex = Math.floor(t * (lutSize - 1)) * 4;
+                srcR = lut[lutIndex];
+                srcG = lut[lutIndex + 1];
+                srcB = lut[lutIndex + 2];
+                srcA = (lut[lutIndex + 3] / 255) * toolAlpha;
+            } else {
+                // Fallback Linear Interpolation
+                srcR = Math.round(mix(fgR, bgR, t))
+                srcG = Math.round(mix(fgG, bgG, t))
+                srcB = Math.round(mix(fgB, bgB, t))
+                srcA = toolAlpha
+            }
 
             const i = (y * output.width + x) * 4
             const dstR = data[i]
@@ -119,10 +152,7 @@ export function renderGradientToLayer(params: RenderGradientParams): HTMLCanvasE
 
             const outA = srcA + dstA * (1 - srcA)
             if (outA <= 0) {
-                data[i] = 0
-                data[i + 1] = 0
-                data[i + 2] = 0
-                data[i + 3] = 0
+                data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 0;
                 continue
             }
 

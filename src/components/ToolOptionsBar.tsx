@@ -42,9 +42,9 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         addLayer,
         deletePath,
         foregroundColor,
-        backgroundColor,
         canvasSize,
-        layers
+        layers,
+        activeGradient
     } = useEditor()
     const { t } = useLanguage()
 
@@ -72,7 +72,6 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
     const {
         brushPresets, addBrushPreset,
-        gradientPresets, addGradientPreset,
         textStylePresets, addTextStylePreset
     } = usePresets()
 
@@ -288,51 +287,54 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
-    const handleSaveGradientPreset = () => {
-        const name = prompt(t('tooloptions.enter_preset_name'), `Gradient ${gradientPresets.length + 1}`)
-        if (name) {
-            // Placeholder: In a real app we'd grab the actual stops from a gradient editor
-            // For now, we'll just save a basic linear gradient defined by current colors if possible,
-            // but since we don't have a gradient editor yet, we can't really save *new* custom gradients
-            // other than what's hardcoded or FG/BG.
-            // Let's just save the current type for now as a "setting" preset
-            addGradientPreset({
-                name,
-                type: toolOptions.gradientType,
-                colors: [{ offset: 0, color: foregroundColor }, { offset: 1, color: backgroundColor }]
-            })
-        }
-    }
 
     const renderGradientOptions = () => (
         <>
-            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <select
-                    className="tool-options-select"
-                    style={{ maxWidth: 100, height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
-                    onChange={(e) => {
-                        const preset = gradientPresets.find(p => p.id === e.target.value)
-                        if (preset) {
-                            onToolOptionChange('gradientType', preset.type)
-                            // Note: We'd also set the colors here if we had a gradient editor state
-                        }
-                        e.target.value = ''
-                    }}
-                    value=""
+            <div className={`tool-options-group ${!activeGradient ? 'opacity-50 grayscale' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div
+                    className="w-24 h-6 border border-gray-600 rounded overflow-hidden cursor-pointer relative group"
+                    title={activeGradient?.name || 'No gradient selected'}
+                // Could add onClick to open Gradient Panel?
                 >
-                    <option value="" disabled>{t('tooloptions.presets')}</option>
-                    {gradientPresets.map(preset => (
-                        <option key={preset.id} value={preset.id}>{preset.name}</option>
-                    ))}
-                </select>
-                <button
-                    className="pref-btn pref-btn-secondary"
-                    style={{ height: 24, fontSize: 12, padding: '0 6px' }}
-                    onClick={handleSaveGradientPreset}
-                    title={t('tooloptions.gradient.save_hint')}
-                >
-                    +
-                </button>
+                    {activeGradient ? (
+                        <canvas
+                            width={96}
+                            height={24}
+                            className="w-full h-full"
+                            style={{ display: 'block' }}
+                            ref={canvas => {
+                                if (canvas && activeGradient) {
+                                    const ctx = canvas.getContext('2d')
+                                    if (ctx) {
+                                        // Quick simple preview render
+                                        // Ideally cache this or reuse generation util
+                                        // For now let's just use linear gradient approximation for UI
+                                        // const grad = ctx.createLinearGradient(0, 0, canvas.width, 0)
+                                        // Since we have complex gradients, we should use the LUT or evaluate
+                                        // But for small preview, maybe just a few stops?
+                                        // Or better: use generateGradientLUT and putImageData
+                                        import('../utils/gradientMath').then(({ generateGradientLUT }) => {
+                                            const lut = generateGradientLUT(activeGradient, canvas.width)
+                                            const imgData = ctx.createImageData(canvas.width, 1)
+                                            for (let i = 0; i < canvas.width; i++) {
+                                                imgData.data[i * 4] = lut[i * 4]
+                                                imgData.data[i * 4 + 1] = lut[i * 4 + 1]
+                                                imgData.data[i * 4 + 2] = lut[i * 4 + 2]
+                                                imgData.data[i * 4 + 3] = lut[i * 4 + 3]
+                                            }
+                                            // Stretch 1 pixel height to full height
+                                            createImageBitmap(imgData).then(bitmap => {
+                                                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+                                            })
+                                        })
+                                    }
+                                }
+                            }}
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-gray-800 flex items-center justify-center text-[10px] text-gray-500">None</div>
+                    )}
+                </div>
             </div>
             <div className="tool-options-divider" />
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

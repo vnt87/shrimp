@@ -3,6 +3,10 @@ import { PersistenceManager } from '../utils/persistence'
 
 import { createVectorPath, duplicatePath as duplicateVectorPath } from '../path/commands'
 import type { VectorPath } from '../path/types'
+import { BrushEngine } from '../utils/brushEngine'
+import { BrushPreset } from '../types/brush'
+import type { GradientResource } from '../types/gradient'
+import { GGRParser } from '../utils/ggrParser'
 
 export interface LayerFilter {
     type: 'blur' | 'brightness' | 'hue-saturation' | 'noise' | 'color-matrix' | 'pixelate' | 'glitch' | 'old-film' | 'adjustment' | 'ascii' | 'dot' | 'emboss' | 'cross-hatch' | 'bulge-pinch' | 'twist' | 'reflection' | 'shockwave' | 'crt' | 'rgb-split' | 'bloom' | 'godray' | 'tilt-shift' | 'zoom-blur' | 'motion-blur' | 'custom'
@@ -237,6 +241,19 @@ interface EditorContextType {
     // Histogram Data (Transient)
     histogramData: HistogramData | null
     setHistogramData: (data: HistogramData | null) => void
+
+    // Brush Engine
+    brushEngine: BrushEngine
+    availableBrushes: BrushPreset[]
+    activeBrushId: string | null
+    setActiveBrushId: (id: string) => void
+    importBrush: (blob: Blob, name: string) => Promise<void>
+
+    // Gradients
+    availableGradients: GradientResource[]
+    activeGradient: GradientResource | null
+    setActiveGradient: (gradient: GradientResource | null) => void
+    importGradient: (file: File) => Promise<void>
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
@@ -473,6 +490,64 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const [viewTransform, setViewTransform] = useState<{ scale: number, offsetX: number, offsetY: number }>({ scale: 1, offsetX: 0, offsetY: 0 })
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
     const [histogramData, setHistogramData] = useState<HistogramData | null>(null)
+
+    // Brush Engine State
+    const brushEngine = useMemo(() => new BrushEngine(), [])
+    const [availableBrushes, setAvailableBrushes] = useState<BrushPreset[]>([])
+    const [activeBrushId, setActiveBrushId] = useState<string | null>(null)
+
+    // Initialize Brush Engine
+    useEffect(() => {
+        brushEngine.init().catch(console.error)
+    }, [brushEngine])
+
+    // Update engine when active brush changes
+    useEffect(() => {
+        if (activeBrushId) {
+            const brush = availableBrushes.find(b => b.id === activeBrushId)
+            if (brush) {
+                brushEngine.configureBrush(brush.settings)
+            }
+        }
+    }, [activeBrushId, availableBrushes, brushEngine])
+
+    // Gradients State
+    const [availableGradients, setAvailableGradients] = useState<GradientResource[]>([])
+    const [activeGradient, setActiveGradient] = useState<GradientResource | null>(null)
+
+    // Load default gradients (or saved ones later)
+    // For now, we can perhaps add a default simple one or just leave empty? 
+    // Let's add FG-BG conceptual support later.
+
+    // Import Gradient Action
+    const importGradient = useCallback(async (file: File) => {
+        try {
+            const text = await file.text()
+            const gradient = GGRParser.parse(text, Math.random().toString(36).substr(2, 9))
+            // Use filename as name if not found? Parser handles name parsing.
+
+            setAvailableGradients(prev => [...prev, gradient])
+            setActiveGradient(gradient)
+        } catch (e) {
+            console.error('Failed to parse gradient:', e)
+            alert('Failed to import gradient')
+        }
+    }, [])
+
+    const importBrush = useCallback(async (blob: Blob, name: string) => {
+        // Detect format from header or extension (passed in name or metadata?)
+        // For now assume .gbr if unknown
+        let format: 'gbr' | 'myb' = 'gbr'
+        if (name.endsWith('.myb')) format = 'myb'
+
+        const arrayBuffer = await blob.arrayBuffer()
+        // If myb, we might need text
+        const data = format === 'myb' ? await blob.text() : arrayBuffer
+
+        const preset = await brushEngine.loadBrush(data, format, name)
+        setAvailableBrushes(prev => [...prev, preset])
+        setActiveBrushId(preset.id)
+    }, [brushEngine])
 
     useEffect(() => {
         if (!activePath) {
@@ -1963,6 +2038,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             commitTransform,
             // Phase 1
             updateFilter,
+            // Phase 3: Brush Engine
+            brushEngine,
+            availableBrushes,
+            activeBrushId,
+            setActiveBrushId,
+            importBrush,
             toggleFilter,
             updateLayerTextStyle,
 
@@ -1992,7 +2073,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setHistogramData,
             activeChannels,
             toggleChannel,
-            setActiveChannels
+            setActiveChannels,
+
+            // Gradients
+            availableGradients,
+            activeGradient,
+            setActiveGradient,
+            importGradient
         }}>
             {children}
         </EditorContext.Provider>

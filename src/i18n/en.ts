@@ -79,9 +79,9 @@ export const en = {
     'menu.adjustment_layers': 'Adjustment Layers',
 
     'menu.windows': 'Windows',
-    'menu.windows.brushes': 'Right Panel Section 1',
-    'menu.windows.layers': 'Right Panel Section 2',
-    'menu.windows.histogram': 'Right Panel Section 3',
+    'menu.windows.brushes': 'Brushes',
+    'menu.windows.layers': 'Layers',
+    'menu.windows.histogram': 'Histogram',
 
     'menu.help': 'Help',
     'menu.help.shortcuts': 'Keyboard Shortcuts',

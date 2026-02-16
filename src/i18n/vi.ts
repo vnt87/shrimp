@@ -81,9 +81,9 @@ export const vi: Record<TranslationKey, string> = {
     'menu.adjustment_layers': 'Lớp điều chỉnh',
 
     'menu.windows': 'Cửa sổ',
-    'menu.windows.brushes': 'Phần Panel Phải 1',
-    'menu.windows.layers': 'Phần Panel Phải 2',
-    'menu.windows.histogram': 'Phần Panel Phải 3',
+    'menu.windows.brushes': 'Cọ vẽ',
+    'menu.windows.layers': 'Lớp',
+    'menu.windows.histogram': 'Biểu đồ',
 
     'menu.help': 'Trợ giúp',
     'menu.help.shortcuts': 'Phím tắt',
