@@ -234,6 +234,7 @@ export const vi: Record<TranslationKey, string> = {
     'tool.text': 'Văn bản',
     'tool.zoom': 'Phóng to/Thu nhỏ',
     'tool.paths': 'Đường dẫn',
+    'tool.clone': 'Con dấu sao chép',
     'tool.transform': 'Biến đổi',
     'toolgroup.selection': 'Công cụ chọn',
     'toolgroup.paint': 'Công cụ vẽ',
@@ -249,6 +250,11 @@ export const vi: Record<TranslationKey, string> = {
     'statusbar.angle': 'Góc',
     'statusbar.color_profile': 'Hồ sơ màu',
     'statusbar.bits_per_channel': '8 bits mỗi kênh',
+
+    // Channels
+    'channel.red': 'Đỏ',
+    'channel.green': 'Xanh lá',
+    'channel.blue': 'Xanh dương',
 
     // Layers Panel
     'layers.tab.layers': 'Lớp',

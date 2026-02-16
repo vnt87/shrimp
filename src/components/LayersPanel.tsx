@@ -292,7 +292,10 @@ export default function LayersPanel() {
         canRedo,
         historyEntries,
         historyCurrentIndex,
-        restoreHistoryIndex
+        restoreHistoryIndex,
+        activeChannels,
+        toggleChannel,
+        setActiveChannels
     } = useEditor()
     const [activeTab, setActiveTab] = useState<'layers' | 'channels' | 'paths' | 'history'>('layers')
     const { t } = useLanguage()
@@ -391,6 +394,68 @@ export default function LayersPanel() {
                 </div>
                 <PanelMenu panelId="layers" />
             </div>
+
+            {
+                activeTab === 'channels' && (
+                    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
+                        {/* Composite RGB */}
+                        <div
+                            className={`layer-row${activeChannels.length === 3 ? ' selected' : ''}`}
+                            onClick={() => setActiveChannels(['r', 'g', 'b'])}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <div className="layer-info" style={{ gap: 8 }}>
+                                <span className="layer-name">RGB</span>
+                            </div>
+                            <div className="layer-status-icon">
+                                <Eye size={16} />
+                            </div>
+                        </div>
+
+                        {/* Red */}
+                        <div
+                            className={`layer-row${activeChannels.includes('r') && activeChannels.length < 3 ? ' selected' : ''}`}
+                            onClick={() => toggleChannel('r')}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <div className="layer-info" style={{ gap: 8 }}>
+                                <span className="layer-name">{t('channel.red' as any) || 'Red'}</span>
+                            </div>
+                            <div className="layer-status-icon">
+                                {activeChannels.includes('r') ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </div>
+                        </div>
+
+                        {/* Green */}
+                        <div
+                            className={`layer-row${activeChannels.includes('g') && activeChannels.length < 3 ? ' selected' : ''}`}
+                            onClick={() => toggleChannel('g')}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <div className="layer-info" style={{ gap: 8 }}>
+                                <span className="layer-name">{t('channel.green' as any) || 'Green'}</span>
+                            </div>
+                            <div className="layer-status-icon">
+                                {activeChannels.includes('g') ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </div>
+                        </div>
+
+                        {/* Blue */}
+                        <div
+                            className={`layer-row${activeChannels.includes('b') && activeChannels.length < 3 ? ' selected' : ''}`}
+                            onClick={() => toggleChannel('b')}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <div className="layer-info" style={{ gap: 8 }}>
+                                <span className="layer-name">{t('channel.blue' as any) || 'Blue'}</span>
+                            </div>
+                            <div className="layer-status-icon">
+                                {activeChannels.includes('b') ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             {
                 activeTab === 'layers' && (
@@ -810,16 +875,7 @@ export default function LayersPanel() {
                 )
             }
 
-            {
-                (activeTab === 'channels') && (
-                    <>
-                        <div className="dialogue-divider" />
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: 12, padding: 12 }}>
-                            Channels panel is not implemented yet.
-                        </div>
-                    </>
-                )
-            }
+
 
             <div className="dialogue-handle" style={{ marginBottom: 1 }} />
             <Suspense fallback={null}>

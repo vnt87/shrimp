@@ -1,7 +1,7 @@
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { Application, extend, useTick } from '@pixi/react'
-import { Container, Sprite, Graphics, Text } from 'pixi.js'
+import { Container, Sprite, Graphics, Text, ColorMatrixFilter } from 'pixi.js'
 import EmptyState from './EmptyState'
 import { useEditor, type Layer, type TransformData } from './EditorContext'
 import PixiLayerSprite from './PixiLayerSprite'
@@ -295,11 +295,13 @@ function PixiLayerRecursive({ layer, hiddenLayerId }: { layer: import('./EditorC
 function BrushCursor({
     cursorRef,
     toolOptions,
-    activeTool
+    activeTool,
+    isAltPressed
 }: {
     cursorRef: React.MutableRefObject<{ x: number, y: number }>
     toolOptions?: ToolOptions
     activeTool: string
+    isAltPressed?: boolean
 }) {
     const graphicsRef = useRef<import('pixi.js').Graphics>(null)
     const { brushSize } = toolOptions || { brushSize: 10 }
@@ -309,7 +311,8 @@ function BrushCursor({
             const { x, y } = cursorRef.current
 
             // Only show for drawing tools
-            const visible = ['brush', 'pencil', 'eraser'].includes(activeTool)
+            // Hide if Clone Stamp + Alt (Source Selection Mode) -> We want crosshair
+            const visible = ['brush', 'pencil', 'eraser', 'clone'].includes(activeTool) && !(activeTool === 'clone' && isAltPressed)
             graphicsRef.current.visible = visible
 
             if (visible) {
@@ -323,11 +326,54 @@ function BrushCursor({
                 // Black inner for contrast
                 graphicsRef.current.circle(0, 0, (brushSize / 2) - 1)
                 graphicsRef.current.stroke({ width: 1, color: 0x000000, alpha: 0.5 })
+                // Black inner for contrast
+                graphicsRef.current.circle(0, 0, (brushSize / 2) - 1)
+                graphicsRef.current.stroke({ width: 1, color: 0x000000, alpha: 0.5 })
             }
         }
     })
 
     return <graphics ref={graphicsRef} draw={() => { }} />
+}
+
+/**
+ * Shows the Clone Source position
+ */
+function CloneSourceCursor({
+    source
+}: {
+    source: { x: number, y: number } | null
+}) {
+    // We need to track mouse down/up to know when to move the source indicator in tandem with the brush
+    // Actually, we can just use the global cursor position logic if we had access to drag start.
+    // simpler: The Canvas component knows when dragging happens. 
+    // But passing "current offset" to this component might be cleaner.
+    // For now, let's just show the static source point. 
+    // Implementing "moving source" visual requires knowing the stroke offset.
+
+    // Let's just draw a crosshair at 'source' for now.
+
+    const draw = useCallback((g: import('pixi.js').Graphics) => {
+        g.clear()
+        if (!source) return
+
+        // Draw crosshair
+        g.moveTo(-10, 0)
+        g.lineTo(10, 0)
+        g.moveTo(0, -10)
+        g.lineTo(0, 10)
+        g.stroke({ width: 1, color: 0x5294e2, alpha: 1 }) // Blue
+        g.circle(0, 0, 3)
+        g.stroke({ width: 1, color: 0xffffff, alpha: 1 })
+    }, [source])
+
+    if (!source) return null
+
+    return <graphics
+        draw={draw}
+        x={source.x}
+        y={source.y}
+    />
 }
 
 // Wrapper to safely render TransformOverlay only when layerId is present
@@ -340,44 +386,108 @@ function TransformOverlayWrapper({ layerId }: { layerId: string | null }) {
  * Inner Pixi scene that renders layers and selection overlay.
  * Must be a child of <Application> to use useApplication().
  */
-function PixiScene({
-    transform,
-    cursorRef,
-    toolOptions,
-    activeTool,
-    hiddenLayerId
-}: {
+function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerId, isAltPressed }: {
     transform: CanvasTransform
     cursorRef: React.MutableRefObject<{ x: number, y: number }>
-    toolOptions?: ToolOptions
+    toolOptions: any
     activeTool: string
     hiddenLayerId?: string | null
+    isAltPressed?: boolean
 }) {
-    const { layers, selection, activeLayerId } = useEditor()
+    const { activeDocumentId, activeChannels, layers, selection, activeLayerId } = useEditor()
+    const activeDocId = activeDocumentId
+
+    // Calculate channel filter
+    const channelFilter = useMemo(() => {
+        // If all channels active, no filter needed
+        if (activeChannels.length === 3) return null
+
+        const filter = new ColorMatrixFilter()
+
+        // Masking behavior: simple zeroing out of inactive channels
+        const r = activeChannels.includes('r') ? 1 : 0
+        const g = activeChannels.includes('g') ? 1 : 0
+        const b = activeChannels.includes('b') ? 1 : 0
+
+        const isSingleChannel = activeChannels.length === 1
+
+        if (isSingleChannel) {
+            if (r) {
+                // Red channel view: Show Red as Grayscale
+                filter.matrix = [
+                    1, 0, 0, 0, 0,
+                    1, 0, 0, 0, 0,
+                    1, 0, 0, 0, 0,
+                    0, 0, 0, 1, 0
+                ]
+            } else if (g) {
+                // Green channel view: Show Green as Grayscale
+                filter.matrix = [
+                    0, 1, 0, 0, 0,
+                    0, 1, 0, 0, 0,
+                    0, 1, 0, 0, 0,
+                    0, 0, 0, 1, 0
+                ]
+            } else if (b) {
+                // Blue channel view: Show Blue as Grayscale
+                filter.matrix = [
+                    0, 0, 1, 0, 0,
+                    0, 0, 1, 0, 0,
+                    0, 0, 1, 0, 0,
+                    0, 0, 0, 1, 0
+                ]
+            }
+        } else {
+            // zero out inactive channels
+            filter.matrix = [
+                r, 0, 0, 0, 0,
+                0, g, 0, 0, 0,
+                0, 0, b, 0, 0,
+                0, 0, 0, 1, 0
+            ]
+        }
+
+        return filter
+    }, [activeChannels])
+
+    if (!activeDocId) return null
 
     return (
         <pixiContainer
             x={transform.offsetX}
             y={transform.offsetY}
-            scale={transform.scale}
+            scale={{ x: transform.scale, y: transform.scale }}
+            filters={channelFilter ? [channelFilter] : []}
         >
-            {/* GPU-rendered layers (recursive) */}
-            {layers.slice().reverse().map(layer => (
+            {layers.slice().reverse().map((layer) => (
                 <PixiLayerRecursive key={layer.id} layer={layer} hiddenLayerId={hiddenLayerId} />
             ))}
 
-            {/* GPU-rendered selection overlay */}
-            {selection && selection.width > 0 && selection.height > 0 && (
-                <SelectionOverlay selection={selection} />
-            )}
+            {/* Selection overlay */}
+            {selection && <SelectionOverlay selection={selection} />}
+
+            {/* Crop Overlay */}
+            {activeTool === 'crop' && <CropOverlay
+                scale={transform.scale}
+                offsetX={transform.offsetX}
+                offsetY={transform.offsetY}
+                onCrop={() => { }} // dummy for now, Canvas handles interaction
+                onCancel={() => { }}
+            />}
 
             {/* Brush Cursor Overlay */}
-            <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} />
+            {/* Brush Cursor Overlay */}
+            <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} isAltPressed={isAltPressed} />
+
+            {/* Clone Source Indicator */}
+            {activeTool === 'clone' && <CloneSourceCursor source={useEditor().cloneSource} />}
 
             {/* Transform Overlay (Pixi) */}
-            {activeTool === 'transform' && (
-                <TransformOverlayWrapper layerId={activeLayerId} />
-            )}
+            {
+                activeTool === 'transform' && (
+                    <TransformOverlayWrapper layerId={activeLayerId} />
+                )
+            }
         </pixiContainer>
     )
 }
@@ -423,7 +533,11 @@ export default function Canvas({
         setCursorInfo,
         viewTransform: transform,
         setViewTransform: setTransform, // Add this
-        setViewportSize
+        setViewportSize,
+        cloneSource,
+        setCloneSource,
+        activeDocumentId
+        // documents // unused
     } = useEditor()
 
     const windowSize = useWindowSize()
@@ -541,7 +655,16 @@ export default function Canvas({
     const [isPanning, setIsPanning] = useState(false)
     const [isSpaceHeld, setIsSpaceHeld] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
-    const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0, layerX: 0, layerY: 0 })
+    const dragStart = useRef({
+        x: 0,
+        y: 0,
+        offsetX: 0,
+        offsetY: 0,
+        layerX: 0,
+        layerY: 0,
+        canvasX: 0,
+        canvasY: 0
+    })
     const cursorRef = useRef({ x: 0, y: 0 })
 
     // Guide dragging state
@@ -591,17 +714,16 @@ export default function Canvas({
 
     // Modifier key state for Picker
     const [isCmdPressed, setIsCmdPressed] = useState(false)
+    const [isAltPressed, setIsAltPressed] = useState(false)
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Meta' || e.key === 'Control') {
-                setIsCmdPressed(true)
-            }
+            if (e.key === 'Alt') setIsAltPressed(true)
+            if (e.key === 'Meta' || e.key === 'Control') setIsCmdPressed(true)
         }
         const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.key === 'Meta' || e.key === 'Control') {
-                setIsCmdPressed(false)
-            }
+            if (e.key === 'Alt') setIsAltPressed(false)
+            if (e.key === 'Meta' || e.key === 'Control') setIsCmdPressed(false)
         }
         window.addEventListener('keydown', handleKeyDown)
         window.addEventListener('keyup', handleKeyUp)
@@ -685,6 +807,11 @@ export default function Canvas({
         const hardness = (toolOptions?.brushHardness ?? 100) / 100
         const isEraser = activeTool === 'eraser'
         const isPencil = activeTool === 'pencil'
+        const isClone = activeTool === 'clone'
+
+        // If cloning but no source, do nothing or warn? 
+        // For now, if no source, we return.
+        if (isClone && !cloneSource) return
 
         ctx.save()
         ctx.globalAlpha = opacity
@@ -700,8 +827,11 @@ export default function Canvas({
             ctx.imageSmoothingEnabled = false
         }
 
-        // Apply hardness via shadow (soft brush)
-        if (!isPencil && hardness < 1) {
+        // Apply hardness via shadow (soft brush), but NOT for clone stamp (cloning usually wants hard or soft edge via clipping/masking ideally, but shadow doesn't work well for image copy)
+        // Actually shadowBlur works for 'filling', but for drawImage it's complex.
+        // For Clone Stamp, to support hardness < 1, we might need a brush mask or radial gradient.
+        // For MVP, let's ignore hardness for Clone Stamp or just use it as is (might blur the edges if we use shadow).
+        if (!isPencil && !isClone && hardness < 1) {
             ctx.shadowBlur = size * (1 - hardness) * 0.5
             ctx.shadowColor = isEraser ? 'rgba(0,0,0,1)' : foregroundColor
         }
@@ -710,7 +840,42 @@ export default function Canvas({
         const lx = canvasX - layer.x
         const ly = canvasY - layer.y
 
-        if (isFirst || !lastDrawPoint.current) {
+        if (isClone && cloneSource) {
+            // Clone Stamp Implementation
+            const dx = cloneSource.x - dragStart.current.canvasX
+            const dy = cloneSource.y - dragStart.current.canvasY
+
+            const sourceX = canvasX + dx
+            const sourceY = canvasY + dy
+
+            // We want to draw a circle of content from sourceX,sourceY at canvasX,canvasY.
+            // To do this properly with round brush:
+            // ctx.beginPath(); ctx.arc(lx, ly, size/2, ...); ctx.clip();
+            // ctx.drawImage(layer.data, sourceX - size/2, sourceY - size/2, size, size, lx - size/2, ly - size/2, size, size);
+
+            // However, doing this for every point in a stroke is expensive and might look weird (stamping modulation).
+            // But it is the standard way for basic clone stamp.
+
+            ctx.beginPath()
+            ctx.arc(lx, ly, size / 2, 0, Math.PI * 2)
+            ctx.clip()
+
+            // Draw from the layer data itself (source)
+            // Note: source coordinates are Canvas coordinates (0,0 is top-left of document).
+            // layer.data coordinates: 0,0 is layer.x, layer.y.
+            // So we need to map Source Global -> Source Layer Local.
+            // SourceLayerLocal = SourceGlobal - layer.x, SourceGlobal - layer.y
+
+            const srcLocalX = sourceX - layer.x
+            const srcLocalY = sourceY - layer.y
+
+            ctx.drawImage(layer.data,
+                srcLocalX - size / 2, srcLocalY - size / 2, size, size,
+                lx - size / 2, ly - size / 2, size, size
+            )
+
+            // Reset clip? restore() handles it.
+        } else if (isFirst || !lastDrawPoint.current) {
             // Single dot
             ctx.beginPath()
             ctx.arc(lx, ly, size / 2, 0, Math.PI * 2)
@@ -734,7 +899,7 @@ export default function Canvas({
         const newCtx = newCanvas.getContext('2d')
         newCtx?.drawImage(layer.data, 0, 0)
         updateLayerData(activeLayerId, newCanvas, history)
-    }, [activeLayerId, layers, activeTool, toolOptions, foregroundColor, updateLayerData])
+    }, [activeLayerId, layers, activeTool, toolOptions, foregroundColor, updateLayerData, cloneSource])
 
     const isPointInSelection = useCallback((x: number, y: number) => {
         if (!selection) return false
@@ -1352,14 +1517,27 @@ export default function Canvas({
                 canvasY: layer.y,
             })
         }
-    }, [activeLayerId, layers])
+    }, [activeLayerId, layers, onToolChange])
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        if (!viewportRef) return
+        if (!activeDocumentId) return // Ensure active document
+
         if (e.detail === 2) {
             handleDoubleClick()
             return
         }
-        if (!viewportRef) return
+
+        const rect = viewportRef.getBoundingClientRect()
+        // Coordinates in canvas space
+        const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
+        const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
+
+        // Clone Stamp Source Setting
+        if (activeTool === 'clone' && isAltPressed) {
+            setCloneSource({ x: canvasX, y: canvasY })
+            return
+        }
 
         // Panning (Space held or Middle click)
         if (isSpaceHeld || e.button === 1) {
@@ -1372,16 +1550,12 @@ export default function Canvas({
                 offsetX: transform.offsetX,
                 offsetY: transform.offsetY,
                 layerX: 0,
-                layerY: 0
+                layerY: 0,
+                canvasX,
+                canvasY
             }
             return
         }
-
-        const rect = viewportRef.getBoundingClientRect()
-        // Coordinates in canvas space
-        const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
-        const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
-
         if (activeTool === 'move' && activeLayerId) {
             const layer = layers.find(l => l.id === activeLayerId)
 
@@ -1412,7 +1586,9 @@ export default function Canvas({
                     offsetX: 0,
                     offsetY: 0,
                     layerX: clickedTextLayer.x,
-                    layerY: clickedTextLayer.y
+                    layerY: clickedTextLayer.y,
+                    canvasX,
+                    canvasY
                 }
                 return;
             }
@@ -1425,9 +1601,23 @@ export default function Canvas({
                     offsetX: 0,
                     offsetY: 0,
                     layerX: layer.x,
-                    layerY: layer.y
+                    layerY: layer.y,
+                    canvasX,
+                    canvasY
                 }
             }
+        } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone') {
+            setIsDragging(true)
+            isDrawing.current = true
+            lastDrawPoint.current = null
+            dragStart.current = {
+                ...dragStart.current,
+                x: e.clientX,
+                y: e.clientY,
+                canvasX,
+                canvasY
+            }
+            drawStrokeTo(canvasX, canvasY, true, false)
         } else if (activeTool === 'rect-select' || activeTool === 'ellipse-select') {
             setIsDragging(true)
             isSelecting.current = true
@@ -1452,11 +1642,6 @@ export default function Canvas({
             })
         } else if (activeTool === 'wand-select') {
             magicWandSelect(canvasX, canvasY)
-        } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser') {
-            setIsDragging(true)
-            isDrawing.current = true
-            lastDrawPoint.current = null
-            drawStrokeTo(canvasX, canvasY, true, false)
         } else if (activeTool === 'gradient') {
             if (!activeLayerId) return
             const layer = layers.find((l: Layer) => l.id === activeLayerId)
@@ -1540,7 +1725,7 @@ export default function Canvas({
 
             animateTo({ scale: targetScale, offsetX: targetOffsetX, offsetY: targetOffsetY })
         }
-    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer, isCmdPressed, viewportRef, textEditorState, commitTextEditor, setActiveLayer])
+    }, [isSpaceHeld, transform, activeTool, activeLayerId, layers, setSelection, drawStrokeTo, floodFill, pickColor, magicWandSelect, toolOptions, addTextLayer, isCmdPressed, isAltPressed, viewportRef, textEditorState, commitTextEditor, setActiveLayer, setCloneSource, handleDoubleClick, animateTo])
 
     const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
         if (!viewportRef) return
@@ -1654,11 +1839,11 @@ export default function Canvas({
                 end: endPoint
             })
             scheduleGradientPreview(endPoint)
-        } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser')) {
+        } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone')) {
             drawStrokeTo(canvasX, canvasY, false, false)
         }
 
-    }, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo, scheduleGradientPreview])
+    }, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo, scheduleGradientPreview, setCursorInfo])
 
     const handleMouseUp = useCallback((e: React.MouseEvent | MouseEvent) => {
         setIsDragging(false)
@@ -1728,7 +1913,7 @@ export default function Canvas({
             setDraggingGuideId(null)
         }
 
-    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition, renderGradientPreview, clearGradientState])
+    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition, renderGradientPreview, clearGradientState, viewportRef])
 
     // Global event listeners for dragging
     useEffect(() => {
@@ -1771,7 +1956,7 @@ export default function Canvas({
             const newOffsetY = mouseY - (mouseY - prev.offsetY) * (newScale / prev.scale)
             return { offsetX: newOffsetX, offsetY: newOffsetY, scale: newScale }
         })
-    }, [layers.length])
+    }, [layers.length, viewportRef, setTransform])
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault()
@@ -1881,7 +2066,8 @@ export default function Canvas({
                                                             ? (toolOptions?.zoomDirection === 'in' ? 'zoom-out' : 'zoom-in')
                                                             : (toolOptions?.zoomDirection === 'out' ? 'zoom-out' : 'zoom-in'))
                                                     ) :
-                                                        'crosshair',
+                                                        (activeTool === 'clone' && isAltPressed) ? 'crosshair' :
+                                                            'crosshair',
                                 }}
                             >
                                 <Application
@@ -1895,6 +2081,7 @@ export default function Canvas({
                                         toolOptions={toolOptions}
                                         activeTool={activeTool}
                                         hiddenLayerId={textEditorState?.layerId}
+                                        isAltPressed={isAltPressed}
                                     />
                                 </Application>
 

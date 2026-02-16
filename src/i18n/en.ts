@@ -233,6 +233,7 @@ export const en = {
     'tool.text': 'Text',
     'tool.zoom': 'Zoom',
     'tool.paths': 'Paths',
+    'tool.clone': 'Clone Stamp',
     'tool.transform': 'Transform',
     'toolgroup.selection': 'Selection Tools',
     'toolgroup.paint': 'Paint Tools',
@@ -248,6 +249,11 @@ export const en = {
     'statusbar.angle': 'Angle',
     'statusbar.color_profile': 'Color Profile',
     'statusbar.bits_per_channel': '8 bits per channel',
+
+    // Channels
+    'channel.red': 'Red',
+    'channel.green': 'Green',
+    'channel.blue': 'Blue',
 
     // Layers Panel
     'layers.tab.layers': 'Layers',

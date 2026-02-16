@@ -76,6 +76,8 @@ export interface TransformData {
 
 // --- Multi-Document Types ---
 
+export type ChannelType = 'r' | 'g' | 'b'
+
 export interface EditorContent {
     layers: Layer[]
     activeLayerId: string | null
@@ -121,6 +123,10 @@ interface EditorContextType {
     activePath: VectorPath | null
     activePathNodeId: string | null
 
+    // Clone Stamp
+    cloneSource: { x: number, y: number } | null
+    setCloneSource: (source: { x: number, y: number } | null) => void
+
     // Colors (Global)
     foregroundColor: string
     backgroundColor: string
@@ -128,6 +134,11 @@ interface EditorContextType {
     setBackgroundColor: (color: string) => void
     swapColors: () => void
     resetColors: () => void
+
+    // Channels
+    activeChannels: ChannelType[]
+    toggleChannel: (channel: ChannelType) => void
+    setActiveChannels: (channels: ChannelType[]) => void
 
     // Actions (Applied to active document)
     setCanvasSize: (size: { width: number; height: number }) => void
@@ -401,6 +412,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     )
     const [activePathNodeId, setActivePathNodeId] = useState<string | null>(null)
     const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([])
+    const [cloneSource, setCloneSource] = useState<{ x: number, y: number } | null>(null)
+
+    // Channels
+    const [activeChannels, setActiveChannelsState] = useState<ChannelType[]>(['r', 'g', 'b'])
 
     // Phase 2: Transient transforms for live preview (not in history)
     // Map layerId -> transform data
@@ -1242,28 +1257,6 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             // No, Pixi default anchor is 0,0.
 
             // Let's assume `transform.x` is the *visual position of the top-left corner* (or whatever the tool updates).
-            // Actually, if we use a Transform Tool, usually we drag the box.
-
-            // Let's assume `transform.x/y` is the Layer's (0,0) position in parent space.
-            // And pivot is local to the layer.
-
-            // The "pivot point" in world space was `originalX + pivotX, originalY + pivotY`.
-            // After transform, that point might move if `transform.x` moves.
-
-            // Let's simplify:
-            // The new layer's top-left position will be:
-            // `transform.x` (base pos) + `pivotX` (offset to pivot) + `minX` (offset to new, rotated top-left).
-            // Wait, `transform.x` is the *updated* layer position.
-            // If the user didn't move the handle, just rotated, `transform.x` stays same.
-
-            // Correct logic:
-            // New Layer X = transform.x + minX + (something about pivot?)
-            // Actually, `transform.x` is the position of the *origin* (top-left of pre-transform content).
-            // We are baking the transform.
-            // So the new origin (top-left of new content) should be:
-            // NewX = transform.x + (minX calculated relative to pivot) + pivotX * (rotated?) -> complex.
-
-            // Let's assume the TransformOverlay gives us the *visual* `x, y` of the layer.
             // We'll refine this when we build the component.
             // For now:
             const newLayerX = transform.x + minX + pivotX // This assumes (transform.x + pivotX) is the center of rotation
@@ -1854,6 +1847,21 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         // No-op if we use the setters above
     }, [])
 
+    const toggleChannel = useCallback((channel: ChannelType) => {
+        setActiveChannelsState(prev => {
+            if (prev.includes(channel)) {
+                // Don't allow empty channels? Or do? 
+                // Usually allowed, results in black screen or transparency.
+                return prev.filter(c => c !== channel)
+            }
+            return [...prev, channel]
+        })
+    }, [])
+
+    const setActiveChannels = useCallback((channels: ChannelType[]) => {
+        setActiveChannelsState(channels)
+    }, [])
+
     return (
         <EditorContext.Provider value={{
             documents,
@@ -1957,7 +1965,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             viewTransform,
             setViewTransform,
             viewportSize,
-            setViewportSize
+            setViewportSize,
+            cloneSource,
+            setCloneSource,
+            activeChannels,
+            toggleChannel,
+            setActiveChannels
         }}>
             {children}
         </EditorContext.Provider>

@@ -64,6 +64,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         'text': t('tool.text'),
         'zoom': t('tool.zoom'),
         'paths': t('tool.paths'),
+        'clone': t('tool.clone') || 'Clone Stamp',
     }
 
     const label = toolLabels[activeTool] || activeTool
@@ -857,6 +858,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderTextOptions()
             case 'picker':
                 return renderPickerOptions()
+            case 'clone':
+                return renderBrushOptions() // Reuse brush options for clone stamp
             case 'crop':
                 return renderCropOptions()
             case 'zoom':
