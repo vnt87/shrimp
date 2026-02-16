@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { ThemeProvider } from './components/ThemeContext'
 import { EditorProvider } from './components/EditorContext'
+import { PresetsProvider } from './components/PresetsContext'
 import Header from './components/Header'
 import ToolOptionsBar from './components/ToolOptionsBar'
 import Toolbox from './components/Toolbox'
@@ -157,26 +158,28 @@ export default function App() {
 
     return (
         <ThemeProvider>
-            <EditorProvider>
-                <div className="app">
-                    <Header onToolSelect={setActiveTool} />
-                    <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
-                    <div className="main-content">
-                        <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
-                            <DocumentTabs />
-                            <Canvas
-                                onCursorMove={setCursorPos}
-                                activeTool={activeTool}
-                                onToolChange={setActiveTool}
-                                toolOptions={toolOptions}
-                            />
+            <PresetsProvider>
+                <EditorProvider>
+                    <div className="app">
+                        <Header onToolSelect={setActiveTool} />
+                        <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
+                        <div className="main-content">
+                            <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
+                                <DocumentTabs />
+                                <Canvas
+                                    onCursorMove={setCursorPos}
+                                    activeTool={activeTool}
+                                    onToolChange={setActiveTool}
+                                    toolOptions={toolOptions}
+                                />
+                            </div>
+                            <RightPanel />
                         </div>
-                        <RightPanel />
+                        <StatusBar cursorPos={cursorPos} />
                     </div>
-                    <StatusBar cursorPos={cursorPos} />
-                </div>
-            </EditorProvider>
+                </EditorProvider>
+            </PresetsProvider>
         </ThemeProvider>
     )
 }

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import { useEditor } from './EditorContext'
+import { usePresets } from './PresetsContext'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
 
 interface ToolOptionsBarProps {
@@ -57,6 +58,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         addLayer,
         deletePath,
         foregroundColor,
+        backgroundColor, // Add this
         canvasSize,
         layers
     } = useEditor()
@@ -130,8 +132,53 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
+    const { brushPresets, addBrushPreset } = usePresets()
+
+    const handleSaveBrushPreset = () => {
+        const name = prompt('Enter preset name:', `Brush ${brushPresets.length + 1}`)
+        if (name) {
+            addBrushPreset({
+                name,
+                size: toolOptions.brushSize,
+                opacity: toolOptions.brushOpacity,
+                hardness: toolOptions.brushHardness,
+                spacing: 1
+            })
+        }
+    }
+
     const renderBrushOptions = () => (
         <>
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <select
+                    className="tool-options-select"
+                    style={{ maxWidth: 100, height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    onChange={(e) => {
+                        const preset = brushPresets.find(p => p.id === e.target.value)
+                        if (preset) {
+                            onToolOptionChange('brushSize', preset.size)
+                            onToolOptionChange('brushOpacity', preset.opacity)
+                            onToolOptionChange('brushHardness', preset.hardness)
+                        }
+                        e.target.value = '' // Reset selection
+                    }}
+                    value=""
+                >
+                    <option value="" disabled>Presets</option>
+                    {brushPresets.map(preset => (
+                        <option key={preset.id} value={preset.id}>{preset.name}</option>
+                    ))}
+                </select>
+                <button
+                    className="pref-btn pref-btn-secondary"
+                    style={{ height: 24, fontSize: 12, padding: '0 6px' }}
+                    onClick={handleSaveBrushPreset}
+                    title="Save current settings as preset"
+                >
+                    +
+                </button>
+            </div>
+            <div className="tool-options-divider" />
             {renderSlider('brushSize', 'Size', 1, 200, 1, 'px')}
             <div className="tool-options-divider" />
             {renderSlider('brushOpacity', 'Opacity', 1, 100, 1, '%')}
@@ -201,8 +248,55 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
+    const { gradientPresets, addGradientPreset } = usePresets()
+
+    const handleSaveGradientPreset = () => {
+        const name = prompt('Enter preset name:', `Gradient ${gradientPresets.length + 1}`)
+        if (name) {
+            // Placeholder: In a real app we'd grab the actual stops from a gradient editor
+            // For now, we'll just save a basic linear gradient defined by current colors if possible, 
+            // but since we don't have a gradient editor yet, we can't really save *new* custom gradients 
+            // other than what's hardcoded or FG/BG. 
+            // Let's just save the current type for now as a "setting" preset
+            addGradientPreset({
+                name,
+                type: toolOptions.gradientType,
+                colors: [{ offset: 0, color: foregroundColor }, { offset: 1, color: backgroundColor }]
+            })
+        }
+    }
+
     const renderGradientOptions = () => (
         <>
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <select
+                    className="tool-options-select"
+                    style={{ maxWidth: 100, height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    onChange={(e) => {
+                        const preset = gradientPresets.find(p => p.id === e.target.value)
+                        if (preset) {
+                            onToolOptionChange('gradientType', preset.type)
+                            // Note: We'd also set the colors here if we had a gradient editor state
+                        }
+                        e.target.value = ''
+                    }}
+                    value=""
+                >
+                    <option value="" disabled>Presets</option>
+                    {gradientPresets.map(preset => (
+                        <option key={preset.id} value={preset.id}>{preset.name}</option>
+                    ))}
+                </select>
+                <button
+                    className="pref-btn pref-btn-secondary"
+                    style={{ height: 24, fontSize: 12, padding: '0 6px' }}
+                    onClick={handleSaveGradientPreset}
+                    title="Save current gradient"
+                >
+                    +
+                </button>
+            </div>
+            <div className="tool-options-divider" />
             <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="slider-label">Type</span>
                 <div style={{ display: 'flex', gap: 2 }}>
@@ -371,8 +465,60 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
+    const { textStylePresets, addTextStylePreset } = usePresets()
+
+    const handleSaveTextPreset = () => {
+        const name = prompt('Enter preset name:', `Text Style ${textStylePresets.length + 1}`)
+        if (name) {
+            addTextStylePreset({
+                name,
+                fontFamily: toolOptions.fontFamily,
+                fontSize: toolOptions.fontSize,
+                color: toolOptions.textColor,
+                bold: toolOptions.textBold,
+                italic: toolOptions.textItalic,
+                underline: toolOptions.textUnderline,
+                strikethrough: toolOptions.textStrikethrough
+            })
+        }
+    }
+
     const renderTextOptions = () => (
         <>
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <select
+                    className="tool-options-select"
+                    style={{ maxWidth: 100, height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    onChange={(e) => {
+                        const preset = textStylePresets.find(p => p.id === e.target.value)
+                        if (preset) {
+                            onToolOptionChange('fontFamily', preset.fontFamily)
+                            onToolOptionChange('fontSize', preset.fontSize)
+                            onToolOptionChange('textColor', preset.color)
+                            onToolOptionChange('textBold', preset.bold)
+                            onToolOptionChange('textItalic', preset.italic)
+                            onToolOptionChange('textUnderline', preset.underline)
+                            onToolOptionChange('textStrikethrough', preset.strikethrough)
+                        }
+                        e.target.value = ''
+                    }}
+                    value=""
+                >
+                    <option value="" disabled>Presets</option>
+                    {textStylePresets.map(preset => (
+                        <option key={preset.id} value={preset.id}>{preset.name}</option>
+                    ))}
+                </select>
+                <button
+                    className="pref-btn pref-btn-secondary"
+                    style={{ height: 24, fontSize: 12, padding: '0 6px' }}
+                    onClick={handleSaveTextPreset}
+                    title="Save text style"
+                >
+                    +
+                </button>
+            </div>
+            <div className="tool-options-divider" />
             {renderSlider('fontSize', 'Size', 8, 200, 1, 'px')}
             <div className="tool-options-divider" />
             <div className="tool-options-slider-group">

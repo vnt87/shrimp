@@ -204,6 +204,16 @@ interface EditorContextType {
     transientTransforms: Record<string, TransformData>
     setTransientTransform: (layerId: string, transform: TransformData | null) => void
     commitTransform: (layerId: string, transform: TransformData) => void
+
+    // Cursor Info (for InfoPanel)
+    cursorInfo: { x: number, y: number, color: string | null }
+    setCursorInfo: (info: { x: number, y: number, color: string | null }) => void
+
+    // View Transform (for Navigator)
+    viewTransform: { scale: number, offsetX: number, offsetY: number }
+    setViewTransform: React.Dispatch<React.SetStateAction<{ scale: number, offsetX: number, offsetY: number }>>
+    viewportSize: { width: number, height: number }
+    setViewportSize: (size: { width: number; height: number }) => void
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
@@ -431,6 +441,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setSelectedLayerIds([activeLayerId])
         }
     }, [activeLayerId])
+
+    const [cursorInfo, setCursorInfo] = useState<{ x: number, y: number, color: string | null }>({ x: 0, y: 0, color: null })
+    const [viewTransform, setViewTransform] = useState<{ scale: number, offsetX: number, offsetY: number }>({ scale: 1, offsetX: 0, offsetY: 0 })
+    const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
 
     useEffect(() => {
         if (!activePath) {
@@ -1933,7 +1947,17 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             deletePath,
             setPathVisibility,
             setPathLocked,
-            setActivePathNodeId
+            setActivePathNodeId,
+
+            // Cursor Info
+            cursorInfo,
+            setCursorInfo,
+
+            // View Transform
+            viewTransform,
+            setViewTransform,
+            viewportSize,
+            setViewportSize
         }}>
             {children}
         </EditorContext.Provider>

@@ -1,4 +1,8 @@
+import { useState } from 'react'
 import { MoreVertical, AlertTriangle } from 'lucide-react'
+import { useEditor } from './EditorContext'
+import InfoPanel from './InfoPanel'
+import NavigatorPanel from './NavigatorPanel'
 
 // Generate stacked area chart paths
 function generateAreaPath(
@@ -30,6 +34,8 @@ function generateAreaPath(
 }
 
 export default function HistogramPanel() {
+    const { cursorInfo } = useEditor()
+    const [activeTab, setActiveTab] = useState<'histogram' | 'navigator' | 'info'>('histogram')
     const chartW = 330
     const chartH = 132
 
@@ -42,62 +48,92 @@ export default function HistogramPanel() {
     ]
 
     return (
-        <div className="dialogue" style={{ flex: 1, overflow: 'hidden' }}>
+        <div className="dialogue" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {/* Header tabs */}
             <div className="dialogue-header">
                 <div className="dialogue-tabs">
-                    <div className="dialogue-tab inactive">Histogram</div>
-                    <div className="dialogue-tab inactive">Navigator</div>
-                    <div className="dialogue-tab active">Info</div>
+                    <div
+                        className={`dialogue-tab ${activeTab === 'histogram' ? 'active' : 'inactive'}`}
+                        onClick={() => setActiveTab('histogram')}
+                    >
+                        Histogram
+                    </div>
+                    <div
+                        className={`dialogue-tab ${activeTab === 'navigator' ? 'active' : 'inactive'}`}
+                        onClick={() => setActiveTab('navigator')}
+                    >
+                        Navigator
+                    </div>
+                    <div
+                        className={`dialogue-tab ${activeTab === 'info' ? 'active' : 'inactive'}`}
+                        onClick={() => setActiveTab('info')}
+                    >
+                        Info
+                    </div>
                 </div>
                 <div className="dialogue-more">
                     <MoreVertical size={16} />
                 </div>
             </div>
 
-            {/* Chart area */}
-            <div className="histogram-container" style={{ flex: 1, position: 'relative' }}>
-                {/* Grid */}
-                <div className="histogram-grid">
-                    {Array.from({ length: 34 }).map((_, i) => (
-                        <div
-                            key={`v${i}`}
-                            className="histogram-grid-line-v"
-                            style={{ left: i * 10 }}
-                        />
-                    ))}
-                    {Array.from({ length: 14 }).map((_, i) => (
-                        <div
-                            key={`h${i}`}
-                            className="histogram-grid-line-h"
-                            style={{ top: i * 10 }}
-                        />
-                    ))}
-                </div>
+            {/* Content Area */}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                {activeTab === 'histogram' && (
+                    <div className="histogram-container" style={{ width: '100%', height: '100%', position: 'relative' }}>
+                        {/* Grid */}
+                        <div className="histogram-grid">
+                            {Array.from({ length: 34 }).map((_, i) => (
+                                <div
+                                    key={`v${i}`}
+                                    className="histogram-grid-line-v"
+                                    style={{ left: i * 10 }}
+                                />
+                            ))}
+                            {Array.from({ length: 14 }).map((_, i) => (
+                                <div
+                                    key={`h${i}`}
+                                    className="histogram-grid-line-h"
+                                    style={{ top: i * 10 }}
+                                />
+                            ))}
+                        </div>
 
-                {/* Stacked area chart */}
-                <div className="histogram-chart">
-                    <svg viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
-                        {areas.map((area, i) => (
-                            <path
-                                key={i}
-                                d={generateAreaPath(
-                                    chartW,
-                                    chartH,
-                                    area.baseY,
-                                    area.amplitude,
-                                    area.seed
-                                )}
-                                fill={area.color}
-                            />
-                        ))}
-                    </svg>
-                </div>
+                        {/* Stacked area chart */}
+                        <div className="histogram-chart">
+                            <svg viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
+                                {areas.map((area, i) => (
+                                    <path
+                                        key={i}
+                                        d={generateAreaPath(
+                                            chartW,
+                                            chartH,
+                                            area.baseY,
+                                            area.amplitude,
+                                            area.seed
+                                        )}
+                                        fill={area.color}
+                                    />
+                                ))}
+                            </svg>
+                        </div>
 
-                {/* Warning icon */}
-                <div className="histogram-warning">
-                    <AlertTriangle size={24} />
-                </div>
+                        {/* Warning icon */}
+                        <div className="histogram-warning">
+                            <AlertTriangle size={24} />
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'navigator' && (
+                    <NavigatorPanel />
+                )}
+
+                {activeTab === 'info' && (
+                    <InfoPanel
+                        cursorPos={{ x: cursorInfo.x, y: cursorInfo.y }}
+                        colorUnderCursor={cursorInfo.color}
+                    />
+                )}
             </div>
 
             <div className="dialogue-handle" style={{ marginBottom: 1 }} />

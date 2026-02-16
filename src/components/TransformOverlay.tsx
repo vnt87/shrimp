@@ -39,7 +39,7 @@ export default function TransformOverlay({ layerId }: { layerId: string }) {
             skewY: 0,
             pivotX: 0, // Pivot at 0,0 (top-left) by default for now? Or center?
             // Usually simpler to pivot at center for rotation.
-            // Let's use center of the layer content.
+            // Use center of the layer content.
             pivotY: 0
         }
     }, [transientTransforms, layerId, layer])
@@ -99,7 +99,7 @@ export default function TransformOverlay({ layerId }: { layerId: string }) {
     // If we put them inside, scaling the object scales the handles.
     // So usually handles are drawn in PARENT space (scene space), calculating positions manually.
 
-    // Let's try drawing in PARENT space.
+    // Draw in PARENT space.
     // We need to map local points (corners) to parent space using the transform.
 
     const toParent = (lx: number, ly: number) => {

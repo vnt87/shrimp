@@ -249,7 +249,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 break
             case 'Invert Colors':
                 // No direct filter for this yet, maybe color matrix?
-                // For now, let's use color-matrix as a placeholder or skip
+                // Placeholder or skip for color-matrix for now
                 break
             case 'About': setShowAbout(true); break
             case 'Github Source':

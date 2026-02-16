@@ -120,7 +120,7 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY,
                 // We need to decide which dimension is "master".
                 // Usually take the larger change or just width?
 
-                // Let's force H based on W for simplicity in this iteration, 
+                // Force H based on W for simplicity in this iteration, 
                 // or check which component of drag is larger.
 
                 // Better approach:
@@ -136,7 +136,7 @@ export default function CropOverlay({ onCrop, onCancel, scale, offsetX, offsetY,
                 // Simplified: Just set H = W / ratio
                 // But we need to respect the anchor point (which is opposite handle).
 
-                // Let's use a simplified aspect ratio enforcement:
+                // Use a simplified aspect ratio enforcement:
                 if (dragHandle.length === 2) { // Corner
                     // Adjust height to match width * ratio? No, H = W / ratio
                     const signW = Math.sign(newW) || 1

@@ -60,6 +60,17 @@ function LayerOutline({ layer, transform }: LayerOutlineProps) {
     />
 }
 
+// Helper hook
+const useWindowSize = () => {
+    const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight })
+    useEffect(() => {
+        const handleResize = () => setSize({ width: window.innerWidth, height: window.innerHeight })
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+    return size
+}
+
 interface CanvasTransform {
     offsetX: number
     offsetY: number
@@ -409,20 +420,25 @@ export default function Canvas({
         setForegroundColor,
         setBackgroundColor,
         setActiveLayer,
+        setCursorInfo,
+        viewTransform: transform,
+        setViewTransform: setTransform, // Add this
+        setViewportSize
     } = useEditor()
 
-    const [transform, setTransform] = useState<CanvasTransform>({
-        offsetX: 0,
-        offsetY: 0,
-        scale: 1,
-    })
+    const windowSize = useWindowSize()
+
+    // Update viewport size
+    useEffect(() => {
+        setViewportSize(windowSize)
+    }, [windowSize, setViewportSize])
 
     // Zoom Animation State
     const animationFrameId = useRef<number | null>(null)
     const activeAnimation = useRef<{
         startTime: number,
-        startTransform: CanvasTransform,
-        targetTransform: CanvasTransform,
+        startTransform: typeof transform,
+        targetTransform: typeof transform,
         duration: number
     } | null>(null)
 
@@ -1549,6 +1565,16 @@ export default function Canvas({
             }))
             return
         }
+
+        // Update Info Panel
+        // Debounce or throttle this if performance issues arise
+        // For color picking, we might need a more optimized approach than reading pixels every frame
+        // For now, just coordinates
+        setCursorInfo({
+            x: canvasX,
+            y: canvasY,
+            color: null // Placeholder, implementing color picking later
+        })
 
         // Handle Guide Dragging (New or Existing)
         if (tempGuide || draggingGuideId) {
