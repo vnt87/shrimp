@@ -1,5 +1,4 @@
 import {
-    MoreVertical,
     ChevronDown,
     Lock,
     Eye,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 import { useEditor, Layer, type LayerFilter } from './EditorContext'
+import PanelMenu from './PanelMenu'
 import FiltersDialog from './FiltersDialog'
 import { getFilterCatalogEntry, isSupportedFilterType } from '../data/filterCatalog'
 
@@ -386,439 +386,447 @@ export default function LayersPanel() {
                     <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'paths' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('paths')}>Paths</button>
                     <button type="button" className={`dialogue-tab dialogue-tab-btn ${activeTab === 'history' ? 'active' : 'inactive'}`} onClick={() => setActiveTab('history')}>History</button>
                 </div>
-                <div className="dialogue-more">
-                    <MoreVertical size={16} />
-                </div>
+                <PanelMenu panelId="layers" />
             </div>
 
-            {activeTab === 'layers' && (
-                <>
-                    <div className="layers-blend-row">
-                        <span className="dialogue-bar-label">Mode</span>
-                        <select
-                            className="layers-dropdown"
-                            style={{ width: 161, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '2px 4px', fontSize: 12, cursor: 'pointer' }}
-                            value={activeLayer?.blendMode || 'normal'}
-                            onChange={(e) => activeLayerId && setLayerBlendMode(activeLayerId, e.target.value)}
-                            disabled={!activeLayerId}
-                        >
-                            <option value="normal">Normal</option>
-                            <option value="multiply">Multiply</option>
-                            <option value="screen">Screen</option>
-                            <option value="overlay">Overlay</option>
-                            <option value="darken">Darken</option>
-                            <option value="lighten">Lighten</option>
-                            <option value="color-dodge">Color Dodge</option>
-                            <option value="color-burn">Color Burn</option>
-                            <option value="hard-light">Hard Light</option>
-                            <option value="soft-light">Soft Light</option>
-                            <option value="difference">Difference</option>
-                            <option value="exclusion">Exclusion</option>
-                            <option value="hue">Hue</option>
-                            <option value="saturation">Saturation</option>
-                            <option value="color">Color</option>
-                            <option value="luminosity">Luminosity</option>
-                        </select>
-                    </div>
-
-                    <div className="dialogue-divider" />
-
-                    <div className="layers-lock-row">
-                        <span className="layers-lock-label">Lock</span>
-                        <div
-                            className={`layers-lock-icon${activeLayer?.locked ? ' active' : ''}`}
-                            onClick={() => activeLayerId && toggleLayerLock(activeLayerId)}
-                        >
-                            <Lock size={16} />
-                        </div>
-
-                        <span className="layers-opacity-label" style={{ marginLeft: 'auto' }}>Opacity</span>
-                        <input
-                            type="range"
-                            className="layers-opacity-slider"
-                            min={0}
-                            max={100}
-                            value={opacityValue}
-                            style={{
-                                background: `linear-gradient(to right, var(--accent-active) 0%, var(--accent-active) ${opacityValue}%, var(--bg-input) ${opacityValue}%, var(--bg-input) 100%)`
-                            }}
-                            onChange={handleOpacityChange}
-                            disabled={!activeLayerId}
-                        />
-                        <input
-                            type="number"
-                            className="layers-opacity-input"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={opacityValue}
-                            onChange={handleOpacityInputChange}
-                            disabled={!activeLayerId}
-                        />
-                        <span className="layers-opacity-unit">%</span>
-                    </div>
-
-                    <div className="dialogue-divider" />
-
-                    <div className="layers-filters-panel">
-                        <div className="layers-filters-header">
-                            <div className="layers-filters-title">
-                                <SlidersHorizontal size={14} />
-                                <span>Adjustments</span>
-                            </div>
-                            <button
-                                type="button"
-                                className="panel-icon-btn"
-                                title="Add adjustment"
-                                onClick={() => openFiltersDialog()}
+            {
+                activeTab === 'layers' && (
+                    <>
+                        <div className="layers-blend-row">
+                            <span className="dialogue-bar-label">Mode</span>
+                            <select
+                                className="layers-dropdown"
+                                style={{ width: 161, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 4, padding: '2px 4px', fontSize: 12, cursor: 'pointer' }}
+                                value={activeLayer?.blendMode || 'normal'}
+                                onChange={(e) => activeLayerId && setLayerBlendMode(activeLayerId, e.target.value)}
                                 disabled={!activeLayerId}
                             >
-                                <Plus size={14} />
-                            </button>
+                                <option value="normal">Normal</option>
+                                <option value="multiply">Multiply</option>
+                                <option value="screen">Screen</option>
+                                <option value="overlay">Overlay</option>
+                                <option value="darken">Darken</option>
+                                <option value="lighten">Lighten</option>
+                                <option value="color-dodge">Color Dodge</option>
+                                <option value="color-burn">Color Burn</option>
+                                <option value="hard-light">Hard Light</option>
+                                <option value="soft-light">Soft Light</option>
+                                <option value="difference">Difference</option>
+                                <option value="exclusion">Exclusion</option>
+                                <option value="hue">Hue</option>
+                                <option value="saturation">Saturation</option>
+                                <option value="color">Color</option>
+                                <option value="luminosity">Luminosity</option>
+                            </select>
                         </div>
 
-                        {!activeLayer ? (
-                            <div className="layers-filters-empty">Select a layer to manage adjustments.</div>
-                        ) : activeLayer.filters.length === 0 ? (
-                            <div className="layers-filters-empty">No adjustments on this layer.</div>
-                        ) : (
-                            <div className="layers-filters-list">
-                                {activeLayer.filters.map((filter, idx) => {
-                                    const label = isSupportedFilterType(filter.type)
-                                        ? getFilterCatalogEntry(filter.type).label
-                                        : filter.type
-                                    return (
-                                        <div key={idx} className="layers-filter-row">
-                                            <button
-                                                type="button"
-                                                className={`layers-filter-visibility${filter.enabled ? '' : ' off'}`}
-                                                onClick={() => activeLayerId && toggleFilter(activeLayerId, idx)}
-                                                title={filter.enabled ? 'Disable adjustment' : 'Enable adjustment'}
-                                            >
-                                                {filter.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="layers-filter-name"
-                                                title="Open adjustment dialog with this filter type"
-                                                onClick={() => openFiltersDialog(filter.type)}
-                                            >
-                                                {label}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="layers-filter-remove"
-                                                title="Remove adjustment"
-                                                onClick={() => activeLayerId && removeFilter(activeLayerId, idx)}
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </div>
+                        <div className="dialogue-divider" />
 
-                    <div className="dialogue-divider" />
-
-                    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
-                        {layers.length === 0 && (
-                            <div style={{ padding: 10, color: '#888', textAlign: 'center' }}>
-                                No layers
+                        <div className="layers-lock-row">
+                            <span className="layers-lock-label">Lock</span>
+                            <div
+                                className={`layers-lock-icon${activeLayer?.locked ? ' active' : ''}`}
+                                onClick={() => activeLayerId && toggleLayerLock(activeLayerId)}
+                            >
+                                <Lock size={16} />
                             </div>
-                        )}
-                        {[...layers].map(layer => (
-                            <LayerItem
-                                key={layer.id}
-                                layer={layer}
-                                depth={0}
-                                onDragStart={handleDragStart}
-                                onDrop={handleDrop}
+
+                            <span className="layers-opacity-label" style={{ marginLeft: 'auto' }}>Opacity</span>
+                            <input
+                                type="range"
+                                className="layers-opacity-slider"
+                                min={0}
+                                max={100}
+                                value={opacityValue}
+                                style={{
+                                    background: `linear-gradient(to right, var(--accent-active) 0%, var(--accent-active) ${opacityValue}%, var(--bg-input) ${opacityValue}%, var(--bg-input) 100%)`
+                                }}
+                                onChange={handleOpacityChange}
+                                disabled={!activeLayerId}
                             />
-                        ))}
-                    </div>
-
-                    <div className="dialogue-divider" />
-
-                    <div className="layer-search">
-                        <div className="layer-search-input">
-                            <input type="text" placeholder="Layer Search" readOnly />
-                            <Search size={16} />
-                        </div>
-                    </div>
-
-                    <div className="dialogue-divider" />
-
-                    <div className="dialogue-actions">
-                        <div className="dialogue-actions-left">
-                            <div
-                                className="dialogue-action-btn"
-                                title="New Layer"
-                                onClick={() => addLayer('New Layer')}
-                            >
-                                <Plus size={16} />
-                            </div>
-                            <div
-                                className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
-                                title="Duplicate Layer"
-                                onClick={() => activeLayerId && duplicateLayer(activeLayerId)}
-                            >
-                                <Copy size={16} />
-                            </div>
-                            <div
-                                className="dialogue-action-btn"
-                                title="New Group"
-                                onClick={() => createGroup(selectedLayerIds.length > 0 ? selectedLayerIds : undefined)}
-                            >
-                                <FolderPlus size={16} />
-                            </div>
-                            <div
-                                className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
-                                title="Delete Layer"
-                                onClick={() => activeLayerId && deleteLayer(activeLayerId)}
-                            >
-                                <Trash2 size={16} />
-                            </div>
-                        </div>
-                        <div className="dialogue-actions-right">
-                            <div className="dialogue-action-btn"><Anchor size={16} /></div>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {activeTab === 'paths' && (
-                <>
-                    <div className="layers-blend-row" style={{ justifyContent: 'space-between' }}>
-                        <span className="dialogue-bar-label">Paths</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                            {paths.length}
-                        </span>
-                    </div>
-
-                    <div className="dialogue-divider" />
-
-                    <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div className="panel-inline-actions">
-                            <button
-                                type="button"
-                                className="panel-btn panel-btn-secondary"
-                                onClick={() => createPath()}
-                                title="Create empty path"
-                            >
-                                New
-                            </button>
-                            <button
-                                type="button"
-                                className="panel-btn panel-btn-secondary"
-                                onClick={() => activePathId && deletePath(activePathId)}
-                                disabled={!activePathId}
-                                title="Delete active path"
-                            >
-                                Delete
-                            </button>
+                            <input
+                                type="number"
+                                className="layers-opacity-input"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={opacityValue}
+                                onChange={handleOpacityInputChange}
+                                disabled={!activeLayerId}
+                            />
+                            <span className="layers-opacity-unit">%</span>
                         </div>
 
-                        <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                            Status: {activePath ? (activePath.closed ? 'Closed' : 'Open') : 'No active path'}
+                        <div className="dialogue-divider" />
+
+                        <div className="layers-filters-panel">
+                            <div className="layers-filters-header">
+                                <div className="layers-filters-title">
+                                    <SlidersHorizontal size={14} />
+                                    <span>Adjustments</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="panel-icon-btn"
+                                    title="Add adjustment"
+                                    onClick={() => openFiltersDialog()}
+                                    disabled={!activeLayerId}
+                                >
+                                    <Plus size={14} />
+                                </button>
+                            </div>
+
+                            {!activeLayer ? (
+                                <div className="layers-filters-empty">Select a layer to manage adjustments.</div>
+                            ) : activeLayer.filters.length === 0 ? (
+                                <div className="layers-filters-empty">No adjustments on this layer.</div>
+                            ) : (
+                                <div className="layers-filters-list">
+                                    {activeLayer.filters.map((filter, idx) => {
+                                        const label = isSupportedFilterType(filter.type)
+                                            ? getFilterCatalogEntry(filter.type).label
+                                            : filter.type
+                                        return (
+                                            <div key={idx} className="layers-filter-row">
+                                                <button
+                                                    type="button"
+                                                    className={`layers-filter-visibility${filter.enabled ? '' : ' off'}`}
+                                                    onClick={() => activeLayerId && toggleFilter(activeLayerId, idx)}
+                                                    title={filter.enabled ? 'Disable adjustment' : 'Enable adjustment'}
+                                                >
+                                                    {filter.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="layers-filter-name"
+                                                    title="Open adjustment dialog with this filter type"
+                                                    onClick={() => openFiltersDialog(filter.type)}
+                                                >
+                                                    {label}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="layers-filter-remove"
+                                                    title="Remove adjustment"
+                                                    onClick={() => activeLayerId && removeFilter(activeLayerId, idx)}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </div>
 
-                        <div className="panel-inline-actions">
-                            <button
-                                type="button"
-                                className="panel-btn panel-btn-secondary"
-                                onClick={togglePathClosed}
-                                disabled={!activePath || (!activePath.closed && activePath.nodes.length < 3)}
-                                title={activePath?.closed ? 'Open path' : 'Close path'}
-                            >
-                                {activePath?.closed ? 'Open' : 'Close'}
-                            </button>
+                        <div className="dialogue-divider" />
+
+                        <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
+                            {layers.length === 0 && (
+                                <div style={{ padding: 10, color: '#888', textAlign: 'center' }}>
+                                    No layers
+                                </div>
+                            )}
+                            {[...layers].map(layer => (
+                                <LayerItem
+                                    key={layer.id}
+                                    layer={layer}
+                                    depth={0}
+                                    onDragStart={handleDragStart}
+                                    onDrop={handleDrop}
+                                />
+                            ))}
                         </div>
 
-                        {selectedNode && (
-                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                                {`Selected: x:${Math.round(selectedNode.x)} y:${Math.round(selectedNode.y)} · ${selectedNode.type}`}
-                            </div>
-                        )}
-                    </div>
+                        <div className="dialogue-divider" />
 
-                    <div className="dialogue-divider" />
-
-                    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
-                        {paths.length === 0 && (
-                            <div style={{ padding: 12, color: 'var(--text-secondary)', textAlign: 'center', fontSize: 12 }}>
-                                No saved paths. Use the Paths tool (`P`) to create one.
+                        <div className="layer-search">
+                            <div className="layer-search-input">
+                                <input type="text" placeholder="Layer Search" readOnly />
+                                <Search size={16} />
                             </div>
-                        )}
-                        {paths.map((path) => (
-                            <div
-                                key={path.id}
-                                className={`layer-row${path.id === activePathId ? ' selected' : ''}`}
-                                onClick={() => setActivePathId(path.id)}
-                                style={{ cursor: 'default' }}
-                            >
-                                <div className="layer-info" style={{ gap: 8 }}>
-                                    <div className="layer-folder-icon">
-                                        <Anchor size={14} />
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        {renamingPathId === path.id ? (
-                                            <input
-                                                value={renamingPathValue}
-                                                onChange={(e) => setRenamingPathValue(e.target.value)}
-                                                onBlur={submitRenamePath}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') submitRenamePath()
-                                                    if (e.key === 'Escape') {
-                                                        setRenamingPathId(null)
-                                                        setRenamingPathValue('')
-                                                    }
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="layer-rename-input"
-                                            />
-                                        ) : (
-                                            <span
-                                                className="layer-name"
-                                                onDoubleClick={(e) => {
-                                                    e.stopPropagation()
-                                                    beginRenamePath(path.id, path.name)
-                                                }}
-                                            >
-                                                {path.name}
+                        </div>
+
+                        <div className="dialogue-divider" />
+
+                        <div className="dialogue-actions">
+                            <div className="dialogue-actions-left">
+                                <div
+                                    className="dialogue-action-btn"
+                                    title="New Layer"
+                                    onClick={() => addLayer('New Layer')}
+                                >
+                                    <Plus size={16} />
+                                </div>
+                                <div
+                                    className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
+                                    title="Duplicate Layer"
+                                    onClick={() => activeLayerId && duplicateLayer(activeLayerId)}
+                                >
+                                    <Copy size={16} />
+                                </div>
+                                <div
+                                    className="dialogue-action-btn"
+                                    title="New Group"
+                                    onClick={() => createGroup(selectedLayerIds.length > 0 ? selectedLayerIds : undefined)}
+                                >
+                                    <FolderPlus size={16} />
+                                </div>
+                                <div
+                                    className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
+                                    title="Delete Layer"
+                                    onClick={() => activeLayerId && deleteLayer(activeLayerId)}
+                                >
+                                    <Trash2 size={16} />
+                                </div>
+                            </div>
+                            <div className="dialogue-actions-right">
+                                <div className="dialogue-action-btn"><Anchor size={16} /></div>
+                            </div>
+                        </div>
+                    </>
+                )
+            }
+
+            {
+                activeTab === 'paths' && (
+                    <>
+                        <div className="layers-blend-row" style={{ justifyContent: 'space-between' }}>
+                            <span className="dialogue-bar-label">Paths</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                                {paths.length}
+                            </span>
+                        </div>
+
+                        <div className="dialogue-divider" />
+
+                        <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div className="panel-inline-actions">
+                                <button
+                                    type="button"
+                                    className="panel-btn panel-btn-secondary"
+                                    onClick={() => createPath()}
+                                    title="Create empty path"
+                                >
+                                    New
+                                </button>
+                                <button
+                                    type="button"
+                                    className="panel-btn panel-btn-secondary"
+                                    onClick={() => activePathId && deletePath(activePathId)}
+                                    disabled={!activePathId}
+                                    title="Delete active path"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+
+                            <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                                Status: {activePath ? (activePath.closed ? 'Closed' : 'Open') : 'No active path'}
+                            </div>
+
+                            <div className="panel-inline-actions">
+                                <button
+                                    type="button"
+                                    className="panel-btn panel-btn-secondary"
+                                    onClick={togglePathClosed}
+                                    disabled={!activePath || (!activePath.closed && activePath.nodes.length < 3)}
+                                    title={activePath?.closed ? 'Open path' : 'Close path'}
+                                >
+                                    {activePath?.closed ? 'Open' : 'Close'}
+                                </button>
+                            </div>
+
+                            {selectedNode && (
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                                    {`Selected: x:${Math.round(selectedNode.x)} y:${Math.round(selectedNode.y)} · ${selectedNode.type}`}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="dialogue-divider" />
+
+                        <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
+                            {paths.length === 0 && (
+                                <div style={{ padding: 12, color: 'var(--text-secondary)', textAlign: 'center', fontSize: 12 }}>
+                                    No saved paths. Use the Paths tool (`P`) to create one.
+                                </div>
+                            )}
+                            {paths.map((path) => (
+                                <div
+                                    key={path.id}
+                                    className={`layer-row${path.id === activePathId ? ' selected' : ''}`}
+                                    onClick={() => setActivePathId(path.id)}
+                                    style={{ cursor: 'default' }}
+                                >
+                                    <div className="layer-info" style={{ gap: 8 }}>
+                                        <div className="layer-folder-icon">
+                                            <Anchor size={14} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            {renamingPathId === path.id ? (
+                                                <input
+                                                    value={renamingPathValue}
+                                                    onChange={(e) => setRenamingPathValue(e.target.value)}
+                                                    onBlur={submitRenamePath}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') submitRenamePath()
+                                                        if (e.key === 'Escape') {
+                                                            setRenamingPathId(null)
+                                                            setRenamingPathValue('')
+                                                        }
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="layer-rename-input"
+                                                />
+                                            ) : (
+                                                <span
+                                                    className="layer-name"
+                                                    onDoubleClick={(e) => {
+                                                        e.stopPropagation()
+                                                        beginRenamePath(path.id, path.name)
+                                                    }}
+                                                >
+                                                    {path.name}
+                                                </span>
+                                            )}
+                                            <span className="layer-name muted" style={{ fontSize: 11 }}>
+                                                {`${path.closed ? 'closed' : 'open'} · ${path.nodes.length} pts${path.locked ? ' · locked' : ''}`}
                                             </span>
-                                        )}
-                                        <span className="layer-name muted" style={{ fontSize: 11 }}>
-                                            {`${path.closed ? 'closed' : 'open'} · ${path.nodes.length} pts${path.locked ? ' · locked' : ''}`}
-                                        </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="layer-status" style={{ display: 'flex', gap: 4 }}>
+                                        <div
+                                            className="layer-status-icon"
+                                            title={path.visible ? 'Hide path' : 'Show path'}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setPathVisibility(path.id, !path.visible)
+                                            }}
+                                        >
+                                            {path.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                                        </div>
+                                        <div
+                                            className={`layer-status-icon${path.locked ? ' active' : ''}`}
+                                            title={path.locked ? 'Unlock path' : 'Lock path'}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setPathLocked(path.id, !path.locked)
+                                            }}
+                                        >
+                                            <Lock size={14} />
+                                        </div>
+                                        <div
+                                            className="layer-status-icon"
+                                            title="Duplicate path"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                duplicateVectorPath(path.id)
+                                            }}
+                                        >
+                                            <Copy size={14} />
+                                        </div>
+                                        <div
+                                            className="layer-status-icon"
+                                            title="Delete path"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                deletePath(path.id)
+                                            }}
+                                        >
+                                            <Trash2 size={14} />
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div className="layer-status" style={{ display: 'flex', gap: 4 }}>
-                                    <div
-                                        className="layer-status-icon"
-                                        title={path.visible ? 'Hide path' : 'Show path'}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setPathVisibility(path.id, !path.visible)
-                                        }}
-                                    >
-                                        {path.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                                    </div>
-                                    <div
-                                        className={`layer-status-icon${path.locked ? ' active' : ''}`}
-                                        title={path.locked ? 'Unlock path' : 'Lock path'}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setPathLocked(path.id, !path.locked)
-                                        }}
-                                    >
-                                        <Lock size={14} />
-                                    </div>
-                                    <div
-                                        className="layer-status-icon"
-                                        title="Duplicate path"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            duplicateVectorPath(path.id)
-                                        }}
-                                    >
-                                        <Copy size={14} />
-                                    </div>
-                                    <div
-                                        className="layer-status-icon"
-                                        title="Delete path"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            deletePath(path.id)
-                                        }}
-                                    >
-                                        <Trash2 size={14} />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </>
-            )}
-
-            {activeTab === 'history' && (
-                <>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px' }}>
-                        <span className="dialogue-bar-label">History Log</span>
-                        <div className="panel-inline-actions">
-                            <button
-                                type="button"
-                                className="panel-icon-btn"
-                                title="Undo"
-                                onClick={() => canUndo && undo()}
-                                disabled={!canUndo}
-                            >
-                                <Undo2 size={14} />
-                            </button>
-                            <button
-                                type="button"
-                                className="panel-icon-btn"
-                                title="Redo"
-                                onClick={() => canRedo && redo()}
-                                disabled={!canRedo}
-                            >
-                                <Redo2 size={14} />
-                            </button>
+                            ))}
                         </div>
-                    </div>
+                    </>
+                )
+            }
 
-                    <div className="dialogue-divider" />
+            {
+                activeTab === 'history' && (
+                    <>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px' }}>
+                            <span className="dialogue-bar-label">History Log</span>
+                            <div className="panel-inline-actions">
+                                <button
+                                    type="button"
+                                    className="panel-icon-btn"
+                                    title="Undo"
+                                    onClick={() => canUndo && undo()}
+                                    disabled={!canUndo}
+                                >
+                                    <Undo2 size={14} />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="panel-icon-btn"
+                                    title="Redo"
+                                    onClick={() => canRedo && redo()}
+                                    disabled={!canRedo}
+                                >
+                                    <Redo2 size={14} />
+                                </button>
+                            </div>
+                        </div>
 
-                    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
-                        {[...historyEntries].reverse().map((entry) => (
-                            <div
-                                key={entry.index}
-                                className={`layer-row${entry.isCurrent ? ' selected' : ''}`}
-                                onDoubleClick={() => restoreHistoryIndex(entry.index)}
-                                title="Double click to restore this state"
-                                style={{ cursor: 'default' }}
-                            >
-                                <div className="layer-info" style={{ gap: 8 }}>
-                                    <div className="layer-folder-icon">
-                                        <Anchor size={14} />
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        <span className="layer-name">{entry.label}</span>
-                                        <span className="layer-name muted" style={{ fontSize: 11 }}>
-                                            {entry.isCurrent ? 'Current state' : `Step ${entry.index + 1}`}
-                                        </span>
+                        <div className="dialogue-divider" />
+
+                        <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
+                            {[...historyEntries].reverse().map((entry) => (
+                                <div
+                                    key={entry.index}
+                                    className={`layer-row${entry.isCurrent ? ' selected' : ''}`}
+                                    onDoubleClick={() => restoreHistoryIndex(entry.index)}
+                                    title="Double click to restore this state"
+                                    style={{ cursor: 'default' }}
+                                >
+                                    <div className="layer-info" style={{ gap: 8 }}>
+                                        <div className="layer-folder-icon">
+                                            <Anchor size={14} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            <span className="layer-name">{entry.label}</span>
+                                            <span className="layer-name muted" style={{ fontSize: 11 }}>
+                                                {entry.isCurrent ? 'Current state' : `Step ${entry.index + 1}`}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
 
-                    <div className="dialogue-divider" />
+                        <div className="dialogue-divider" />
 
-                    <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-secondary)' }}>
-                        Double-click any item to restore that state. Current: Step {historyCurrentIndex + 1}
-                    </div>
-                </>
-            )}
+                        <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-secondary)' }}>
+                            Double-click any item to restore that state. Current: Step {historyCurrentIndex + 1}
+                        </div>
+                    </>
+                )
+            }
 
-            {(activeTab === 'channels') && (
-                <>
-                    <div className="dialogue-divider" />
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: 12, padding: 12 }}>
-                        Channels panel is not implemented yet.
-                    </div>
-                </>
-            )}
+            {
+                (activeTab === 'channels') && (
+                    <>
+                        <div className="dialogue-divider" />
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: 12, padding: 12 }}>
+                            Channels panel is not implemented yet.
+                        </div>
+                    </>
+                )
+            }
 
             <div className="dialogue-handle" style={{ marginBottom: 1 }} />
-            {showFiltersDialog && (
-                <FiltersDialog
-                    initialFilterType={initialFilterType}
-                    onClose={() => setShowFiltersDialog(false)}
-                />
-            )}
-        </div>
+            {
+                showFiltersDialog && (
+                    <FiltersDialog
+                        initialFilterType={initialFilterType}
+                        onClose={() => setShowFiltersDialog(false)}
+                    />
+                )
+            }
+        </div >
     )
 }

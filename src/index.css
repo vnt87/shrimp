@@ -308,6 +308,8 @@ body,
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-main);
+  position: relative;
+  z-index: 20;
 }
 
 .header-left {
@@ -483,17 +485,17 @@ body,
   width: 24px;
   height: 100%;
   cursor: pointer;
-  transition: opacity var(--transition);
 }
 
-.header-icon-btn:hover {
-  opacity: 0.8;
+.header-icon-btn:hover svg {
+  color: var(--text-primary);
 }
 
 .header-icon-btn svg {
   width: 16px;
   height: 16px;
   color: var(--text-secondary);
+  transition: color var(--transition);
 }
 
 

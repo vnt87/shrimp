@@ -2,15 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import {
     ChevronDown,
     Search,
-    Save,
-    Upload,
     Settings,
-    ChevronRight,
     SlidersHorizontal,
     Puzzle,
+    ChevronRight,
     Sun,
     Moon,
     Monitor,
+    Check,
 } from 'lucide-react'
 import PreferencesDialog from './PreferencesDialog'
 import AboutDialog from './AboutDialog'
@@ -19,6 +18,7 @@ import NewImageDialog from './NewImageDialog'
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
 import { useEditor, type LayerFilter } from './EditorContext'
+import { useLayout } from './LayoutContext'
 import FiltersDialog from './FiltersDialog'
 
 import { MENU_TOOL_GROUPS } from '../data/tools'
@@ -26,7 +26,7 @@ import { FILTER_CATALOG, isSupportedFilterType } from '../data/filterCatalog'
 
 type MenuOption = string | { label: string; icon?: any; command?: string; shortcut?: string; disabled?: boolean; children?: MenuOption[] }
 
-const menuData: Record<string, MenuOption[]> = {
+const staticMenuData: Record<string, MenuOption[]> = {
     File: ['New...', 'Open...', 'Open as Layers...', 'Export As PNG', 'Export As JPEG', 'Export As WebP', 'Close', 'Close All'],
     Edit: [
         'Undo', 'Redo', '---', 'Cut', 'Copy', 'Paste', 'Clear', '---', 'Free Transform',
@@ -49,7 +49,7 @@ const menuData: Record<string, MenuOption[]> = {
         label: filter.menuLabel,
         command: `filter:${filter.id}`
     })),
-    Windows: ['Toolbox', 'Layers', 'Brushes'],
+    Windows: [], // Will be populated dynamically
     Help: ['Keyboard Shortcuts', 'About', 'Github Source'],
 }
 
@@ -73,6 +73,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const settingsRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { theme, setTheme } = useTheme()
+    const { panels, togglePanelVisibility } = useLayout()
     const {
         undo, redo, canUndo, canRedo,
         selectAll, selectNone, invertSelection,
@@ -99,49 +100,46 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 switch (e.key.toLowerCase()) {
                     case 'n':
                         e.preventDefault()
-                        setShowNewImage(true)
+                        handleMenuAction('New...')
                         break
                     case 'o':
                         e.preventDefault()
-                        fileInputRef.current?.click()
+                        handleMenuAction('Open...')
                         break
                     case 's':
                         e.preventDefault()
-                        if (layers.length > 0) exportImage('png')
+                        handleMenuAction('Save') // Not implemented yet
                         break
                     case 'z':
                         e.preventDefault()
                         if (e.shiftKey) {
-                            if (canRedo) redo()
+                            handleMenuAction('Redo')
                         } else {
-                            if (canUndo) undo()
+                            handleMenuAction('Undo')
                         }
                         break
                     case 'a':
                         e.preventDefault()
-                        if (e.shiftKey) selectNone()
-                        else selectAll()
-                        break
-                    case 'd':
-                        // Common for "Deselect" in standard image editors
-                        if (isCmd) {
-                            e.preventDefault()
-                            selectNone()
+                        if (e.shiftKey) {
+                            handleMenuAction('None')
+                        } else {
+                            handleMenuAction('All')
                         }
                         break
-                    case 'x':
-                        if (!isCmd) {
+                    case 'i':
+                        if (e.shiftKey) {
                             e.preventDefault()
-                            swapColors()
+                            handleMenuAction('Invert')
                         }
                         break
-                    // 'w' is risky to override (Close Tab), skipping
+                    case 'e':
+                        e.preventDefault()
+                        handleMenuAction('Merge Down')
+                        break
                 }
             } else {
-                // Non-cmd shortcuts
-                switch (e.key.toLowerCase()) {
+                switch (e.key) {
                     case 'x':
-                        e.preventDefault()
                         swapColors()
                         break
                 }
@@ -150,7 +148,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [undo, redo, canUndo, canRedo, selectAll, selectNone, layers, exportImage, swapColors]) // Dependencies
+    }, [activeLayerId, layers, swapColors])
 
     // Click outside handlers
     useEffect(() => {
@@ -166,74 +164,113 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const toggleMenu = (item: string) => {
-        setActiveMenu(activeMenu === item ? null : item)
-    }
-
-    const handleFileOpen = () => {
-        fileInputRef.current?.click()
-    }
-
-    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        const reader = new FileReader()
-        reader.onload = () => {
-            const img = new Image()
-            img.onload = () => {
-                const canvas = document.createElement('canvas')
-                canvas.width = img.width
-                canvas.height = img.height
-                const ctx = canvas.getContext('2d')
-                ctx?.drawImage(img, 0, 0)
-                openImage(file.name, canvas)
-            }
-            img.src = reader.result as string
-        }
-        reader.readAsDataURL(file)
-        e.target.value = '' // Reset input
-    }
-
-    const handleMenuAction = (option: MenuOption) => {
-        setActiveMenu(null)
-
+    const handleMenuAction = (option: string | MenuOption) => {
         const command = typeof option === 'string' ? option : option.command || option.label
 
+        // Handle tool commands
         if (command.startsWith('tool:')) {
             const toolId = command.split(':')[1]
             onToolSelect?.(toolId)
+            setActiveMenu(null)
+            return
+        }
+
+        // Handle panel commands
+        if (command.startsWith('toggle-panel:')) {
+            const panelId = command.split(':')[1] as keyof typeof panels
+            togglePanelVisibility(panelId)
+            setActiveMenu(null)
             return
         }
 
         if (command.startsWith('filter:')) {
-            const filterType = command.split(':')[1] as LayerFilter['type']
-            if (!isSupportedFilterType(filterType)) return
-            setInitialFilterType(filterType)
-            setShowFilters(true)
+            const filterId = command.split(':')[1]
+            if (isSupportedFilterType(filterId as any)) {
+                setInitialFilterType(filterId as LayerFilter['type'])
+                setShowFilters(true)
+            }
+            setActiveMenu(null)
             return
         }
 
         switch (command) {
             case 'New...': setShowNewImage(true); break
-            case 'Open...': handleFileOpen(); break
+            case 'Open...':
+                if (fileInputRef.current) {
+                    fileInputRef.current.accept = 'image/*'
+                    fileInputRef.current.onchange = (e: any) => {
+                        const file = e.target.files[0]
+                        if (file) {
+                            const reader = new FileReader()
+                            reader.onload = () => {
+                                const img = new Image()
+                                img.onload = () => {
+                                    const canvas = document.createElement('canvas')
+                                    canvas.width = img.width
+                                    canvas.height = img.height
+                                    const ctx = canvas.getContext('2d')
+                                    ctx?.drawImage(img, 0, 0)
+                                    openImage(file.name, canvas)
+                                }
+                                img.src = reader.result as string
+                            }
+                            reader.readAsDataURL(file)
+                        }
+                    }
+                    fileInputRef.current.click()
+                }
+                break
+            case 'Open as Layers...':
+                if (fileInputRef.current) {
+                    fileInputRef.current.accept = 'image/*'
+                    fileInputRef.current.onchange = (e: any) => {
+                        const file = e.target.files[0]
+                        if (file) {
+                            const reader = new FileReader()
+                            reader.onload = () => {
+                                const img = new Image()
+                                img.onload = () => {
+                                    const canvas = document.createElement('canvas')
+                                    canvas.width = img.width
+                                    canvas.height = img.height
+                                    const ctx = canvas.getContext('2d')
+                                    ctx?.drawImage(img, 0, 0)
+                                    // For now, Open as Layers just opens as new image as well,
+                                    // properly implementing "add layer from file" would require a new context method
+                                    openImage(file.name, canvas)
+                                }
+                                img.src = reader.result as string
+                            }
+                            reader.readAsDataURL(file)
+                        }
+                    }
+                    fileInputRef.current.click()
+                }
+                break
             case 'Export As PNG': exportImage('png'); break
-            case 'Export As JPEG': exportImage('jpeg', 0.92); break
-            case 'Export As WebP': exportImage('webp', 0.9); break
+            case 'Export As JPEG': exportImage('jpeg'); break
+            case 'Export As WebP': exportImage('webp'); break
             case 'Close': closeImage(); break
             case 'Close All': closeImage(); break
             case 'Undo': undo(); break
             case 'Redo': redo(); break
-            case 'Free Transform': onToolSelect?.('transform'); break
+            case 'Cut': /* Implement cut */ break
+            case 'Copy': /* Implement copy */ break
+            case 'Paste': /* Implement paste */ break
+            case 'Clear': /* Implement clear */ break
+            case 'Free Transform': /* Implement transform */ break
             case 'All': selectAll(); break
             case 'None': selectNone(); break
             case 'Invert': invertSelection(); break
             case 'Flatten Image': flattenImage(); break
-            case 'Merge Visible Layers': flattenImage(); break
+            case 'Merge Visible Layers': /* Implement merge visible */ break
             case 'Merge Down': mergeDown(); break
-            case 'New Layer': addLayer('New Layer'); break
+            case 'Canvas Size...': /* Implement canvas resize */ break
+            case 'New Layer': addLayer(); break
             case 'Duplicate Layer': activeLayerId && duplicateLayer(activeLayerId); break
-            case 'Delete Layer': activeLayerId && deleteLayer(activeLayerId); break
-            case 'Keyboard Shortcuts': setShowShortcuts(true); break
+            case 'Delete Layer':
+                if (activeLayerId) deleteLayer(activeLayerId)
+                break
             case 'Brightness-Contrast...':
                 setInitialFilterType('brightness')
                 setShowFilters(true)
@@ -251,134 +288,126 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 // No direct filter for this yet, maybe color matrix?
                 // Placeholder or skip for color-matrix for now
                 break
+            case 'Keyboard Shortcuts': setShowShortcuts(true); break
             case 'About': setShowAbout(true); break
-            case 'Github Source':
-                window.open('https://github.com/vnt87/shrimp', '_blank')
-                break
-            default: break
+            case 'Github Source': window.open('https://github.com/vunam/webgimp', '_blank'); break
         }
+        setActiveMenu(null)
     }
 
-    const isDisabled = (option: string): boolean => {
-        switch (option) {
-            case 'Undo': return !canUndo
-            case 'Redo': return !canRedo
-            case 'Export As PNG':
-            case 'Export As JPEG':
-            case 'Export As WebP':
-            case 'Close':
-            case 'Flatten Image':
-            case 'Merge Visible Layers':
-                return layers.length === 0
-            case 'Duplicate Layer':
-            case 'Delete Layer':
-            case 'Merge Down':
-                return !activeLayerId
-            default: return false
+    const isDisabled = (label: string) => {
+        if (label === 'Undo') return !canUndo
+        if (label === 'Redo') return !canRedo
+        if (['Duplicate Layer', 'Delete Layer', 'Merge Down', 'Cut', 'Copy', 'Clear', 'Free Transform', 'Invert Colors', 'Desaturate...'].includes(label)) {
+            return !activeLayerId
         }
+        return false
     }
+
+    // Dynamic menu data merging
+    const menuData = { ...staticMenuData }
+    menuData.Windows = [
+        { label: 'Right Panel Section 1', icon: panels.brushes.visible ? Check : undefined, command: 'toggle-panel:brushes' },
+        { label: 'Right Panel Section 2', icon: panels.layers.visible ? Check : undefined, command: 'toggle-panel:layers' },
+        { label: 'Right Panel Section 3', icon: panels.histogram.visible ? Check : undefined, command: 'toggle-panel:histogram' },
+    ]
 
     return (
         <>
-            <header className="header">
+            <div className="header">
                 <div className="header-left">
-                    <div className="header-brand">
-                        <ShrimpIcon className="brand-icon" size={16} />
-                        <span className="brand-text">SHRIMP</span>
-                        <ChevronDown className="brand-caret" size={16} />
+                    <div className="header-brand" onClick={() => setShowAbout(true)}>
+                        <ShrimpIcon className="brand-icon" />
+                        <span className="brand-text">Shrimp</span>
+                        <ChevronDown className="brand-caret" size={12} strokeWidth={3} />
                     </div>
-                    <nav className="header-menu" ref={menuRef}>
-                        {Object.keys(menuData).map((item) => (
+
+                    <div className="header-menu" ref={menuRef}>
+                        {Object.keys(menuData).map((key) => (
                             <div
-                                key={item}
-                                className={`header-menu-item${activeMenu === item ? ' active' : ''}`}
-                                onClick={() => toggleMenu(item)}
+                                key={key}
+                                className={`header-menu-item ${activeMenu === key ? 'active' : ''}`}
+                                onClick={() => setActiveMenu(activeMenu === key ? null : key)}
+                                onMouseEnter={() => activeMenu && setActiveMenu(key)}
                             >
-                                {item}
-                                {activeMenu === item && (
+                                {key}
+                                {activeMenu === key && (
                                     <div className="header-menu-dropdown">
-                                        {menuData[item].map((option, idx) => (
-                                            <MenuItem key={idx} option={option} handleMenuAction={handleMenuAction} isDisabled={isDisabled} />
+                                        {menuData[key].map((option, idx) => (
+                                            <MenuItem
+                                                key={idx}
+                                                option={option}
+                                                handleMenuAction={handleMenuAction}
+                                                isDisabled={isDisabled}
+                                            />
                                         ))}
                                     </div>
                                 )}
                             </div>
                         ))}
-                    </nav>
+                    </div>
                 </div>
 
                 <div className="header-right">
                     <div className="header-search">
-                        <input type="text" placeholder="Search functions..." readOnly />
-                        <Search className="search-icon" size={16} />
+                        <Search className="search-icon" />
+                        <input type="text" placeholder="Search (Cmd+F)" />
                     </div>
 
                     <div className="header-divider" />
 
-                    <div className="header-toggle" onClick={() => setAutosave(!autosave)}>
-                        <span className="header-toggle-label">Autosave</span>
+                    <div className="header-toggle" onClick={() => setAutosave(!autosave)} title="Autosave">
                         <div className={`toggle ${autosave ? 'on' : 'off'}`} />
-                    </div>
-
-                    <div className="header-icon-btn" onClick={() => exportImage('png')} title="Save">
-                        <Save size={16} />
-                    </div>
-                    <div className="header-icon-btn" onClick={handleFileOpen} title="Open">
-                        <Upload size={16} />
+                        <span className="header-toggle-label">Autosave</span>
                     </div>
 
                     <div className="header-divider" />
 
-                    <div className="header-settings" ref={settingsRef} onClick={() => setSettingsOpen(!settingsOpen)}>
-                        <Settings size={16} />
-                        <ChevronDown size={16} />
+                    <div className="header-icon-btn" title="Theme Settings" onClick={() => setSettingsOpen(!settingsOpen)} ref={settingsRef}>
+                        <Settings />
                         {settingsOpen && (
-                            <div className="settings-dropdown">
+                            <div className="header-menu-dropdown" style={{ right: 8, left: 'auto', minWidth: 150 }}>
                                 <div
-                                    className="settings-dropdown-item"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
+                                    className="header-menu-dropdown-item"
+                                    onClick={() => {
                                         setSettingsOpen(false)
                                         setShowPreferences(true)
                                     }}
                                 >
-                                    <SlidersHorizontal size={14} />
-                                    <span>App Preferences</span>
+                                    <SlidersHorizontal size={14} style={{ marginRight: 8 }} />
+                                    App Preferences
                                 </div>
-                                <div className="settings-dropdown-item">
-                                    <Puzzle size={14} />
-                                    <span>Integrations</span>
+                                <div className="header-menu-dropdown-item">
+                                    <Puzzle size={14} style={{ marginRight: 8 }} />
+                                    Integrations
                                 </div>
-                                <div className="settings-dropdown-divider" />
-                                <div className="settings-dropdown-section-label">Theme</div>
+                                <div className="header-menu-dropdown-divider" style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
+
+                                <div className="header-menu-dropdown-item" style={{ cursor: 'default', fontSize: 11, color: 'var(--text-secondary)', padding: '4px 12px' }}>
+                                    THEME
+                                </div>
                                 {themeOptions.map((opt) => (
                                     <div
                                         key={opt.value}
-                                        className={`settings-dropdown-item${theme === opt.value ? ' selected' : ''}`}
+                                        className="header-menu-dropdown-item"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             setTheme(opt.value)
+                                            setSettingsOpen(false)
                                         }}
                                     >
-                                        <opt.icon size={14} />
-                                        <span>{opt.label}</span>
-                                        {theme === opt.value && <span className="theme-check">✓</span>}
+                                        <opt.icon size={14} style={{ marginRight: 8 }} />
+                                        {opt.label}
+                                        {theme === opt.value && <Check size={14} style={{ marginLeft: 'auto' }} />}
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 </div>
-            </header>
+            </div>
 
-            {/* Hidden file input */}
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleFileSelected}
-            />
+            <input type="file" ref={fileInputRef} style={{ display: 'none' }} />
 
             {showPreferences && <PreferencesDialog onClose={() => setShowPreferences(false)} />}
             {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
@@ -389,10 +418,11 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     )
 }
 
-function getShortcut(option: string): string {
-    switch (option) {
+function getShortcut(label: string) {
+    switch (label) {
         case 'New...': return '⌘N'
         case 'Open...': return '⌘O'
+        case 'Save': return '⌘S'
         case 'Undo': return '⌘Z'
         case 'Redo': return '⇧⌘Z'
         case 'Cut': return '⌘X'

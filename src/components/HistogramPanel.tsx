@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { MoreVertical, AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useEditor } from './EditorContext'
 import InfoPanel from './InfoPanel'
 import NavigatorPanel from './NavigatorPanel'
+import PanelMenu from './PanelMenu'
 
 // Generate stacked area chart paths
 function generateAreaPath(
@@ -48,7 +49,7 @@ export default function HistogramPanel() {
     ]
 
     return (
-        <div className="dialogue" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="dialogue" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
             {/* Header tabs */}
             <div className="dialogue-header">
                 <div className="dialogue-tabs">
@@ -71,9 +72,7 @@ export default function HistogramPanel() {
                         Info
                     </div>
                 </div>
-                <div className="dialogue-more">
-                    <MoreVertical size={16} />
-                </div>
+                <PanelMenu panelId="histogram" />
             </div>
 
             {/* Content Area */}

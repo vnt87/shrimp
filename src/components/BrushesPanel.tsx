@@ -1,5 +1,4 @@
 import {
-    MoreVertical,
     Search,
     List,
     LayoutGrid,
@@ -10,6 +9,7 @@ import {
     RefreshCw,
     Folder,
 } from 'lucide-react'
+import PanelMenu from './PanelMenu'
 
 const brushVariants = [
     1, 2, 3, 4, 5, 1, 2, 3, 4, 5,
@@ -27,9 +27,7 @@ export default function BrushesPanel() {
                     <div className="dialogue-tab inactive">Gradient</div>
                     <div className="dialogue-tab inactive">Text Styles</div>
                 </div>
-                <div className="dialogue-more">
-                    <MoreVertical size={16} />
-                </div>
+                <PanelMenu panelId="brushes" />
             </div>
 
             {/* Search bar */}
