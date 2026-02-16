@@ -1,6 +1,6 @@
 export const en = {
     // Common
-    'common.shrimp': 'Shrimp',
+    'common.shrimp': 'SHRIMP',
 
     // Header / Navbar
     'header.themeSettings': 'Theme Settings',

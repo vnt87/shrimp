@@ -2,7 +2,7 @@ import { TranslationKey } from './en'
 
 export const vi: Record<TranslationKey, string> = {
     // Common
-    'common.shrimp': 'Shrimp',
+    'common.shrimp': 'SHRIMP',
 
     // Header / Navbar
     'header.themeSettings': 'Cài đặt Chủ đề',

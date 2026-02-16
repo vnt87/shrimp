@@ -22,8 +22,17 @@ import { useLayout } from './LayoutContext'
 import { useLanguage } from '../i18n/LanguageContext'
 const FiltersDialog = lazy(() => import('./FiltersDialog'))
 
-import { MENU_TOOL_GROUPS } from '../data/tools'
+import { MENU_TOOL_GROUPS, shortcuts, toolGroups } from '../data/tools'
 import { FILTER_CATALOG, isSupportedFilterType } from '../data/filterCatalog'
+
+interface SearchResult {
+    id: string
+    label: string
+    type: 'tool' | 'filter'
+    icon?: any
+    shortcut?: string
+    action: () => void
+}
 
 type MenuOption = string | { label: string; icon?: any; command?: string; shortcut?: string; disabled?: boolean; children?: MenuOption[] }
 
@@ -48,6 +57,16 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const searchInputRef = useRef<HTMLInputElement>(null)
+    const searchContainerRef = useRef<HTMLDivElement>(null)
+
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('')
+    const [showSearch, setShowSearch] = useState(false)
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+    const [focusedResultIndex, setFocusedResultIndex] = useState(0)
+
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
     const { theme, setTheme } = useTheme()
     const { t, language, setLanguage } = useLanguage()
     const { panels, togglePanelVisibility } = useLayout()
@@ -136,9 +155,80 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
                 setSettingsOpen(false)
             }
+            if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+                setShowSearch(false)
+            }
         }
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    // Search Index Construction
+    const searchIndex = useRef<SearchResult[]>([])
+    useEffect(() => {
+        const index: SearchResult[] = []
+
+        // Index Tools
+        toolGroups.flat().forEach(tool => {
+            index.push({
+                id: tool.id,
+                label: t(tool.label as any),
+                type: 'tool',
+                icon: tool.icon,
+                shortcut: shortcuts[tool.id],
+                action: () => onToolSelect?.(tool.id)
+            })
+        })
+
+        // Index Filters
+        FILTER_CATALOG.forEach(filter => {
+            index.push({
+                id: filter.id,
+                label: t(filter.menuLabel as any),
+                type: 'filter',
+                icon: SlidersHorizontal,
+                action: () => {
+                    setInitialFilterType(filter.id)
+                    setShowFilters(true)
+                }
+            })
+        })
+
+        searchIndex.current = index
+    }, [t, onToolSelect])
+
+    // Search Logic
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setSearchResults(searchIndex.current.slice(0, 10)) // Show first 10 by default or recent?
+            return
+        }
+
+        const query = searchQuery.toLowerCase()
+        const results = searchIndex.current.filter(item =>
+            item.label.toLowerCase().includes(query) ||
+            (item.shortcut && item.shortcut.toLowerCase().includes(query))
+        )
+        setSearchResults(results)
+    }, [searchQuery])
+
+    const executeSearchResult = (result: SearchResult) => {
+        result.action()
+        setShowSearch(false)
+        setSearchQuery('')
+    }
+
+    // Global shortcut for search
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+                e.preventDefault()
+                searchInputRef.current?.focus()
+                setShowSearch(true)
+            }
+        }
+        window.addEventListener('keydown', handleGlobalKeyDown)
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown)
     }, [])
 
     const handleMenuAction = (option: string | MenuOption) => {
@@ -395,9 +485,62 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 </div>
 
                 <div className="header-right">
-                    <div className="header-search">
+                    <div className="header-search" ref={searchContainerRef}>
                         <Search className="search-icon" />
-                        <input type="text" placeholder={t('header.search_placeholder')} />
+                        <input
+                            ref={searchInputRef}
+                            type="text"
+                            placeholder={isMac ? "Search (⌘/)" : "Search (Ctrl+/)"}
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setFocusedResultIndex(0);
+                                if (e.target.value) setShowSearch(true);
+                            }}
+                            onFocus={() => setShowSearch(true)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setFocusedResultIndex(prev => Math.min(prev + 1, searchResults.length - 1));
+                                } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setFocusedResultIndex(prev => Math.max(prev - 1, 0));
+                                } else if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (searchResults[focusedResultIndex]) {
+                                        executeSearchResult(searchResults[focusedResultIndex]);
+                                    }
+                                } else if (e.key === 'Escape') {
+                                    setShowSearch(false);
+                                    searchInputRef.current?.blur();
+                                }
+                            }}
+                        />
+                        {showSearch && (searchQuery || searchResults.length > 0) && (
+                            <div className="header-search-results">
+                                {searchResults.length > 0 ? (
+                                    searchResults.map((result, index) => (
+                                        <div
+                                            key={`${result.type}-${result.id}`}
+                                            className={`search-result-item ${index === focusedResultIndex ? 'active' : ''}`}
+                                            onClick={() => executeSearchResult(result)}
+                                            onMouseEnter={() => setFocusedResultIndex(index)}
+                                        >
+                                            {result.icon && <result.icon size={14} className="result-icon" />}
+                                            <div className="result-info">
+                                                <span className="result-label">{result.label}</span>
+                                                <span className="result-type">{result.type === 'tool' ? 'Tool' : 'Filter'}</span>
+                                            </div>
+                                            {result.shortcut && <span className="result-shortcut">{result.shortcut}</span>}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="search-no-results">
+                                        No results found
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="header-divider" />

@@ -438,6 +438,7 @@ body,
   height: 20px;
   width: 167px;
   gap: 6px;
+  position: relative;
 }
 
 .header-search input {
@@ -3249,6 +3250,7 @@ body,
   width: 100%;
   height: 4px;
   -webkit-appearance: none;
+  appearance: none;
   background: var(--bg-input);
   border-radius: 2px;
   outline: none;
@@ -3570,4 +3572,99 @@ body,
 .tab-add-btn:hover {
   background: var(--hover-overlay);
   color: var(--text-primary);
+}
+
+/* ===== Header Search Results ===== */
+.header-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  border-top: none;
+  box-shadow: var(--shadow-dropdown);
+  z-index: 1000;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: 4px 0;
+  max-height: 300px;
+  overflow-y: auto;
+  width: 240px;
+  /* Wider than the input */
+}
+
+.search-result-item {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.search-result-item:hover,
+.search-result-item.active {
+  background: var(--accent-active);
+  color: white;
+}
+
+.search-result-item .result-icon {
+  color: var(--text-secondary);
+}
+
+.search-result-item:hover .result-icon,
+.search-result-item.active .result-icon {
+  color: white;
+}
+
+.result-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.result-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.search-result-item:hover .result-label,
+.search-result-item.active .result-label {
+  color: white;
+}
+
+.result-type {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.search-result-item:hover .result-type,
+.search-result-item.active .result-type {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.result-shortcut {
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  padding: 2px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border-input);
+}
+
+.search-result-item:hover .result-shortcut,
+.search-result-item.active .result-shortcut {
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+  border-color: transparent;
+}
+
+.search-no-results {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }

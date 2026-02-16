@@ -36,7 +36,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
                         <ShrimpIcon size={48} />
                     </div>
 
-                    <h1 className="about-app-name">WebGIMP</h1>
+                    <h1 className="about-app-name">SHRIMP</h1>
                     <span className="about-version">{t('dialog.about.version')} {APP_VERSION}</span>
                     <div className="about-tagline">
                         <div style={{ marginBottom: '4px' }}>
