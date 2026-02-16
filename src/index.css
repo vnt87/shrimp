@@ -258,6 +258,31 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ===== Global Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--bg-scrollbar-thumb);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
+
 /* ===== App Layout ===== */
 .app {
   width: 100vw;
@@ -1438,19 +1463,6 @@ body,
   position: relative;
 }
 
-.brush-grid-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.brush-grid-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.brush-grid-container::-webkit-scrollbar-thumb {
-  background: var(--bg-scrollbar-thumb);
-  border-radius: 4px;
-  opacity: 0.5;
-}
 
 .brush-grid-row {
   display: flex;
@@ -2287,14 +2299,6 @@ body,
   flex-shrink: 0;
 }
 
-.pref-sidebar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.pref-sidebar::-webkit-scrollbar-thumb {
-  background: var(--border-main);
-  border-radius: 2px;
-}
 
 .pref-sidebar-item {
   display: flex;
@@ -2350,14 +2354,6 @@ body,
   min-width: 0;
 }
 
-.pref-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.pref-content::-webkit-scrollbar-thumb {
-  background: var(--border-main);
-  border-radius: 3px;
-}
 
 .pref-page-title {
   font-size: 16px;
@@ -2948,14 +2944,7 @@ body,
   min-height: 0;
 }
 
-.shortcuts-body::-webkit-scrollbar {
-  width: 6px;
-}
 
-.shortcuts-body::-webkit-scrollbar-thumb {
-  background: var(--border-main);
-  border-radius: 3px;
-}
 
 .shortcuts-group {
   margin-bottom: 14px;
@@ -3356,14 +3345,6 @@ body,
   scrollbar-color: var(--border-main) transparent;
 }
 
-.font-dropdown::-webkit-scrollbar {
-  width: 6px;
-}
-
-.font-dropdown::-webkit-scrollbar-thumb {
-  background: var(--border-main);
-  border-radius: 3px;
-}
 
 /* ===== Context Menu ===== */
 .context-menu {
