@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import {
     ChevronDown,
     Search,
@@ -11,16 +11,16 @@ import {
     Monitor,
     Check,
 } from 'lucide-react'
-import PreferencesDialog from './PreferencesDialog'
-import AboutDialog from './AboutDialog'
-import KeyboardShortcutsDialog from './KeyboardShortcutsDialog'
-import NewImageDialog from './NewImageDialog'
+const PreferencesDialog = lazy(() => import('./PreferencesDialog'))
+const AboutDialog = lazy(() => import('./AboutDialog'))
+const KeyboardShortcutsDialog = lazy(() => import('./KeyboardShortcutsDialog'))
+const NewImageDialog = lazy(() => import('./NewImageDialog'))
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
 import { useEditor, type LayerFilter } from './EditorContext'
 import { useLayout } from './LayoutContext'
 import { useLanguage } from '../i18n/LanguageContext'
-import FiltersDialog from './FiltersDialog'
+const FiltersDialog = lazy(() => import('./FiltersDialog'))
 
 import { MENU_TOOL_GROUPS } from '../data/tools'
 import { FILTER_CATALOG, isSupportedFilterType } from '../data/filterCatalog'
@@ -487,11 +487,13 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
             <input type="file" ref={fileInputRef} style={{ display: 'none' }} />
 
-            {showPreferences && <PreferencesDialog open={showPreferences} onClose={() => setShowPreferences(false)} />}
-            {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
-            {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
-            {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
-            {showFilters && <FiltersDialog initialFilterType={initialFilterType} onClose={() => setShowFilters(false)} />}
+            <Suspense fallback={null}>
+                {showPreferences && <PreferencesDialog open={showPreferences} onClose={() => setShowPreferences(false)} />}
+                {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+                {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
+                {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
+                {showFilters && <FiltersDialog initialFilterType={initialFilterType} onClose={() => setShowFilters(false)} />}
+            </Suspense>
         </>
     )
 }

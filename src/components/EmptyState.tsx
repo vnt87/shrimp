@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { FolderOpen, ClipboardPaste, Image, FilePlus } from 'lucide-react'
 import ShrimpIcon from './ShrimpIcon'
-import NewImageDialog from './NewImageDialog'
+const NewImageDialog = lazy(() => import('./NewImageDialog'))
 
 interface EmptyStateProps {
     onLoadSample: () => void
@@ -40,7 +40,9 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
                     </button>
                 </div>
             </div>
-            {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
+            <Suspense fallback={null}>
+                {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
+            </Suspense>
         </div>
     )
 }

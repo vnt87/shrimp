@@ -16,10 +16,10 @@ import {
     Redo2,
     SlidersHorizontal,
 } from 'lucide-react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { useEditor, Layer, type LayerFilter } from './EditorContext'
 import PanelMenu from './PanelMenu'
-import FiltersDialog from './FiltersDialog'
+const FiltersDialog = lazy(() => import('./FiltersDialog'))
 import { getFilterCatalogEntry, isSupportedFilterType } from '../data/filterCatalog'
 import { useLanguage } from '../i18n/LanguageContext'
 import { TranslationKey } from '../i18n/en'
@@ -822,14 +822,16 @@ export default function LayersPanel() {
             }
 
             <div className="dialogue-handle" style={{ marginBottom: 1 }} />
-            {
-                showFiltersDialog && (
-                    <FiltersDialog
-                        initialFilterType={initialFilterType}
-                        onClose={() => setShowFiltersDialog(false)}
-                    />
-                )
-            }
+            <Suspense fallback={null}>
+                {
+                    showFiltersDialog && (
+                        <FiltersDialog
+                            initialFilterType={initialFilterType}
+                            onClose={() => setShowFiltersDialog(false)}
+                        />
+                    )
+                }
+            </Suspense>
         </div >
     )
 }
