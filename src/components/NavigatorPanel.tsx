@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { useEditor } from './EditorContext'
-import { Minus, Plus } from 'lucide-react'
+import { ZoomIn, ZoomOut } from 'lucide-react'
 
 export default function NavigatorPanel() {
     const { canvasSize, layers, viewTransform, setViewTransform, viewportSize } = useEditor()
@@ -41,7 +41,7 @@ export default function NavigatorPanel() {
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
         // bg
-        ctx.fillStyle = '#1e1e1e'
+        ctx.fillStyle = '#111'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
 
         // Draw layers
@@ -50,7 +50,7 @@ export default function NavigatorPanel() {
         ctx.scale(navScale, navScale)
 
         // Draw Checkerboard
-        ctx.fillStyle = '#333'
+        ctx.fillStyle = '#1a1a1a'
         ctx.fillRect(0, 0, canvasSize.width, canvasSize.height)
 
         layers.slice().reverse().forEach(layer => {
@@ -64,25 +64,21 @@ export default function NavigatorPanel() {
 
         // Draw Viewport Rect
         if (viewportSize.width > 0 && viewportSize.height > 0) {
-            // Viewport in canvas coordinates
-            // viewTransform.offsetX/Y is the canvas position relative to viewport origin
-            // So visible rect starts at: -offsetX / scale, -offsetY / scale
             const visibleX = -viewTransform.offsetX / viewTransform.scale
             const visibleY = -viewTransform.offsetY / viewTransform.scale
             const visibleW = viewportSize.width / viewTransform.scale
             const visibleH = viewportSize.height / viewTransform.scale
 
-            // Convert to Nav coordinates
             const navRectX = visibleX * navScale + offsetX
             const navRectY = visibleY * navScale + offsetY
             const navRectW = visibleW * navScale
             const navRectH = visibleH * navScale
 
-            ctx.lineWidth = 1
-            ctx.strokeStyle = 'red'
+            ctx.lineWidth = 1.5
+            ctx.strokeStyle = '#3b82f6'
             ctx.strokeRect(navRectX, navRectY, navRectW, navRectH)
 
-            ctx.fillStyle = 'rgba(255, 0, 0, 0.1)'
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.15)'
             ctx.fillRect(navRectX, navRectY, navRectW, navRectH)
         }
 
@@ -96,14 +92,8 @@ export default function NavigatorPanel() {
         const x = e.clientX - rect.left
         const y = e.clientY - rect.top
 
-        // Logic: If clicking inside rect, start drag. If outside, jump to pos?
-        // User asked for "pan within that small area". 
-        // Let's implement jump-to-pos on click, and then drag.
-
-        // Calculate clicked position in Main Canvas Coordinates
         const { navScale, offsetX, offsetY } = metrics
 
-        // Check if inside viewport rect
         const visibleX = -viewTransform.offsetX / viewTransform.scale
         const visibleY = -viewTransform.offsetY / viewTransform.scale
         const visibleW = viewportSize.width / viewTransform.scale
@@ -115,34 +105,25 @@ export default function NavigatorPanel() {
         const navRectH = visibleH * navScale
 
         if (x >= navRectX && x <= navRectX + navRectW && y >= navRectY && y <= navRectY + navRectH) {
-            // Clicking inside - simple drag
             setIsDragging(true)
             setDragStart({ x, y })
             setInitialTransform(viewTransform)
         } else {
-            // Clicking outside - jump center to click
             const canvasClickX = (x - offsetX) / navScale
             const canvasClickY = (y - offsetY) / navScale
-
-            // Center viewport on click
-            // Target visible center = canvasClickX, canvasClickY
-            // Target visible TopLeft = center - width/2
 
             const targetVisibleX = canvasClickX - (visibleW / 2)
             const targetVisibleY = canvasClickY - (visibleH / 2)
 
-            // Convert back to transform offset
-            // offsetX = -targetVisibleX * scale
             const newOffsetX = -targetVisibleX * viewTransform.scale
             const newOffsetY = -targetVisibleY * viewTransform.scale
 
             const newTransform = { ...viewTransform, offsetX: newOffsetX, offsetY: newOffsetY }
             setViewTransform(newTransform)
 
-            // Also start dragging immediately from the center
             setIsDragging(true)
             setDragStart({ x, y })
-            setInitialTransform(newTransform) // Use the new one as base
+            setInitialTransform(newTransform)
         }
     }
 
@@ -160,17 +141,8 @@ export default function NavigatorPanel() {
         if (!metrics) return
         const { navScale } = metrics
 
-        // Convert deltaNav to deltaCanvas
-        // deltaCanvas = deltaNav / navScale
         const deltaCanvasX = dx / navScale
         const deltaCanvasY = dy / navScale
-
-        // Update Transform Offset
-        // Changing viewport position by +deltaCanvas means moving canvas by -deltaCanvas * scale
-        // Wait.
-        // If I move viewport RIGHT (+dx), visible area moves right.
-        // Canvas Offset moves LEFT.
-        // newOffset = initialOffset - deltaCanvas * scale
 
         const newOffsetX = initialTransform.offsetX - (deltaCanvasX * initialTransform.scale)
         const newOffsetY = initialTransform.offsetY - (deltaCanvasY * initialTransform.scale)
@@ -185,79 +157,185 @@ export default function NavigatorPanel() {
 
     const handleZoom = (direction: 'in' | 'out') => {
         const factor = direction === 'in' ? 1.2 : 1 / 1.2
+        updateZoom(viewTransform.scale * factor)
+    }
 
-        // Zoom towards center of viewport
+    const updateZoom = (newScale: number) => {
+        // Clamp scale
+        const clampedScale = Math.min(Math.max(newScale, 0.01), 32)
+
         const centerX = viewportSize.width / 2
         const centerY = viewportSize.height / 2
 
-        // Calculate canvas point at center of viewport
         const canvasX = (centerX - viewTransform.offsetX) / viewTransform.scale
         const canvasY = (centerY - viewTransform.offsetY) / viewTransform.scale
 
-        const newScale = viewTransform.scale * factor
-
-        // New offset to keep canvasX, canvasY at center
-        // center = offset + point * newScale
-        // offset = center - point * newScale
-
-        const newOffsetX = centerX - canvasX * newScale
-        const newOffsetY = centerY - canvasY * newScale
+        const newOffsetX = centerX - canvasX * clampedScale
+        const newOffsetY = centerY - canvasY * clampedScale
 
         setViewTransform({
-            scale: newScale,
+            scale: clampedScale,
             offsetX: newOffsetX,
             offsetY: newOffsetY
         })
     }
 
-    return (
-        <div className="navigator-panel" style={{ width: '100%', height: '100%', position: 'relative', background: '#111', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-                <canvas
-                    ref={canvasRef}
-                    width={200}
-                    height={150}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: isDragging ? 'grabbing' : 'grab' }}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                />
-            </div>
+    const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = parseFloat(e.target.value)
+        // Logarithmic scale for better control? Or simple power?
+        // Let's use val as power of 2 for smooth exponential zoom
+        const newScale = Math.pow(2, val)
+        updateZoom(newScale)
+    }
 
-            {/* Zoom Controls */}
+    // Convert scale to slider value (log2)
+    const sliderValue = Math.log2(viewTransform.scale)
+
+    const [isHovered, setIsHovered] = useState(false)
+
+    return (
+        <div
+            className="navigator-panel"
+            style={{ width: '100%', height: '100%', position: 'relative', background: '#111', overflow: 'hidden' }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            <canvas
+                ref={canvasRef}
+                width={200}
+                height={150}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: isDragging ? 'grabbing' : 'grab' }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+            />
+
+            {/* Floating Zoom Controls - Subtle & Hover triggered (Vertical Right) */}
             <div style={{
-                height: 32,
-                borderTop: '1px solid var(--border-main)',
+                position: 'absolute',
+                right: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 8px',
-                background: 'var(--bg-panel)'
+                gap: 8,
+                padding: '12px 2px',
+                zIndex: 10,
+                userSelect: 'none',
+                opacity: isHovered || isDragging ? 1 : 0,
+                pointerEvents: isHovered || isDragging ? 'auto' : 'none',
+                transition: 'opacity 0.2s ease-in-out'
             }}>
-                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                <button
+                    className="zoom-btn"
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        padding: 2,
+                        borderRadius: 4,
+                        filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.5))'
+                    }}
+                    onClick={() => handleZoom('in')}
+                    title="Zoom In"
+                >
+                    <ZoomIn size={16} />
+                </button>
+
+                <div style={{
+                    height: 80,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '10px 0'
+                }}>
+                    <input
+                        type="range"
+                        min={-6} // 1/64 = ~1.5%
+                        max={5}  // 32 = 3200%
+                        step={0.01}
+                        value={sliderValue}
+                        onChange={handleSliderChange}
+                        style={{
+                            width: 80,
+                            height: 4,
+                            accentColor: '#3b82f6',
+                            cursor: 'pointer',
+                            transform: 'rotate(270deg)',
+                            filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.5))'
+                        }}
+                    />
+                </div>
+
+                <button
+                    className="zoom-btn"
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        padding: 2,
+                        borderRadius: 4,
+                        filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.5))'
+                    }}
+                    onClick={() => handleZoom('out')}
+                    title="Zoom Out"
+                >
+                    <ZoomOut size={16} />
+                </button>
+
+                <span
+                    style={{
+                        fontSize: 10,
+                        color: 'rgba(255, 255, 255, 0.5)',
+                        fontWeight: 500,
+                        fontFamily: 'Inter, system-ui',
+                        textShadow: '0 0 3px rgba(0,0,0,0.8)',
+                        transform: 'rotate(0deg)', // Keep text horizontal
+                        marginTop: 4,
+                        cursor: 'pointer'
+                    }}
+                    onDoubleClick={() => updateZoom(1.0)}
+                    title="Double-click to reset zoom to 100%"
+                >
                     {Math.round(viewTransform.scale * 100)}%
                 </span>
-                <div style={{ display: 'flex', gap: 4 }}>
-                    <button
-                        className="pref-btn pref-btn-secondary"
-                        style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        onClick={() => handleZoom('out')}
-                        title="Zoom Out"
-                    >
-                        <Minus size={14} />
-                    </button>
-                    {/* Slider could go here */}
-                    <button
-                        className="pref-btn pref-btn-secondary"
-                        style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        onClick={() => handleZoom('in')}
-                        title="Zoom In"
-                    >
-                        <Plus size={14} />
-                    </button>
-                </div>
             </div>
+
+            <style>{`
+                .zoom-btn:hover {
+                    color: white !important;
+                    background: rgba(255,255,255,0.1) !important;
+                }
+                .zoom-btn:active {
+                    transform: scale(0.9);
+                }
+                input[type=range] {
+                    -webkit-appearance: none;
+                    background: transparent;
+                }
+                input[type=range]::-webkit-slider-runnable-track {
+                    height: 4px;
+                    background: rgba(255,255,255,0.2);
+                    border-radius: 2px;
+                }
+                input[type=range]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    height: 12px;
+                    width: 12px;
+                    border-radius: 50%;
+                    background: #3b82f6;
+                    cursor: pointer;
+                    margin-top: -4px;
+                    box-shadow: 0 0 4px rgba(0,0,0,0.5);
+                    border: 2px solid #1e1e1e;
+                }
+            `}</style>
         </div>
     )
 }

@@ -32,6 +32,8 @@ export const en = {
     'menu.file.new': 'New...',
     'menu.file.open': 'Open...',
     'menu.file.open_layers': 'Open as Layers...',
+    'menu.file.save': 'Save',
+    'menu.file.save_as': 'Save As...',
     'menu.file.export_png': 'Export As PNG',
     'menu.file.export_jpeg': 'Export As JPEG',
     'menu.file.export_webp': 'Export As WebP',

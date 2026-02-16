@@ -24,6 +24,7 @@ const FiltersDialog = lazy(() => import('./FiltersDialog'))
 
 import { MENU_TOOL_GROUPS, shortcuts, toolGroups } from '../data/tools'
 import { FILTER_CATALOG, isSupportedFilterType } from '../data/filterCatalog'
+import { saveToShrimpFile, loadFromShrimpFile } from '../utils/fileIO'
 
 interface SearchResult {
     id: string
@@ -79,7 +80,9 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         openImage,
         addLayer, deleteLayer, duplicateLayer,
         activeLayerId, layers,
-        swapColors
+        swapColors,
+        activeDocument, // for saving
+        loadDocument // for loading
     } = useEditor()
 
     // Key handlers
@@ -102,9 +105,12 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                         e.preventDefault()
                         handleMenuAction('Open...')
                         break
+
                     case 's':
                         e.preventDefault()
-                        handleMenuAction('Save') // Not implemented yet
+                        if (activeDocument) {
+                            saveToShrimpFile(activeDocument.history.present, `${activeDocument.name}.shrimp`)
+                        }
                         break
                     case 'z':
                         e.preventDefault()
@@ -262,29 +268,45 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
         switch (command) {
             case 'New...': setShowNewImage(true); break
+
             case 'Open...':
                 if (fileInputRef.current) {
-                    fileInputRef.current.accept = 'image/*'
-                    fileInputRef.current.onchange = (e: any) => {
+                    fileInputRef.current.accept = '.shrimp,image/*'
+                    fileInputRef.current.onchange = async (e: any) => {
                         const file = e.target.files[0]
                         if (file) {
-                            const reader = new FileReader()
-                            reader.onload = () => {
-                                const img = new Image()
-                                img.onload = () => {
-                                    const canvas = document.createElement('canvas')
-                                    canvas.width = img.width
-                                    canvas.height = img.height
-                                    const ctx = canvas.getContext('2d')
-                                    ctx?.drawImage(img, 0, 0)
-                                    openImage(file.name, canvas)
+                            if (file.name.endsWith('.shrimp')) {
+                                try {
+                                    const content = await loadFromShrimpFile(file)
+                                    loadDocument(content, file.name.replace('.shrimp', ''))
+                                } catch (err) {
+                                    console.error('Failed to load .shrimp file', err)
+                                    alert('Failed to load file')
                                 }
-                                img.src = reader.result as string
+                            } else {
+                                const reader = new FileReader()
+                                reader.onload = () => {
+                                    const img = new Image()
+                                    img.onload = () => {
+                                        const canvas = document.createElement('canvas')
+                                        canvas.width = img.width
+                                        canvas.height = img.height
+                                        const ctx = canvas.getContext('2d')
+                                        ctx?.drawImage(img, 0, 0)
+                                        openImage(file.name, canvas)
+                                    }
+                                    img.src = reader.result as string
+                                }
+                                reader.readAsDataURL(file)
                             }
-                            reader.readAsDataURL(file)
                         }
                     }
                     fileInputRef.current.click()
+                }
+                break
+            case 'Save':
+                if (activeDocument) {
+                    saveToShrimpFile(activeDocument.history.present, `${activeDocument.name}.shrimp`)
                 }
                 break
             case 'Open as Layers...':
@@ -377,6 +399,8 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             { label: t('menu.file.new'), command: 'New...' },
             { label: t('menu.file.open'), command: 'Open...' },
             { label: t('menu.file.open_layers'), command: 'Open as Layers...' },
+            { label: t('menu.file.save'), command: 'Save', shortcut: 'Cmd+S' },
+            { label: t('menu.file.save_as'), command: 'Save As' },
             { label: t('menu.file.export_png'), command: 'Export As PNG' },
             { label: t('menu.file.export_jpeg'), command: 'Export As JPEG' },
             { label: t('menu.file.export_webp'), command: 'Export As WebP' },

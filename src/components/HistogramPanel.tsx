@@ -86,20 +86,20 @@ export default function HistogramPanel() {
                                 <div
                                     key={`v${i}`}
                                     className="histogram-grid-line-v"
-                                    style={{ left: i * 10 }}
+                                    style={{ left: i * 10, background: 'rgba(255, 255, 255, 0.08)' }}
                                 />
                             ))}
                             {Array.from({ length: 14 }).map((_, i) => (
                                 <div
                                     key={`h${i}`}
                                     className="histogram-grid-line-h"
-                                    style={{ top: i * 10 }}
+                                    style={{ top: i * 10, background: 'rgba(255, 255, 255, 0.08)' }}
                                 />
                             ))}
                         </div>
 
                         {/* Charts */}
-                        <div className="histogram-chart" style={{ backgroundColor: '#0a0a0a', mixBlendMode: 'normal' }}>
+                        <div className="histogram-chart" style={{ backgroundColor: '#2b2b2b', mixBlendMode: 'normal' }}>
                             <svg viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
                                 {histogramData && activeChannels.includes('r') && (
                                     <path

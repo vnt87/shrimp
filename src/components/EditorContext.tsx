@@ -116,6 +116,7 @@ interface EditorContextType {
     activeDocumentId: string | null
     activeDocument: Document | null
     addDocument: (initialContent?: Partial<EditorContent>, name?: string) => void
+    loadDocument: (content: EditorContent, name: string) => void
     closeDocument: (id: string) => void
     setActiveDocumentId: (id: string) => void
 
@@ -538,6 +539,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         setDocuments(prev => [...prev, newDoc])
         setActiveDocumentId(newDoc.id)
     }, [documents])
+
+    const loadDocument = useCallback((content: EditorContent, name: string) => {
+        const newDoc = createDocument(name, content)
+        setDocuments(prev => [...prev, newDoc])
+        setActiveDocumentId(newDoc.id)
+    }, [])
 
     // Better closeDocument with synchronized active ID update
     const closeDocument = useCallback((id: string) => {
@@ -1880,6 +1887,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             activeDocumentId,
             activeDocument,
             addDocument,
+            loadDocument,
             closeDocument,
             setActiveDocumentId,
             layers,

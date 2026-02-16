@@ -34,6 +34,8 @@ export const vi: Record<TranslationKey, string> = {
     'menu.file.new': 'Mới...',
     'menu.file.open': 'Mở...',
     'menu.file.open_layers': 'Mở dưới dạng các lớp...',
+    'menu.file.save': 'Lưu',
+    'menu.file.save_as': 'Lưu dưới dạng...',
     'menu.file.export_png': 'Xuất ra PNG',
     'menu.file.export_jpeg': 'Xuất ra JPEG',
     'menu.file.export_webp': 'Xuất ra WebP',
