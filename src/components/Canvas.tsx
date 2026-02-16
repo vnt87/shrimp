@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { Application, extend, useTick } from '@pixi/react'
-import { Container, Sprite, Graphics, Text, ColorMatrixFilter, Texture, RenderTexture } from 'pixi.js'
+import { Container, Sprite, Graphics, Text, ColorMatrixFilter, Texture, RenderTexture, Matrix } from 'pixi.js'
 import type { Application as PixiApplication } from 'pixi.js'
 import EmptyState from './EmptyState'
 import { useEditor, type Layer, type TransformData } from './EditorContext'
@@ -582,29 +582,37 @@ function HistogramExtractor({
             clearTimeout(timeoutRef.current)
         }
 
-        timeoutRef.current = setTimeout(() => {
+        // Make the callback async to handle extract.pixels promise
+        timeoutRef.current = setTimeout(async () => {
             if (!app || !app.renderer) return
 
             processingRef.current = true
 
-            // Downsample strategy: Render to a small texture
-            const size = 128 // 128x128 is enough for histogram
-            if (!textureRef.current) {
-                textureRef.current = RenderTexture.create({ width: size, height: size })
-            }
-
-            // Render stage to texture
             try {
+                // Downsample strategy: Render to a small texture
+                const size = 128 // 128x128 is enough for histogram
+                if (!textureRef.current) {
+                    textureRef.current = RenderTexture.create({ width: size, height: size })
+                }
+
+                // Scaled render to fit stage into 128x128
+                const scale = size / Math.max(app.renderer.width, app.renderer.height, 1)
+                const matrix = new Matrix().scale(scale, scale)
+
                 app.renderer.render({
                     container: app.stage,
-                    target: textureRef.current!
+                    target: textureRef.current!,
+                    // @ts-ignore - matrix/transform property in v8
+                    transform: matrix
                 })
 
-                // Extract pixels
-                const pixels = app.renderer.extract.pixels(textureRef.current!)
+                // Extract pixels (Async in PixiJS v8)
+                const result = await app.renderer.extract.pixels(textureRef.current!)
 
-                // Send to worker
-                if (pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray) {
+                // Robust extraction: result could be a raw array or an object { pixels, ... }
+                const pixels = (result as any).pixels || result
+
+                if (pixels && (pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray)) {
                     workerRef.current?.postMessage({
                         pixels,
                         width: size,
@@ -613,9 +621,9 @@ function HistogramExtractor({
                 }
             } catch (err) {
                 console.error('[Histogram] Extraction failed', err)
+            } finally {
                 processingRef.current = false
             }
-
         }, 200) // Debounce 200ms
     }, [app, activeDocumentId, layers, setHistogramData])
 

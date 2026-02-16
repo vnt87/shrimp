@@ -2,10 +2,14 @@
 
 ![SHRIMP Icon](/public/favicon.svg)
 
-**SHRIMP** is a modern, web-based image editor inspired by GIMP. This is a project I've been working on and off since 2020 during Covid.
+**SHRIMP** stands for Simple Hi-Res Image Manipulation Program. As the name suggests, it is a web-based image editor inspired by GIMP. This is a project I've been working on and off since 2020 during Covid.
 
-Background: I was a big fan of GIMP back in the days (think early 2000s). I used it for photo editing, graphic design, and web development. I wrote a couple of popular graphic tutorial for the GIMP that was trending on the GIMP forum and Good-Tutorials (high five if you're one of the OGs who still remember Good-Tutorials).
-Anyway, one of my biggest gripe with GIMP is its user interface. Don't get me wrong, GIMP is an awesome pieceo of software and I appreciate decades of work poured into it from the developers who did it for free. But as a UI/UX designer, I just couldn't bare to use such a dated and unintuitive interface. 
+Unlike GIMP which is a desktop application powered by [GEGL](https://gegl.org/) (Generic Graphics Library) and based on GTK, SHRIMP is a web-based image editor powered by [PixiJS](https://pixijs.com/) (a 2D rendering engine) and based on React. In fact, when I first started I considered naming this project PIMP (Pixi.js Image Manipulation Program) because it is essentially a Pixi.js frontend. It makes sense if you know that I coined that name when I was 15 years old. 
+
+I was a big fan of GIMP back in the days (think early 2000s). I used it for photo editing, graphic design, and web development. I wrote a couple of popular graphic tutorial for the GIMP that was trending on the GIMP forum and Good-Tutorials (high five if you're one of the OGs who still remember Good-Tutorials).
+Anyway, one of my biggest gripe with GIMP is its user interface. Don't get me wrong, GIMP is an awesome pieceo of software and I appreciate decades of work poured into it from the developers who did it for free. But as a UI/UX designer, I just couldn't bare to use such a dated and unintuitive interface. So in 2020, as the world going under lockdown, I suddenly had a lot of time in my hands and decided to create NeoGIMP as a proof of concept to show that a modern, intuitive interface can be created for GIMP. It started as a visual only project (created with Figma), I am a visual designer by trade and did not have the technical know-how to turn the project into a real product. Not until last year when it was made possible thanks to the arrival of LLM agents that made development possible to non-developers like me.
+Yes, this is a vibe-coded project, and should be treated as such. I've taken measures to make sure it works entirely offline (like Photopea) and not touch anything sensitive on your system, but it is always a good idea to be wary.
+
 Inpspirations:
 - **GIMP** - the OG of course
 - **Pixel Editor by Pavel Kanzelsberger**: I remember back then there was a project called Pixel Editor or someething along that line, created by a a solo developer from Slovakia. It had a great interface, it was everything GIMP user wished GIMP would be. But unfortunately it was proprietary, and that obviously doesn't pan out for the developer in the Linux community. It died after a few years.

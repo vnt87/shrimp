@@ -16,6 +16,7 @@ export const vi: Record<TranslationKey, string> = {
     'dialog.about.github': 'GitHub',
     'dialog.about.website': 'Trang web',
     'dialog.about.license': 'Giấy phép',
+    'dialog.about.powered_by': 'Phát triển bởi',
     'dialog.about.changelog': 'Nhật ký thay đổi',
     'dialog.about.coming_soon': 'Sắp có',
     'dialog.about.close': 'Đóng',

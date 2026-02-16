@@ -23,9 +23,9 @@ function generateHistogramPath(
 
     for (let i = 0; i < data.length; i++) {
         const x = i * step
-        // Logarithmic scale often looks better for histograms, but linear is standard
-        // Let's use linear for now.
-        const normalized = data[i] / max
+        // Logarithmic scale is much better for visualizing histograms with dominant peaks
+        // y = log(1+count) / log(1+max)
+        const normalized = Math.log10(1 + data[i]) / Math.log10(1 + max)
         const y = height - (normalized * height * 0.95) // Leave 5% padding at top
         d += ` L ${x} ${y}`
     }
@@ -105,20 +105,19 @@ export default function HistogramPanel() {
                                     <path
                                         d={generateHistogramPath(histogramData.r, chartW, chartH, maxValue)}
                                         fill="rgba(255, 0, 0, 0.5)"
-                                        style={{ mixBlendMode: 'screen' }}
                                     />
                                 )}
                                 {histogramData && activeChannels.includes('g') && (
                                     <path
                                         d={generateHistogramPath(histogramData.g, chartW, chartH, maxValue)}
-                                        fill="rgba(0, 255, 0, 0.5)"
+                                        fill="rgba(60, 255, 60, 0.7)"
                                         style={{ mixBlendMode: 'screen' }}
                                     />
                                 )}
                                 {histogramData && activeChannels.includes('b') && (
                                     <path
                                         d={generateHistogramPath(histogramData.b, chartW, chartH, maxValue)}
-                                        fill="rgba(0, 0, 255, 0.5)"
+                                        fill="rgba(60, 60, 255, 0.7)"
                                         style={{ mixBlendMode: 'screen' }}
                                     />
                                 )}

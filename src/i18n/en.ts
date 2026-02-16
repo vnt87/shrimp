@@ -14,6 +14,7 @@ export const en = {
     'dialog.about.github': 'GitHub',
     'dialog.about.website': 'Website',
     'dialog.about.license': 'License',
+    'dialog.about.powered_by': 'Powered by',
     'dialog.about.changelog': 'Changelog',
     'dialog.about.coming_soon': 'Coming soon',
     'dialog.about.close': 'Close',

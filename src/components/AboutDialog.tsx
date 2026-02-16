@@ -62,6 +62,19 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
                         </div>
 
                         <div className="about-info-row">
+                            <span className="about-info-label">{t('dialog.about.powered_by')}</span>
+                            <a
+                                className="about-info-link"
+                                href="https://pixijs.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                PixiJS
+                                <ExternalLink size={11} />
+                            </a>
+                        </div>
+
+                        <div className="about-info-row">
                             <span className="about-info-label">{t('dialog.about.github')}</span>
                             <a
                                 className="about-info-link"
