@@ -481,8 +481,7 @@ body,
 .header-icon-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 24px;
+  padding: 0 8px;
   height: 100%;
   cursor: pointer;
 }

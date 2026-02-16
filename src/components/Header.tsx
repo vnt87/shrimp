@@ -365,6 +365,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
                     <div className="header-icon-btn" title="Theme Settings" onClick={() => setSettingsOpen(!settingsOpen)} ref={settingsRef}>
                         <Settings />
+                        <ChevronDown size={12} strokeWidth={3} style={{ marginLeft: 4, width: 12, height: 12 }} />
                         {settingsOpen && (
                             <div className="header-menu-dropdown" style={{ right: 8, left: 'auto', minWidth: 150 }}>
                                 <div
