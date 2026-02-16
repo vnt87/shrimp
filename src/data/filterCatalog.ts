@@ -144,8 +144,10 @@ export const FILTER_CATALOG: FilterCatalogEntry[] = [
         id: 'cross-hatch',
         label: 'filter.cross_hatch',
         menuLabel: 'filter.cross_hatch',
-        defaultParams: {},
-        sliders: []
+        defaultParams: { strength: 1 },
+        sliders: [
+            { label: 'filter.param.strength', key: 'strength', min: 0, max: 10, step: 1 },
+        ]
     },
     {
         id: 'bulge-pinch',

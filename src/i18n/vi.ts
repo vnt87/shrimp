@@ -8,10 +8,10 @@ export const vi: Record<TranslationKey, string> = {
     'header.themeSettings': 'Cài đặt Chủ đề',
 
     // About Dialog
-    'dialog.about.title': 'Về WebGIMP',
+    'dialog.about.title': 'Giới thiệu về SHRIMP',
     'dialog.about.version': 'Phiên bản',
     'dialog.about.tagline.main': 'Simple Hi-Res Image Manipulation Program',
-    'dialog.about.tagline.sub': 'Trình chỉnh sửa ảnh giống GIMP dựa trên web',
+    'dialog.about.tagline.sub': 'Trình chỉnh sửa ảnh online lấy cảm hứng từ The GIMP',
     'dialog.about.author': 'Tác giả',
     'dialog.about.github': 'GitHub',
     'dialog.about.website': 'Trang web',

@@ -2,30 +2,15 @@ import { useState, useEffect } from 'react'
 import {
     X,
     Cpu,
-    Palette,
-    FileInput,
     MousePointer2,
     Image as ImageIcon,
-    Grid3X3,
     Layout,
-    Paintbrush,
-    Wrench,
-    MessageSquare,
-    HelpCircle,
     Monitor,
-    AppWindow,
-    Eye,
-    Type,
-    Magnet,
-    Gamepad2,
-    Joystick,
-    FolderOpen as Folder, // Map FolderOpen to Folder for now if needed, or just import Folder
+    FolderOpen as Folder,
     ChevronDown,
     ChevronRight,
-    Keyboard, // Added
-    Search // Added
+    Keyboard
 } from 'lucide-react'
-import { useEditor } from './EditorContext'
 import { useTheme } from './ThemeContext'
 import { useLanguage } from '../i18n/LanguageContext'
 
@@ -102,7 +87,7 @@ interface PreferencesDialogProps {
 }
 
 // ── Component ───────────────────────────────────────────────────
-export default function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
+export default function PreferencesDialog({ open: _open, onClose }: PreferencesDialogProps) {
     const { t } = useLanguage() // Added
     const [activeItem, setActiveItem] = useState<string>('System Resources') // Changed initial state and type
     const [expanded, setExpanded] = useState<Record<string, boolean>>({

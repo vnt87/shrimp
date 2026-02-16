@@ -6,7 +6,7 @@ export const en = {
     'header.themeSettings': 'Theme Settings',
 
     // About Dialog
-    'dialog.about.title': 'About WebGIMP',
+    'dialog.about.title': 'About SHRIMP',
     'dialog.about.version': 'Version',
     'dialog.about.tagline.main': 'Simple Hi-Res Image Manipulation Program',
     'dialog.about.tagline.sub': 'A web-based image editor inspired by GIMP',
