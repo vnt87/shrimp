@@ -51,6 +51,9 @@ export interface ToolOptions {
     // Path options
     pathMode: 'design' | 'edit' | 'move'
     pathPolygonal: boolean
+    // Clone options
+    cloneSampleMode: 'current' | 'all'
+    cloneTarget: 'active' | 'new'
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -86,6 +89,8 @@ const defaultToolOptions: ToolOptions = {
     zoomDirection: 'in',
     pathMode: 'design',
     pathPolygonal: false,
+    cloneSampleMode: 'current',
+    cloneTarget: 'active',
 }
 
 export default function App() {

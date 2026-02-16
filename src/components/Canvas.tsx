@@ -1,7 +1,8 @@
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { Application, extend, useTick } from '@pixi/react'
-import { Container, Sprite, Graphics, Text, ColorMatrixFilter } from 'pixi.js'
+import { Container, Sprite, Graphics, Text, ColorMatrixFilter, Texture, RenderTexture } from 'pixi.js'
+import type { Application as PixiApplication } from 'pixi.js'
 import EmptyState from './EmptyState'
 import { useEditor, type Layer, type TransformData } from './EditorContext'
 import PixiLayerSprite from './PixiLayerSprite'
@@ -13,6 +14,8 @@ import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
 import ContextMenu from './ContextMenu'
 import { cloneCanvas, renderGradientToLayer } from '../utils/gradient'
+import { HistogramData } from './EditorContext'
+import HistogramWorker from '../workers/histogram.worker?worker'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics, Text })
@@ -382,38 +385,67 @@ function TransformOverlayWrapper({ layerId }: { layerId: string | null }) {
     return <TransformOverlay layerId={layerId} />
 }
 
+// Helper component to render the temporary clone stroke
+function TempCloneLayer({ canvasRef }: { canvasRef: React.RefObject<HTMLCanvasElement | null> }) {
+    const spriteRef = useRef<import('pixi.js').Sprite>(null)
+    const textureRef = useRef<Texture | null>(null)
+
+    useTick(() => {
+        if (!spriteRef.current) return
+
+        if (canvasRef.current) {
+            if (!textureRef.current) {
+                const t = Texture.from(canvasRef.current)
+                textureRef.current = t
+                spriteRef.current.texture = t
+            } else {
+                textureRef.current.update()
+            }
+        }
+    })
+
+    useEffect(() => {
+        return () => {
+            if (textureRef.current) {
+                textureRef.current.destroy()
+                textureRef.current = null
+            }
+        }
+    }, [])
+
+    return <pixiSprite ref={spriteRef} x={0} y={0} />
+}
+
 /**
  * Inner Pixi scene that renders layers and selection overlay.
  * Must be a child of <Application> to use useApplication().
  */
-function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerId, isAltPressed }: {
+function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerId, isAltPressed, layersContainerRef, tempStrokeCanvas }: {
     transform: CanvasTransform
     cursorRef: React.MutableRefObject<{ x: number, y: number }>
     toolOptions: any
     activeTool: string
     hiddenLayerId?: string | null
     isAltPressed?: boolean
+    layersContainerRef: React.MutableRefObject<any>
+    tempStrokeCanvas: React.MutableRefObject<HTMLCanvasElement | null>
 }) {
     const { activeDocumentId, activeChannels, layers, selection, activeLayerId } = useEditor()
     const activeDocId = activeDocumentId
 
     // Calculate channel filter
     const channelFilter = useMemo(() => {
-        // If all channels active, no filter needed
-        if (activeChannels.length === 3) return null
+        if (activeChannels.length === 3) return null // All channels active (RGB)
 
         const filter = new ColorMatrixFilter()
 
-        // Masking behavior: simple zeroing out of inactive channels
-        const r = activeChannels.includes('r') ? 1 : 0
-        const g = activeChannels.includes('g') ? 1 : 0
-        const b = activeChannels.includes('b') ? 1 : 0
+        const r = activeChannels.includes('r')
+        const g = activeChannels.includes('g')
+        const b = activeChannels.includes('b')
 
-        const isSingleChannel = activeChannels.length === 1
-
-        if (isSingleChannel) {
+        // If only one channel is active, show it as grayscale intensity
+        if (activeChannels.length === 1) {
             if (r) {
-                // Red channel view: Show Red as Grayscale
                 filter.matrix = [
                     1, 0, 0, 0, 0,
                     1, 0, 0, 0, 0,
@@ -421,7 +453,6 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
                     0, 0, 0, 1, 0
                 ]
             } else if (g) {
-                // Green channel view: Show Green as Grayscale
                 filter.matrix = [
                     0, 1, 0, 0, 0,
                     0, 1, 0, 0, 0,
@@ -429,7 +460,6 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
                     0, 0, 0, 1, 0
                 ]
             } else if (b) {
-                // Blue channel view: Show Blue as Grayscale
                 filter.matrix = [
                     0, 0, 1, 0, 0,
                     0, 0, 1, 0, 0,
@@ -438,15 +468,14 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
                 ]
             }
         } else {
-            // zero out inactive channels
+            // Otherwise just mask out inactive channels
             filter.matrix = [
-                r, 0, 0, 0, 0,
-                0, g, 0, 0, 0,
-                0, 0, b, 0, 0,
+                r ? 1 : 0, 0, 0, 0, 0,
+                0, g ? 1 : 0, 0, 0, 0,
+                0, 0, b ? 1 : 0, 0, 0,
                 0, 0, 0, 1, 0
             ]
         }
-
         return filter
     }, [activeChannels])
 
@@ -459,9 +488,16 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
             scale={{ x: transform.scale, y: transform.scale }}
             filters={channelFilter ? [channelFilter] : []}
         >
-            {layers.slice().reverse().map((layer) => (
-                <PixiLayerRecursive key={layer.id} layer={layer} hiddenLayerId={hiddenLayerId} />
-            ))}
+            <pixiContainer ref={layersContainerRef}>
+                {layers.slice().reverse().map((layer) => (
+                    <PixiLayerRecursive key={layer.id} layer={layer} hiddenLayerId={hiddenLayerId} />
+                ))}
+            </pixiContainer>
+
+            {/* Temp Clone Layer for "Clone to New Layer" mode */}
+            {activeTool === 'clone' && toolOptions?.cloneTarget === 'new' && (
+                <TempCloneLayer canvasRef={tempStrokeCanvas} />
+            )}
 
             {/* Selection overlay */}
             {selection && <SelectionOverlay selection={selection} />}
@@ -475,7 +511,6 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
                 onCancel={() => { }}
             />}
 
-            {/* Brush Cursor Overlay */}
             {/* Brush Cursor Overlay */}
             <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} isAltPressed={isAltPressed} />
 
@@ -492,8 +527,108 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
     )
 }
 
+function HistogramExtractor({
+    app,
+    layers,
+    activeDocumentId,
+    setHistogramData
+}: {
+    app: PixiApplication,
+    layers: Layer[],
+    activeDocumentId: string | null,
+    setHistogramData: (data: HistogramData | null) => void
+}) {
+    const workerRef = useRef<Worker | null>(null)
+    const processingRef = useRef(false)
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const textureRef = useRef<import('pixi.js').RenderTexture | null>(null)
 
+    // Init worker
+    useEffect(() => {
+        // @ts-ignore
+        workerRef.current = new HistogramWorker()
+        if (workerRef.current) {
+            workerRef.current.onmessage = (e) => {
+                if (e.data) {
+                    setHistogramData(e.data)
+                }
+                processingRef.current = false
+            }
+        }
+        return () => {
+            workerRef.current?.terminate()
+        }
+    }, [setHistogramData])
 
+    // Cleanup texture
+    useEffect(() => {
+        return () => {
+            if (textureRef.current) {
+                textureRef.current.destroy(true)
+                textureRef.current = null
+            }
+        }
+    }, [])
+
+    const triggerUpdate = useCallback(() => {
+        if (!app || !app.renderer || !activeDocumentId || layers.length === 0) {
+            setHistogramData(null)
+            return
+        }
+
+        if (processingRef.current) return
+
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+        }
+
+        timeoutRef.current = setTimeout(() => {
+            if (!app || !app.renderer) return
+
+            processingRef.current = true
+
+            // Downsample strategy: Render to a small texture
+            const size = 128 // 128x128 is enough for histogram
+            if (!textureRef.current) {
+                textureRef.current = RenderTexture.create({ width: size, height: size })
+            }
+
+            // Render stage to texture
+            try {
+                app.renderer.render({
+                    container: app.stage,
+                    target: textureRef.current!
+                })
+
+                // Extract pixels
+                const pixels = app.renderer.extract.pixels(textureRef.current!)
+
+                // Send to worker
+                if (pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray) {
+                    workerRef.current?.postMessage({
+                        pixels,
+                        width: size,
+                        height: size
+                    }, [pixels.buffer]) // Transfer buffer
+                }
+            } catch (err) {
+                console.error('[Histogram] Extraction failed', err)
+                processingRef.current = false
+            }
+
+        }, 200) // Debounce 200ms
+    }, [app, activeDocumentId, layers, setHistogramData])
+
+    // Trigger on relevant changes
+    // We strictly depend on layers and activeDocumentId. 
+    // Ideally we'd depend on a "version" or "dirty" flag to avoid deep diffing,
+    // but React's reference equality on `layers` might be enough *if* immutable updates are used correctly.
+    useEffect(() => {
+        triggerUpdate()
+    }, [triggerUpdate, layers, activeDocumentId])
+
+    return null
+}
 
 export default function Canvas({
     onCursorMove,
@@ -536,8 +671,10 @@ export default function Canvas({
         setViewportSize,
         cloneSource,
         setCloneSource,
-        activeDocumentId
+        activeDocumentId,
         // documents // unused
+        setHistogramData,
+        addLayer,
     } = useEditor()
 
     const windowSize = useWindowSize()
@@ -655,7 +792,18 @@ export default function Canvas({
     const [isPanning, setIsPanning] = useState(false)
     const [isSpaceHeld, setIsSpaceHeld] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
-    const dragStart = useRef({
+    const dragStart = useRef<{
+        x: number
+        y: number
+        offsetX: number
+        offsetY: number
+        layerX: number
+        layerY: number
+        canvasX: number
+        canvasY: number
+        cloneSourceCanvas?: HTMLCanvasElement
+        isDrawingToNewLayer?: boolean
+    }>({
         x: 0,
         y: 0,
         offsetX: 0,
@@ -681,6 +829,8 @@ export default function Canvas({
         canvasY: number           // position in canvas coords
     } | null>(null)
     const textEditorRef = useRef<HTMLTextAreaElement>(null)
+    const layersContainerRef = useRef<any>(null) // Ref for the layers container
+    const tempStrokeCanvas = useRef<HTMLCanvasElement | null>(null) // For clone to new layer
 
     // Commit (save) the inline text editor
     const commitTextEditor = useCallback(() => {
@@ -742,7 +892,9 @@ export default function Canvas({
     const isLassoing = useRef(false)
 
     const [viewportRef, setViewportRef] = useState<HTMLDivElement | null>(null)
-    const pixiAppRef = useRef<any>(null)
+    const pixiAppRef = useRef<PixiApplication | null>(null)
+    const [pixiApp, setPixiApp] = useState<PixiApplication | null>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Keep the PixiJS renderer sized to the .canvas-viewport element
@@ -795,12 +947,30 @@ export default function Canvas({
 
     // --- Drawing helper: draw stroke segment ---
     const drawStrokeTo = useCallback((canvasX: number, canvasY: number, isFirst: boolean, history: boolean = true) => {
-        if (!activeLayerId) return
-        const layer = layers.find((l: Layer) => l.id === activeLayerId)
-        if (!layer || !layer.data || layer.locked) return
+        let ctx: CanvasRenderingContext2D | null = null
+        let layerX = 0
+        let layerY = 0
+        let currentLayer: Layer | undefined
 
-        const ctx = layer.data.getContext('2d')
+        // Determine target context
+        if (dragStart.current.isDrawingToNewLayer && tempStrokeCanvas.current) {
+            ctx = tempStrokeCanvas.current.getContext('2d')
+            layerX = 0
+            layerY = 0
+        } else {
+            if (!activeLayerId) return
+            currentLayer = layers.find((l: Layer) => l.id === activeLayerId)
+            if (!currentLayer || !currentLayer.data || currentLayer.locked) return
+            ctx = currentLayer.data.getContext('2d')
+            if (currentLayer) {
+                layerX = currentLayer.x
+                layerY = currentLayer.y
+            }
+        }
+
         if (!ctx) return
+
+        ctx.save()
 
         const size = toolOptions?.brushSize ?? 10
         const opacity = (toolOptions?.brushOpacity ?? 100) / 100
@@ -810,10 +980,11 @@ export default function Canvas({
         const isClone = activeTool === 'clone'
 
         // If cloning but no source, do nothing or warn? 
-        // For now, if no source, we return.
-        if (isClone && !cloneSource) return
+        if (isClone && !cloneSource) {
+            ctx.restore()
+            return
+        }
 
-        ctx.save()
         ctx.globalAlpha = opacity
         ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over'
         ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : foregroundColor
@@ -827,18 +998,15 @@ export default function Canvas({
             ctx.imageSmoothingEnabled = false
         }
 
-        // Apply hardness via shadow (soft brush), but NOT for clone stamp (cloning usually wants hard or soft edge via clipping/masking ideally, but shadow doesn't work well for image copy)
-        // Actually shadowBlur works for 'filling', but for drawImage it's complex.
-        // For Clone Stamp, to support hardness < 1, we might need a brush mask or radial gradient.
-        // For MVP, let's ignore hardness for Clone Stamp or just use it as is (might blur the edges if we use shadow).
+        // Apply hardness via shadow
         if (!isPencil && !isClone && hardness < 1) {
             ctx.shadowBlur = size * (1 - hardness) * 0.5
             ctx.shadowColor = isEraser ? 'rgba(0,0,0,1)' : foregroundColor
         }
 
-        // Adjust coordinates relative to layer position
-        const lx = canvasX - layer.x
-        const ly = canvasY - layer.y
+        // Adjust coordinates relative to destination layer position
+        const lx = canvasX - layerX
+        const ly = canvasY - layerY
 
         if (isClone && cloneSource) {
             // Clone Stamp Implementation
@@ -848,41 +1016,46 @@ export default function Canvas({
             const sourceX = canvasX + dx
             const sourceY = canvasY + dy
 
-            // We want to draw a circle of content from sourceX,sourceY at canvasX,canvasY.
-            // To do this properly with round brush:
-            // ctx.beginPath(); ctx.arc(lx, ly, size/2, ...); ctx.clip();
-            // ctx.drawImage(layer.data, sourceX - size/2, sourceY - size/2, size, size, lx - size/2, ly - size/2, size, size);
-
-            // However, doing this for every point in a stroke is expensive and might look weird (stamping modulation).
-            // But it is the standard way for basic clone stamp.
-
             ctx.beginPath()
             ctx.arc(lx, ly, size / 2, 0, Math.PI * 2)
             ctx.clip()
 
-            // Draw from the layer data itself (source)
-            // Note: source coordinates are Canvas coordinates (0,0 is top-left of document).
-            // layer.data coordinates: 0,0 is layer.x, layer.y.
-            // So we need to map Source Global -> Source Layer Local.
-            // SourceLayerLocal = SourceGlobal - layer.x, SourceGlobal - layer.y
+            // Draw from the source
+            let srcImage: HTMLCanvasElement | OffscreenCanvas | null = null
+            let srcX = 0
+            let srcY = 0
 
-            const srcLocalX = sourceX - layer.x
-            const srcLocalY = sourceY - layer.y
+            if (dragStart.current.cloneSourceCanvas) {
+                // Sample All Layers
+                srcImage = dragStart.current.cloneSourceCanvas
+                srcX = sourceX
+                srcY = sourceY
+            } else {
+                // Sample Current Layer (or rather, the Active Layer at start)
+                // If we are cloning to new layer, we might want to sample from the active layer still?
+                // Yes, standard behavior is "current layer" means the layer selected in panel.
+                const sourceLayer = layers.find(l => l.id === activeLayerId)
+                if (sourceLayer && sourceLayer.data) {
+                    srcImage = sourceLayer.data
+                    srcX = sourceX - sourceLayer.x
+                    srcY = sourceY - sourceLayer.y
+                }
+            }
 
-            ctx.drawImage(layer.data,
-                srcLocalX - size / 2, srcLocalY - size / 2, size, size,
-                lx - size / 2, ly - size / 2, size, size
-            )
-
-            // Reset clip? restore() handles it.
+            if (srcImage) {
+                ctx.drawImage(srcImage,
+                    srcX - size / 2, srcY - size / 2, size, size,
+                    lx - size / 2, ly - size / 2, size, size
+                )
+            }
         } else if (isFirst || !lastDrawPoint.current) {
             // Single dot
             ctx.beginPath()
             ctx.arc(lx, ly, size / 2, 0, Math.PI * 2)
             ctx.fill()
         } else {
-            const prevX = lastDrawPoint.current.x - layer.x
-            const prevY = lastDrawPoint.current.y - layer.y
+            const prevX = lastDrawPoint.current.x - layerX
+            const prevY = lastDrawPoint.current.y - layerY
             ctx.beginPath()
             ctx.moveTo(prevX, prevY)
             ctx.lineTo(lx, ly)
@@ -892,13 +1065,15 @@ export default function Canvas({
         ctx.restore()
         lastDrawPoint.current = { x: canvasX, y: canvasY }
 
-        // Clone the canvas to trigger React state update
-        const newCanvas = document.createElement('canvas')
-        newCanvas.width = layer.data.width
-        newCanvas.height = layer.data.height
-        const newCtx = newCanvas.getContext('2d')
-        newCtx?.drawImage(layer.data, 0, 0)
-        updateLayerData(activeLayerId, newCanvas, history)
+        if (!dragStart.current.isDrawingToNewLayer && currentLayer && currentLayer.data) {
+            // Clone the canvas to trigger React state update
+            const newCanvas = document.createElement('canvas')
+            newCanvas.width = currentLayer.data.width
+            newCanvas.height = currentLayer.data.height
+            const newCtx = newCanvas.getContext('2d')
+            newCtx?.drawImage(currentLayer.data, 0, 0)
+            updateLayerData(activeLayerId!, newCanvas, history)
+        }
     }, [activeLayerId, layers, activeTool, toolOptions, foregroundColor, updateLayerData, cloneSource])
 
     const isPointInSelection = useCallback((x: number, y: number) => {
@@ -1610,12 +1785,45 @@ export default function Canvas({
             setIsDragging(true)
             isDrawing.current = true
             lastDrawPoint.current = null
+
+            let cloneSourceCanvas: HTMLCanvasElement | undefined
+            if (activeTool === 'clone') {
+                if (toolOptions?.cloneSampleMode === 'all' && pixiAppRef.current && layersContainerRef.current) {
+                    cloneSourceCanvas = pixiAppRef.current.renderer.extract.canvas(layersContainerRef.current) as HTMLCanvasElement
+                }
+
+                if (toolOptions?.cloneTarget === 'new') {
+                    // Initialize or clear temp canvas
+                    if (!tempStrokeCanvas.current) {
+                        tempStrokeCanvas.current = document.createElement('canvas')
+                    }
+                    // Ensure size matches document
+                    // We need canvasSize from context but it's not destructured above yet
+                    // Let's assume we can get it from dragStart or activeDocument
+
+                    // Actually let's use the current canvas dimensions from dragStart or similar if possible
+                    // Or just use the source canvas size if available, otherwise fallback to window?
+                    // Better to use canvasSize from useEditor
+
+                    // We need access to canvasSize here. It's available in Component scope.
+                    if (tempStrokeCanvas.current.width !== canvasSize.width || tempStrokeCanvas.current.height !== canvasSize.height) {
+                        tempStrokeCanvas.current.width = canvasSize.width
+                        tempStrokeCanvas.current.height = canvasSize.height
+                    }
+
+                    const ctx = tempStrokeCanvas.current.getContext('2d')
+                    ctx?.clearRect(0, 0, tempStrokeCanvas.current.width, tempStrokeCanvas.current.height)
+                }
+            }
+
             dragStart.current = {
                 ...dragStart.current,
                 x: e.clientX,
                 y: e.clientY,
                 canvasX,
-                canvasY
+                canvasY,
+                cloneSourceCanvas,
+                isDrawingToNewLayer: toolOptions?.cloneTarget === 'new'
             }
             drawStrokeTo(canvasX, canvasY, true, false)
         } else if (activeTool === 'rect-select' || activeTool === 'ellipse-select') {
@@ -1851,6 +2059,47 @@ export default function Canvas({
         isSelecting.current = false
         isLassoing.current = false
 
+        // Commit "Clone to New Layer" stroke
+        if (activeTool === 'clone' && dragStart.current.isDrawingToNewLayer && tempStrokeCanvas.current && isDrawing.current) {
+            const tempCanvas = tempStrokeCanvas.current
+
+            // Check if any drawing happened? We assume isDrawing.current means "started".
+
+            const cloneLayerName = 'Clone Layer'
+            const existingCloneLayer = layers.find(l => l.name === cloneLayerName)
+
+            const commitCanvas = document.createElement('canvas')
+            commitCanvas.width = tempCanvas.width
+            commitCanvas.height = tempCanvas.height
+            const commitCtx = commitCanvas.getContext('2d')
+            if (commitCtx) {
+                commitCtx.drawImage(tempCanvas, 0, 0)
+            }
+
+            if (existingCloneLayer && existingCloneLayer.data) {
+                // Merge onto existing
+                const ctx = existingCloneLayer.data.getContext('2d')
+                if (ctx) {
+                    ctx.save()
+                    ctx.globalAlpha = 1.0
+                    ctx.globalCompositeOperation = 'source-over'
+                    ctx.drawImage(commitCanvas, 0, 0)
+                    ctx.restore()
+                    updateLayerData(existingCloneLayer.id, existingCloneLayer.data, true)
+                }
+            } else {
+                // Create New
+                addLayer(cloneLayerName, commitCanvas)
+            }
+
+            // Clear temp canvas
+            const tCtx = tempCanvas.getContext('2d')
+            tCtx?.clearRect(0, 0, tempCanvas.width, tempCanvas.height)
+
+            isDrawing.current = false
+            lastDrawPoint.current = null
+        }
+
         // Finish drawing stroke
         if (isDrawing.current && activeLayerId) {
             const layer = layers.find(l => l.id === activeLayerId)
@@ -1913,7 +2162,7 @@ export default function Canvas({
             setDraggingGuideId(null)
         }
 
-    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition, renderGradientPreview, clearGradientState, viewportRef])
+    }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition, renderGradientPreview, clearGradientState, viewportRef, addLayer])
 
     // Global event listeners for dragging
     useEffect(() => {
@@ -2046,6 +2295,7 @@ export default function Canvas({
                             }}
                         >
                             <div
+                                ref={containerRef}
                                 className="viewport"
                                 style={{
                                     /* 
@@ -2071,9 +2321,13 @@ export default function Canvas({
                                 }}
                             >
                                 <Application
+                                    resizeTo={containerRef}
                                     backgroundColor={0x505050}
                                     backgroundAlpha={0} // Transparent background so checkboard shows through
-                                    onInit={(app: any) => { pixiAppRef.current = app }}
+                                    onInit={(app: PixiApplication) => {
+                                        pixiAppRef.current = app
+                                        setPixiApp(app)
+                                    }}
                                 >
                                     <PixiScene
                                         transform={transform}
@@ -2082,7 +2336,17 @@ export default function Canvas({
                                         activeTool={activeTool}
                                         hiddenLayerId={textEditorState?.layerId}
                                         isAltPressed={isAltPressed}
+                                        layersContainerRef={layersContainerRef}
+                                        tempStrokeCanvas={tempStrokeCanvas}
                                     />
+                                    {pixiApp && (
+                                        <HistogramExtractor
+                                            app={pixiApp}
+                                            layers={layers}
+                                            activeDocumentId={activeDocumentId}
+                                            setHistogramData={setHistogramData}
+                                        />
+                                    )}
                                 </Application>
 
                                 {/* Floating Info Window for Color Picker */}

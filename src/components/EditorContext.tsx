@@ -74,6 +74,13 @@ export interface TransformData {
     pivotY: number
 }
 
+export interface HistogramData {
+    r: number[]
+    g: number[]
+    b: number[]
+    lum: number[]
+}
+
 // --- Multi-Document Types ---
 
 export type ChannelType = 'r' | 'g' | 'b'
@@ -225,6 +232,10 @@ interface EditorContextType {
     setViewTransform: React.Dispatch<React.SetStateAction<{ scale: number, offsetX: number, offsetY: number }>>
     viewportSize: { width: number, height: number }
     setViewportSize: (size: { width: number; height: number }) => void
+
+    // Histogram Data (Transient)
+    histogramData: HistogramData | null
+    setHistogramData: (data: HistogramData | null) => void
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
@@ -460,6 +471,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const [cursorInfo, setCursorInfo] = useState<{ x: number, y: number, color: string | null }>({ x: 0, y: 0, color: null })
     const [viewTransform, setViewTransform] = useState<{ scale: number, offsetX: number, offsetY: number }>({ scale: 1, offsetX: 0, offsetY: 0 })
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
+    const [histogramData, setHistogramData] = useState<HistogramData | null>(null)
 
     useEffect(() => {
         if (!activePath) {
@@ -1968,6 +1980,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setViewportSize,
             cloneSource,
             setCloneSource,
+            histogramData,
+            setHistogramData,
             activeChannels,
             toggleChannel,
             setActiveChannels

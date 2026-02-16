@@ -5,48 +5,49 @@ import InfoPanel from './InfoPanel'
 import NavigatorPanel from './NavigatorPanel'
 import PanelMenu from './PanelMenu'
 
-// Generate stacked area chart paths
-function generateAreaPath(
+// Generate SVG path from histogram data
+function generateHistogramPath(
+    data: number[],
     width: number,
     height: number,
-    baseY: number,
-    amplitude: number,
-    seed: number
+    maxValue: number
 ): string {
-    const points: number[] = []
-    const steps = 20
+    if (!data || data.length === 0) return ''
 
-    for (let i = 0; i <= steps; i++) {
-        const x = (i / steps) * width
-        const noise =
-            Math.sin(i * 0.8 + seed) * amplitude * 0.4 +
-            Math.sin(i * 1.5 + seed * 2) * amplitude * 0.3 +
-            Math.cos(i * 0.3 + seed * 3) * amplitude * 0.2
-        points.push(x)
-        points.push(Math.max(0, Math.min(height, baseY - noise)))
-    }
+    // Normalization factor (prevent division by zero)
+    const max = maxValue || 1
 
     let d = `M 0 ${height}`
-    for (let i = 0; i < points.length; i += 2) {
-        d += ` L ${points[i]} ${points[i + 1]}`
+
+    const step = width / (data.length - 1)
+
+    for (let i = 0; i < data.length; i++) {
+        const x = i * step
+        // Logarithmic scale often looks better for histograms, but linear is standard
+        // Let's use linear for now.
+        const normalized = data[i] / max
+        const y = height - (normalized * height * 0.95) // Leave 5% padding at top
+        d += ` L ${x} ${y}`
     }
+
     d += ` L ${width} ${height} Z`
     return d
 }
 
 export default function HistogramPanel() {
-    const { cursorInfo } = useEditor()
+    const { cursorInfo, histogramData, activeChannels } = useEditor()
     const [activeTab, setActiveTab] = useState<'histogram' | 'navigator' | 'info'>('histogram')
     const chartW = 330
     const chartH = 132
 
-    const areas = [
-        { baseY: 100, amplitude: 30, color: 'rgba(160, 80, 200, 0.3)', seed: 1 },
-        { baseY: 85, amplitude: 25, color: 'rgba(200, 80, 80, 0.35)', seed: 2.5 },
-        { baseY: 65, amplitude: 20, color: 'rgba(200, 160, 60, 0.4)', seed: 4 },
-        { baseY: 50, amplitude: 20, color: 'rgba(100, 180, 120, 0.4)', seed: 5.5 },
-        { baseY: 35, amplitude: 18, color: 'rgba(80, 120, 200, 0.5)', seed: 7 },
-    ]
+    // Calculate max value for normalization
+    const maxValue = histogramData
+        ? Math.max(
+            ...histogramData.r,
+            ...histogramData.g,
+            ...histogramData.b
+        )
+        : 1
 
     return (
         <div className="dialogue" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -97,29 +98,42 @@ export default function HistogramPanel() {
                             ))}
                         </div>
 
-                        {/* Stacked area chart */}
-                        <div className="histogram-chart">
+                        {/* Charts */}
+                        <div className="histogram-chart" style={{ mixBlendMode: 'screen' }}>
                             <svg viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
-                                {areas.map((area, i) => (
+                                {histogramData && activeChannels.includes('r') && (
                                     <path
-                                        key={i}
-                                        d={generateAreaPath(
-                                            chartW,
-                                            chartH,
-                                            area.baseY,
-                                            area.amplitude,
-                                            area.seed
-                                        )}
-                                        fill={area.color}
+                                        d={generateHistogramPath(histogramData.r, chartW, chartH, maxValue)}
+                                        fill="rgba(255, 0, 0, 0.5)"
+                                        style={{ mixBlendMode: 'screen' }}
                                     />
-                                ))}
+                                )}
+                                {histogramData && activeChannels.includes('g') && (
+                                    <path
+                                        d={generateHistogramPath(histogramData.g, chartW, chartH, maxValue)}
+                                        fill="rgba(0, 255, 0, 0.5)"
+                                        style={{ mixBlendMode: 'screen' }}
+                                    />
+                                )}
+                                {histogramData && activeChannels.includes('b') && (
+                                    <path
+                                        d={generateHistogramPath(histogramData.b, chartW, chartH, maxValue)}
+                                        fill="rgba(0, 0, 255, 0.5)"
+                                        style={{ mixBlendMode: 'screen' }}
+                                    />
+                                )}
+                                {/* Luminance (active by default if RGB are all active or inactive? Logic can vary) */}
+                                {/* For now let's show Luminance if it's explicitly selected or maybe as a background? */}
+                                {/* Typically Apps show RGB + Gray using logic. Let's just stick to RGB for now based on activeChannels */}
                             </svg>
                         </div>
 
-                        {/* Warning icon */}
-                        <div className="histogram-warning">
-                            <AlertTriangle size={24} />
-                        </div>
+                        {/* Warning icon if no data */}
+                        {!histogramData && (
+                            <div className="histogram-warning">
+                                <AlertTriangle size={24} color="#aaa" />
+                            </div>
+                        )}
                     </div>
                 )}
 

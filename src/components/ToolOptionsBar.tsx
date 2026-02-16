@@ -203,6 +203,38 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
+    const renderCloneOptions = () => (
+        <>
+            {renderBrushOptions()}
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">{t('tooloptions.sample')}</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.cloneSampleMode}
+                    onChange={(e) => onToolOptionChange('cloneSampleMode', e.target.value as any)}
+                >
+                    <option value="current">{t('tooloptions.sample.current')}</option>
+                    <option value="all">{t('tooloptions.sample.all')}</option>
+                </select>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">{t('tooloptions.target')}</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.cloneTarget}
+                    onChange={(e) => onToolOptionChange('cloneTarget', e.target.value as any)}
+                >
+                    <option value="active">{t('tooloptions.target.active')}</option>
+                    <option value="new">{t('tooloptions.target.new')}</option>
+                </select>
+            </div>
+        </>
+    )
+
     const renderBucketOptions = () => (
         <>
             {renderSlider('fillThreshold', t('tooloptions.threshold'), 0, 255, 1, '')}
@@ -859,7 +891,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             case 'picker':
                 return renderPickerOptions()
             case 'clone':
-                return renderBrushOptions() // Reuse brush options for clone stamp
+                return renderCloneOptions()
             case 'crop':
                 return renderCropOptions()
             case 'zoom':
