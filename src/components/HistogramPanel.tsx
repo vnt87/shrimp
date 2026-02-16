@@ -79,27 +79,27 @@ export default function HistogramPanel() {
             {/* Content Area */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                 {activeTab === 'histogram' && (
-                    <div className="histogram-container" style={{ width: '100%', height: '100%', position: 'relative' }}>
+                    <div className="histogram-container" style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#4a4a4a' }}>
                         {/* Grid */}
                         <div className="histogram-grid">
                             {Array.from({ length: 34 }).map((_, i) => (
                                 <div
                                     key={`v${i}`}
                                     className="histogram-grid-line-v"
-                                    style={{ left: i * 10, background: 'rgba(255, 255, 255, 0.08)' }}
+                                    style={{ left: i * 10, background: 'rgba(255, 255, 255, 0.1)' }}
                                 />
                             ))}
                             {Array.from({ length: 14 }).map((_, i) => (
                                 <div
                                     key={`h${i}`}
                                     className="histogram-grid-line-h"
-                                    style={{ top: i * 10, background: 'rgba(255, 255, 255, 0.08)' }}
+                                    style={{ top: i * 10, background: 'rgba(255, 255, 255, 0.1)' }}
                                 />
                             ))}
                         </div>
 
                         {/* Charts */}
-                        <div className="histogram-chart" style={{ backgroundColor: '#2b2b2b', mixBlendMode: 'normal' }}>
+                        <div className="histogram-chart" style={{ backgroundColor: '#000000', mixBlendMode: 'lighten' }}>
                             <svg viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
                                 {histogramData && activeChannels.includes('r') && (
                                     <path
