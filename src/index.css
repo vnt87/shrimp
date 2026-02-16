@@ -1579,6 +1579,15 @@ body,
   pointer-events: none;
 }
 
+.panel-header-action {
+  transition: background var(--transition), color var(--transition);
+}
+
+.panel-header-action:hover {
+  background: var(--active-overlay);
+  color: var(--text-primary) !important;
+}
+
 .dialogue-handle {
   width: 10px;
   height: 4px;
