@@ -89,7 +89,7 @@ export const en = {
     'menu.help.source': 'Github Source',
 
     // Header Right
-    'header.search_placeholder': 'Search (Cmd+F)',
+    'header.search_placeholder': 'Search (Cmd+/)',
     'header.autosave': 'Autosave',
     'header.settings.preferences': 'App Preferences',
     'header.settings.integrations': 'Integrations',

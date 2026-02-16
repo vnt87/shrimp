@@ -146,15 +146,6 @@ export default function App() {
                         brushSize: Math.min(500, prev.brushSize + 2)
                     }))
                     break
-                case 'x': {
-                    // Swap colors - handled by EditorContext but needs dispatch
-                    // We'll let the keyboard event bubble to the toolbox
-                    break
-                }
-                case 'd': {
-                    // Reset colors - similarly
-                    break
-                }
             }
         }
 

@@ -18,7 +18,7 @@ const shortcutData: ShortcutGroup[] = [
         shortcuts: [
             { action: 'menu.file.new', keys: '⌘N' },
             { action: 'menu.file.open', keys: '⌘O' },
-            { action: 'menu.file.export_png', keys: '⌘S' },
+            { action: 'menu.file.save', keys: '⌘S' },
         ],
     },
     {
@@ -36,7 +36,13 @@ const shortcutData: ShortcutGroup[] = [
         shortcuts: [
             { action: 'menu.select.all', keys: '⌘A' },
             { action: 'menu.select.none', keys: '⇧⌘A' },
-            { action: 'menu.select.invert', keys: '⌘D' },
+            { action: 'menu.select.invert', keys: '⇧⌘I' },
+        ],
+    },
+    {
+        name: 'menu.layer',
+        shortcuts: [
+            { action: 'menu.layer.merge_down', keys: '⌘E' },
         ],
     },
     {
@@ -54,11 +60,17 @@ const shortcutData: ShortcutGroup[] = [
             { action: 'tool.picker', keys: 'I' },
             { action: 'tool.text', keys: 'T' },
             { action: 'tool.zoom', keys: 'Z' },
+            { action: 'tool.paths', keys: 'P' },
+            { action: 'tool.clone', keys: 'S' },
         ],
     },
     {
-        name: 'common.shrimp', // Canvas / Common
+        name: 'common.shrimp',
         shortcuts: [
+            { action: 'header.search_placeholder', keys: '⌘/' },
+            { action: 'toolbox.swap_title', keys: 'X' },
+            { action: 'toolbox.reset_title', keys: 'D' },
+            { action: 'tooloptions.size', keys: '[ ]' },
             { action: 'Cancel Crop / Deselect', keys: 'Esc' },
         ],
     },

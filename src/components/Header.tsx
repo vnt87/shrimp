@@ -80,7 +80,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         openImage,
         addLayer, deleteLayer, duplicateLayer,
         activeLayerId, layers,
-        swapColors,
+        swapColors, resetColors,
         activeDocument, // for saving
         loadDocument // for loading
     } = useEditor()
@@ -142,7 +142,12 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             } else {
                 switch (e.key) {
                     case 'x':
+                        e.preventDefault()
                         swapColors()
+                        break
+                    case 'd':
+                        e.preventDefault()
+                        resetColors()
                         break
                 }
             }

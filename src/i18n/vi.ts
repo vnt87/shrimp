@@ -91,7 +91,7 @@ export const vi: Record<TranslationKey, string> = {
     'menu.help.source': 'Mã nguồn Github',
 
     // Header Right
-    'header.search_placeholder': 'Tìm kiếm (Cmd+F)',
+    'header.search_placeholder': 'Tìm kiếm (Cmd+/)',
     'header.autosave': 'Tự động lưu',
     'header.settings.preferences': 'Tùy chọn ứng dụng',
     'header.settings.integrations': 'Tích hợp',
