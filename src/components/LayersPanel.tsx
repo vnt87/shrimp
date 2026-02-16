@@ -464,12 +464,12 @@ export default function LayersPanel() {
                         <div className="layers-filters-header">
                             <div className="layers-filters-title">
                                 <SlidersHorizontal size={14} />
-                                <span>Filters</span>
+                                <span>Adjustments</span>
                             </div>
                             <button
                                 type="button"
                                 className="panel-icon-btn"
-                                title="Add filter"
+                                title="Add adjustment"
                                 onClick={() => openFiltersDialog()}
                                 disabled={!activeLayerId}
                             >
@@ -478,9 +478,9 @@ export default function LayersPanel() {
                         </div>
 
                         {!activeLayer ? (
-                            <div className="layers-filters-empty">Select a layer to manage filters.</div>
+                            <div className="layers-filters-empty">Select a layer to manage adjustments.</div>
                         ) : activeLayer.filters.length === 0 ? (
-                            <div className="layers-filters-empty">No filters on this layer.</div>
+                            <div className="layers-filters-empty">No adjustments on this layer.</div>
                         ) : (
                             <div className="layers-filters-list">
                                 {activeLayer.filters.map((filter, idx) => {
@@ -493,14 +493,14 @@ export default function LayersPanel() {
                                                 type="button"
                                                 className={`layers-filter-visibility${filter.enabled ? '' : ' off'}`}
                                                 onClick={() => activeLayerId && toggleFilter(activeLayerId, idx)}
-                                                title={filter.enabled ? 'Disable filter' : 'Enable filter'}
+                                                title={filter.enabled ? 'Disable adjustment' : 'Enable adjustment'}
                                             >
                                                 {filter.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
                                             </button>
                                             <button
                                                 type="button"
                                                 className="layers-filter-name"
-                                                title="Open filter dialog with this filter type"
+                                                title="Open adjustment dialog with this filter type"
                                                 onClick={() => openFiltersDialog(filter.type)}
                                             >
                                                 {label}
@@ -508,7 +508,7 @@ export default function LayersPanel() {
                                             <button
                                                 type="button"
                                                 className="layers-filter-remove"
-                                                title="Remove filter"
+                                                title="Remove adjustment"
                                                 onClick={() => activeLayerId && removeFilter(activeLayerId, idx)}
                                             >
                                                 <Trash2 size={14} />

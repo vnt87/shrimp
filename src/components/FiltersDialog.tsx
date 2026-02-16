@@ -143,7 +143,7 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                 >
                     <span className="dialogue-title">
                         <SlidersHorizontal size={14} className="icon-blue" />
-                        Filters
+                        Adjustment Layers
                     </span>
                     <div className="dialogue-close" onClick={handleClose}>
                         <X size={14} />
@@ -165,7 +165,7 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
 
                     <div className="filters-main">
                         <div className="filters-params-area">
-                            <h3>{selectedEntry.label} Settings</h3>
+                            <h3>{selectedEntry.label} Adjustments</h3>
                             {sliderRows.map((slider) => (
                                 <div className="filter-slider-group" key={slider.key}>
                                     <div className="filter-slider-header">
@@ -189,7 +189,7 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                         <div className="filters-preview-panel">
                             <div className="filters-preview-header">Live Preview</div>
                             <p className="filters-preview-text">
-                                Changes are previewed directly on the canvas. Use Add Filter to commit or Close/Esc to discard.
+                                Changes are previewed directly on the canvas. Use Add Adjustment to commit or Close/Esc to discard.
                             </p>
                             <div className="filters-preview-pill">{selectedEntry.label}</div>
                             <div className="filters-preview-values">
@@ -208,7 +208,7 @@ export default function FiltersDialog({ initialFilterType = 'blur', onClose }: F
                     <button className="pref-btn pref-btn-secondary" onClick={handleClose}>Close</button>
                     <button className="pref-btn pref-btn-primary" onClick={handleApply}>
                         <Check size={14} style={{ marginRight: 4 }} />
-                        Add Filter
+                        Add Adjustment
                     </button>
                 </div>
             </div>

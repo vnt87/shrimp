@@ -45,7 +45,7 @@ const menuData: Record<string, MenuOption[]> = {
     Image: ['Flatten Image', 'Merge Visible Layers', '---', 'Canvas Size...'],
     Layer: ['New Layer', 'Duplicate Layer', 'Delete Layer', '---', 'Merge Down'],
     Colors: ['Brightness-Contrast...', 'Hue-Saturation...', 'Desaturate...', 'Invert Colors'],
-    Filters: FILTER_CATALOG.map((filter) => ({
+    'Adjustment Layers': FILTER_CATALOG.map((filter) => ({
         label: filter.menuLabel,
         command: `filter:${filter.id}`
     })),
