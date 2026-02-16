@@ -95,6 +95,22 @@ npm run build
 
 The output will be in the `dist/` directory.
 
+### Docker Deployment
+
+You can deploy the application using Docker.
+
+1.  Build and run the container locally:
+    ```bash
+    docker compose up -d --build
+    ```
+
+2.  Or use the image from GitHub Container Registry (after the first successful GitHub Action run):
+    ```bash
+    docker compose up -d
+    ```
+
+The application will be available at `http://localhost:1337`.
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
