@@ -602,7 +602,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                                 </div>
                                 <div className="header-menu-dropdown-divider" style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
 
-                                <div className="header-menu-dropdown-item" style={{ cursor: 'default', fontSize: 11, color: 'var(--text-secondary)', padding: '4px 12px' }}>
+                                <div className="header-menu-dropdown-label">
                                     {t('header.settings.theme')}
                                 </div>
                                 {themeOptions.map((opt) => (
@@ -623,7 +623,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
                                 <div className="header-menu-dropdown-divider" style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
 
-                                <div className="header-menu-dropdown-item" style={{ cursor: 'default', fontSize: 11, color: 'var(--text-secondary)', padding: '4px 12px' }}>
+                                <div className="header-menu-dropdown-label">
                                     {t('header.settings.language')}
                                 </div>
 

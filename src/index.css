@@ -401,6 +401,19 @@ body,
   color: white;
 }
 
+.header-menu-dropdown-label {
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: default;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .header-menu-dropdown-item .shortcut {
   color: var(--text-secondary);
   font-size: 10px;
