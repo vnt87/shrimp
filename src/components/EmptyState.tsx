@@ -1,7 +1,10 @@
 import { useState, lazy, Suspense } from 'react'
 import { FolderOpen, ClipboardPaste, Image, FilePlus } from 'lucide-react'
 import ShrimpIcon from './ShrimpIcon'
+import { useEditor } from './EditorContext'
 const NewImageDialog = lazy(() => import('./NewImageDialog'))
+const GenerateImageDialog = lazy(() => import('./GenerateImageDialog'))
+const SparkleButton = lazy(() => import('./SparkleButton').then(module => ({ default: module.SparkleButton })))
 
 interface EmptyStateProps {
     onLoadSample: () => void
@@ -10,7 +13,32 @@ interface EmptyStateProps {
 }
 
 export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard }: EmptyStateProps) {
+    const { openImage } = useEditor()
     const [showNewImage, setShowNewImage] = useState(false)
+    const [showGenerateImage, setShowGenerateImage] = useState(false)
+
+    const handleGenerateImage = async (url: string) => {
+        try {
+            const img = new window.Image()
+            img.crossOrigin = "Anonymous"
+            img.src = url
+            await new Promise((resolve, reject) => {
+                img.onload = resolve
+                img.onerror = reject
+            })
+
+            const canvas = document.createElement('canvas')
+            canvas.width = img.width
+            canvas.height = img.height
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+                ctx.drawImage(img, 0, 0)
+                openImage("AI Generated Image", canvas)
+            }
+        } catch (e) {
+            console.error("Failed to load generated image", e)
+        }
+    }
 
     return (
         <div className="empty-state">
@@ -26,6 +54,9 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
                         <FilePlus size={16} />
                         <span>New File</span>
                     </button>
+                    <SparkleButton onClick={() => setShowGenerateImage(true)}>
+                        Generate Image
+                    </SparkleButton>
                     <button className="empty-state-btn" onClick={onOpenFile}>
                         <FolderOpen size={16} />
                         <span>Open (local file)</span>
@@ -42,6 +73,7 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
             </div>
             <Suspense fallback={null}>
                 {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
+                {showGenerateImage && <GenerateImageDialog onClose={() => setShowGenerateImage(false)} onLayerCreate={handleGenerateImage} />}
             </Suspense>
         </div>
     )

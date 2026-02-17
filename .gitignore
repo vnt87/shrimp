@@ -5,3 +5,4 @@ node_modules
 dist/
 prawn*/
 .vercel
+test-image-gen.js

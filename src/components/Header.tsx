@@ -15,6 +15,7 @@ const PreferencesDialog = lazy(() => import('./PreferencesDialog'))
 const AboutDialog = lazy(() => import('./AboutDialog'))
 const KeyboardShortcutsDialog = lazy(() => import('./KeyboardShortcutsDialog'))
 const NewImageDialog = lazy(() => import('./NewImageDialog'))
+const GenerateImageDialog = lazy(() => import('./GenerateImageDialog'))
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
 import { useEditor, type LayerFilter } from './EditorContext'
@@ -53,6 +54,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const [showAbout, setShowAbout] = useState(false)
     const [showShortcuts, setShowShortcuts] = useState(false)
     const [showNewImage, setShowNewImage] = useState(false)
+    const [showGenerateImage, setShowGenerateImage] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
     const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
     const menuRef = useRef<HTMLDivElement>(null)
@@ -273,6 +275,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
         switch (command) {
             case 'New...': setShowNewImage(true); break
+            case 'Generate Image...': setShowGenerateImage(true); break
 
             case 'Open...':
                 if (fileInputRef.current) {
@@ -402,6 +405,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const menuData: Record<string, MenuOption[]> = {
         [t('menu.file')]: [
             { label: t('menu.file.new'), command: 'New...' },
+            { label: 'Generate Image...', command: 'Generate Image...' },
             { label: t('menu.file.open'), command: 'Open...' },
             { label: t('menu.file.open_layers'), command: 'Open as Layers...' },
             { label: t('menu.file.save'), command: 'Save', shortcut: 'Cmd+S' },
@@ -664,6 +668,27 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
                 {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
                 {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
+                {showGenerateImage && <GenerateImageDialog onClose={() => setShowGenerateImage(false)} onLayerCreate={async (url) => {
+                    try {
+                        const img = new Image()
+                        img.crossOrigin = "Anonymous"
+                        img.src = url
+                        await new Promise((resolve, reject) => {
+                            img.onload = resolve
+                            img.onerror = reject
+                        })
+                        const canvas = document.createElement('canvas')
+                        canvas.width = img.width
+                        canvas.height = img.height
+                        const ctx = canvas.getContext('2d')
+                        if (ctx) {
+                            ctx.drawImage(img, 0, 0)
+                            openImage("AI Generated", canvas)
+                        }
+                    } catch (e) {
+                        console.error("Failed to load generated image", e)
+                    }
+                }} />}
                 {showFilters && <FiltersDialog initialFilterType={initialFilterType} onClose={() => setShowFilters(false)} />}
             </Suspense>
         </>

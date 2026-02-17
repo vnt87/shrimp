@@ -12,6 +12,8 @@
     },
     "dependencies": {
         "@pixi/react": "^8.0.5",
+        "@tsparticles/engine": "^3.9.1",
+        "@tsparticles/react": "^3.0.0",
         "@types/file-saver": "^2.0.7",
         "file-saver": "^2.0.5",
         "idb-keyval": "^6.2.2",
@@ -21,7 +23,8 @@
         "pixi-filters": "^6.1.5",
         "pixi.js": "^8.16.0",
         "react": "^19.0.0",
-        "react-dom": "^19.0.0"
+        "react-dom": "^19.0.0",
+        "tsparticles": "^3.9.1"
     },
     "devDependencies": {
         "@types/react": "^19.0.0",

@@ -19,11 +19,14 @@ import {
     PaintBucket,
     PenLine,
     Trash2,
-    Blend
+    Blend,
+    Loader2,
+    Sparkles
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
 import { useLanguage } from '../i18n/LanguageContext'
+import { AIService } from '../services/AIService'
 
 interface ToolOptionsBarProps {
     activeTool: string
@@ -65,10 +68,13 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         'zoom': t('tool.zoom'),
         'paths': t('tool.paths'),
         'clone': t('tool.clone') || 'Clone Stamp',
+        'gen-fill': t('tool.gen_fill' as any) || 'Generative Fill',
     }
 
     const label = toolLabels[activeTool] || activeTool
     const [isCmdPressed, setIsCmdPressed] = useState(false)
+    const [genPrompt, setGenPrompt] = useState('')
+    const [isGenerating, setIsGenerating] = useState(false)
 
     const {
         brushPresets, addBrushPreset,
@@ -876,6 +882,74 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
+
+
+    const handleGenFill = async () => {
+        if (!genPrompt) return
+        setIsGenerating(true)
+        try {
+            const url = await AIService.generateImage(genPrompt, '1024x1024')
+            const img = new window.Image()
+            img.crossOrigin = "Anonymous"
+            img.src = url
+            await new Promise((resolve, reject) => {
+                img.onload = resolve
+                img.onerror = reject
+            })
+            const canvas = document.createElement('canvas')
+            canvas.width = img.width
+            canvas.height = img.height
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+                ctx.drawImage(img, 0, 0)
+                addLayer(`AI: ${genPrompt}`, canvas)
+            }
+        } catch (e) {
+            console.error(e)
+            // Ideally assume toast context exists or alert
+            // alert("Generative Fill Failed") 
+            // Silent fail or console error for now to avoid annoying alerts.
+        } finally {
+            setIsGenerating(false)
+        }
+    }
+
+    const renderGenFillOptions = () => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+                type="text"
+                placeholder={t('tooloptions.gen_fill.prompt_placeholder' as any) || "Describe image..."}
+                className="tool-options-text-input"
+                style={{ width: 220, height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4, padding: '0 6px' }}
+                value={genPrompt}
+                onChange={(e) => setGenPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && genPrompt && !isGenerating) {
+                        handleGenFill()
+                    }
+                }}
+            />
+            <button
+                className="pref-btn pref-btn-primary"
+                style={{ height: 24, fontSize: 11, padding: '0 8px', gap: 6, display: 'flex', alignItems: 'center' }}
+                onClick={handleGenFill}
+                disabled={!genPrompt || isGenerating}
+            >
+                {isGenerating ? (
+                    <>
+                        <Loader2 size={12} className="animate-spin" />
+                        <span>{t('common.generating' as any) || "Generating..."}</span>
+                    </>
+                ) : (
+                    <>
+                        <Sparkles size={12} />
+                        <span>{t('tooloptions.gen_fill.generate' as any) || "Generate"}</span>
+                    </>
+                )}
+            </button>
+        </div>
+    )
+
     const renderToolSpecificOptions = () => {
         switch (activeTool) {
             case 'brush':
@@ -898,8 +972,12 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderCropOptions()
             case 'zoom':
                 return renderZoomOptions()
+            case 'zoom':
+                return renderZoomOptions()
             case 'paths':
                 return renderPathOptions()
+            case 'gen-fill':
+                return renderGenFillOptions()
             case 'lasso-select':
             case 'rect-select':
             case 'ellipse-select':

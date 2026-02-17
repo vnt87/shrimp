@@ -16,6 +16,7 @@ import {
     CircleDashed,
     Scale3d,
     Stamp,
+    Sparkles,
     LucideIcon
 } from 'lucide-react'
 
@@ -39,6 +40,7 @@ export const toolGroups: ToolDefinition[][] = [
         { id: 'ellipse-select', icon: CircleDashed, label: 'tool.ellipse_select' },
         { id: 'lasso-select', icon: LassoSelect, label: 'tool.lasso_select' },
         { id: 'wand-select', icon: Wand2, label: 'tool.wand_select' },
+        { id: 'gen-fill', icon: Sparkles, label: 'tool.gen_fill' },
     ],
     [
         { id: 'paths', icon: PenTool, label: 'tool.paths' },
