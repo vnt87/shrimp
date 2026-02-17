@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Sparkles, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Sparkles, Check, AlertCircle } from 'lucide-react';
 import { AIService } from '../services/AIService';
+import ImageLoader from './ImageLoader';
 
 interface GenerateImageDialogProps {
     onClose: () => void;
@@ -133,30 +134,39 @@ const GenerateImageDialog: React.FC<GenerateImageDialogProps> = ({ onClose, onLa
                             borderRadius: 6,
                             overflow: 'hidden',
                             border: '1px solid var(--border-color)',
-                            background: 'var(--bg-2)', // Checkered pattern would be nice here ideally
+                            background: 'var(--bg-2)',
                             minHeight: 200,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             position: 'relative'
                         }}>
-                            {isGenerating ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--text-secondary)' }}>
-                                    <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent-active)' }} />
-                                    <span style={{ fontSize: 12 }}>Generating assets...</span>
-                                </div>
-                            ) : (
-                                <img
-                                    src={generatedImage!}
-                                    alt="Generated result"
-                                    style={{
-                                        maxWidth: '100%',
-                                        maxHeight: 320,
-                                        objectFit: 'contain',
-                                        display: 'block'
-                                    }}
-                                />
-                            )}
+                            {(() => {
+                                const [w, h] = size.split('x').map(Number);
+                                const ratio = w / h;
+                                const maxWidth = 440;
+                                const maxHeight = 320;
+
+                                let displayW = maxWidth;
+                                let displayH = displayW / ratio;
+
+                                if (displayH > maxHeight) {
+                                    displayH = maxHeight;
+                                    displayW = displayH * ratio;
+                                }
+
+                                return (
+                                    <ImageLoader
+                                        src={generatedImage || ''}
+                                        width={Math.round(displayW)}
+                                        height={Math.round(displayH)}
+                                        gridSize={20}
+                                        cellColor="var(--text-secondary)"
+                                        loadingDelay={0}
+                                        style={{ margin: 'auto' }}
+                                    />
+                                );
+                            })()}
                         </div>
                     )}
 
