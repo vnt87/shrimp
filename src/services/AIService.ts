@@ -1,4 +1,6 @@
 
+import { integrationStore } from '../hooks/useIntegrationStore';
+
 interface GenerateImageResponse {
     created: number;
     data: Array<{
@@ -7,24 +9,31 @@ interface GenerateImageResponse {
     }>;
 }
 
-const API_URL = 'http://127.0.0.1:8045/v1/images/generations';
-
 export const AIService = {
     /**
      * Generates an image based on the provided prompt and size.
      * Returns the image URL.
      */
     generateImage: async (prompt: string, size: string = "1024x1024"): Promise<string> => {
+        const settings = integrationStore.get();
+
+        if (!settings.isAIEnabled) {
+            throw new Error("AI features are disabled. Enable them in Edit > Integrations.");
+        }
+
+        const { baseUrl, apiKey, modelId } = settings;
+        const url = `${baseUrl}/images/generations`; // OpenAI compatible endpoint
+
         try {
-            const response = await fetch(API_URL, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer not-needed'
+                    'Authorization': `Bearer ${apiKey}`
                 },
                 body: JSON.stringify({
                     prompt,
-                    model: "gemini-3-pro-image",
+                    model: modelId,
                     n: 1,
                     size,
                     response_format: "url"

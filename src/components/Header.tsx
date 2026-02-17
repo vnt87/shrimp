@@ -12,6 +12,7 @@ import {
     Check,
 } from 'lucide-react'
 const PreferencesDialog = lazy(() => import('./PreferencesDialog'))
+const IntegrationsDialog = lazy(() => import('./IntegrationsDialog'))
 const AboutDialog = lazy(() => import('./AboutDialog'))
 const KeyboardShortcutsDialog = lazy(() => import('./KeyboardShortcutsDialog'))
 const NewImageDialog = lazy(() => import('./NewImageDialog'))
@@ -21,6 +22,7 @@ import { useTheme } from './ThemeContext'
 import { useEditor, type LayerFilter } from './EditorContext'
 import { useLayout } from './LayoutContext'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useIntegrationStore } from '../hooks/useIntegrationStore'
 const FiltersDialog = lazy(() => import('./FiltersDialog'))
 
 import { MENU_TOOL_GROUPS, shortcuts, toolGroups } from '../data/tools'
@@ -55,6 +57,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const [showShortcuts, setShowShortcuts] = useState(false)
     const [showNewImage, setShowNewImage] = useState(false)
     const [showGenerateImage, setShowGenerateImage] = useState(false)
+    const [showIntegrations, setShowIntegrations] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
     const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
     const menuRef = useRef<HTMLDivElement>(null)
@@ -86,6 +89,9 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         activeDocument, // for saving
         loadDocument // for loading
     } = useEditor()
+    const { isAIEnabled } = useIntegrationStore()
+    // Alias for readability in menu construction active region
+    const showIntegrationsButton = isAIEnabled;
 
     // Key handlers
     useEffect(() => {
@@ -387,6 +393,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 break
             case 'Keyboard Shortcuts': setShowShortcuts(true); break
             case 'About': setShowAbout(true); break
+            case 'Integrations...': setShowIntegrations(true); break
             case 'Github Source': window.open('https://github.com/vunam/webgimp', '_blank'); break
         }
         setActiveMenu(null)
@@ -405,7 +412,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const menuData: Record<string, MenuOption[]> = {
         [t('menu.file')]: [
             { label: t('menu.file.new'), command: 'New...' },
-            { label: 'Generate Image...', command: 'Generate Image...' },
+            ...(showIntegrationsButton ? [{ label: 'Generate Image...', command: 'Generate Image...' }] : []),
             { label: t('menu.file.open'), command: 'Open...' },
             { label: t('menu.file.open_layers'), command: 'Open as Layers...' },
             { label: t('menu.file.save'), command: 'Save', shortcut: 'Cmd+S' },
@@ -427,6 +434,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             '---',
             { label: t('menu.edit.free_transform'), command: 'Free Transform' },
             '---',
+
             ...MENU_TOOL_GROUPS.map(group => ({
                 label: t(group.label as any),
                 children: group.tools.map(tool => ({
@@ -600,7 +608,13 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                                     <SlidersHorizontal size={14} style={{ marginRight: 8 }} />
                                     {t('header.settings.preferences')}
                                 </div>
-                                <div className="header-menu-dropdown-item">
+                                <div
+                                    className="header-menu-dropdown-item"
+                                    onClick={() => {
+                                        setSettingsOpen(false)
+                                        setShowIntegrations(true)
+                                    }}
+                                >
                                     <Puzzle size={14} style={{ marginRight: 8 }} />
                                     {t('header.settings.integrations')}
                                 </div>
@@ -665,6 +679,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
             <Suspense fallback={null}>
                 {showPreferences && <PreferencesDialog open={showPreferences} onClose={() => setShowPreferences(false)} />}
+                {showIntegrations && <IntegrationsDialog open={showIntegrations} onClose={() => setShowIntegrations(false)} />}
                 {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
                 {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
                 {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}

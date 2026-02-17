@@ -25,6 +25,7 @@ const GenerateImageDialog = lazy(() => import('./GenerateImageDialog'))
 import { getFilterCatalogEntry, isSupportedFilterType } from '../data/filterCatalog'
 import { useLanguage } from '../i18n/LanguageContext'
 import { TranslationKey } from '../i18n/en'
+import { useIntegrationStore } from '../hooks/useIntegrationStore'
 
 // --- Layer Thumbnail ---
 function LayerThumbnail({ layer }: { layer: Layer }) {
@@ -299,6 +300,7 @@ export default function LayersPanel() {
         toggleChannel,
         setActiveChannels
     } = useEditor()
+    const { isAIEnabled } = useIntegrationStore()
     const [activeTab, setActiveTab] = useState<'layers' | 'channels' | 'paths' | 'history'>('layers')
     const { t } = useLanguage()
     const [renamingPathId, setRenamingPathId] = useState<string | null>(null)
@@ -629,13 +631,15 @@ export default function LayersPanel() {
                                 >
                                     <Plus size={16} />
                                 </div>
-                                <div
-                                    className="dialogue-action-btn"
-                                    title={t('layers.btn.new_ai' as any) || 'New AI Layer'}
-                                    onClick={() => setShowAiDialog(true)}
-                                >
-                                    <Sparkles size={16} />
-                                </div>
+                                {isAIEnabled && (
+                                    <div
+                                        className="dialogue-action-btn"
+                                        title={t('layers.btn.new_ai' as any) || 'New AI Layer'}
+                                        onClick={() => setShowAiDialog(true)}
+                                    >
+                                        <Sparkles size={16} />
+                                    </div>
+                                )}
                                 <div
                                     className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
                                     title={t('layers.btn.duplicate')}

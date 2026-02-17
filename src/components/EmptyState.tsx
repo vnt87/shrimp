@@ -6,6 +6,8 @@ const NewImageDialog = lazy(() => import('./NewImageDialog'))
 const GenerateImageDialog = lazy(() => import('./GenerateImageDialog'))
 const SparkleButton = lazy(() => import('./SparkleButton').then(module => ({ default: module.SparkleButton })))
 
+import { useIntegrationStore } from '../hooks/useIntegrationStore'
+
 interface EmptyStateProps {
     onLoadSample: () => void
     onOpenFile: () => void
@@ -14,6 +16,7 @@ interface EmptyStateProps {
 
 export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard }: EmptyStateProps) {
     const { openImage } = useEditor()
+    const { isAIEnabled } = useIntegrationStore()
     const [showNewImage, setShowNewImage] = useState(false)
     const [showGenerateImage, setShowGenerateImage] = useState(false)
 
@@ -54,9 +57,11 @@ export default function EmptyState({ onLoadSample, onOpenFile, onPasteClipboard 
                         <FilePlus size={16} />
                         <span>New File</span>
                     </button>
-                    <SparkleButton onClick={() => setShowGenerateImage(true)}>
-                        Generate Image
-                    </SparkleButton>
+                    {isAIEnabled && (
+                        <SparkleButton onClick={() => setShowGenerateImage(true)}>
+                            Generate Image
+                        </SparkleButton>
+                    )}
                     <button className="empty-state-btn" onClick={onOpenFile}>
                         <FolderOpen size={16} />
                         <span>Open (local file)</span>

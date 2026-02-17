@@ -47,7 +47,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         foregroundColor,
         canvasSize,
         layers,
-        activeGradient
+        activeGradient,
+        selection
     } = useEditor()
     const { t } = useLanguage()
 
@@ -901,8 +902,14 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             canvas.height = img.height
             const ctx = canvas.getContext('2d')
             if (ctx) {
-                ctx.drawImage(img, 0, 0)
-                addLayer(`AI: ${genPrompt}`, canvas)
+                if (selection && selection.type === 'rect') {
+                    // Draw only within selection
+                    ctx.drawImage(img, selection.x, selection.y, selection.width, selection.height)
+                    addLayer(`AI: ${genPrompt}`, canvas)
+                } else {
+                    ctx.drawImage(img, 0, 0)
+                    addLayer(`AI: ${genPrompt}`, canvas)
+                }
             }
         } catch (e) {
             console.error(e)
@@ -915,37 +922,27 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
     }
 
     const renderGenFillOptions = () => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-                type="text"
-                placeholder={t('tooloptions.gen_fill.prompt_placeholder' as any) || "Describe image..."}
-                className="tool-options-text-input"
-                style={{ width: 220, height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4, padding: '0 6px' }}
-                value={genPrompt}
-                onChange={(e) => setGenPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' && genPrompt && !isGenerating) {
-                        handleGenFill()
-                    }
-                }}
-            />
+        <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+            <div style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
+                <Sparkles size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input
+                    type="text"
+                    className="tool-options-text-input"
+                    placeholder={t('tooloptions.gen_fill.prompt_placeholder' as any) || "Describe what to generate..."}
+                    value={genPrompt}
+                    onChange={(e) => setGenPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleGenFill()}
+                    style={{ width: '100%', paddingLeft: 28 }}
+                />
+            </div>
             <button
                 className="pref-btn pref-btn-primary"
-                style={{ height: 24, fontSize: 11, padding: '0 8px', gap: 6, display: 'flex', alignItems: 'center' }}
                 onClick={handleGenFill}
-                disabled={!genPrompt || isGenerating}
+                disabled={isGenerating || !genPrompt.trim()}
+                style={{ height: 24, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6 }}
             >
-                {isGenerating ? (
-                    <>
-                        <Loader2 size={12} className="animate-spin" />
-                        <span>{t('common.generating' as any) || "Generating..."}</span>
-                    </>
-                ) : (
-                    <>
-                        <Sparkles size={12} />
-                        <span>{t('tooloptions.gen_fill.generate' as any) || "Generate"}</span>
-                    </>
-                )}
+                {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                <span>{t('tooloptions.gen_fill.generate' as any) || "Generate"}</span>
             </button>
         </div>
     )
@@ -972,8 +969,6 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderCropOptions()
             case 'zoom':
                 return renderZoomOptions()
-            case 'zoom':
-                return renderZoomOptions()
             case 'paths':
                 return renderPathOptions()
             case 'gen-fill':
@@ -981,7 +976,6 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             case 'lasso-select':
             case 'rect-select':
             case 'ellipse-select':
-                // Maybe add antialiasing toggle later
                 return (
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                         {t('tooloptions.selection_tools')}
@@ -998,10 +992,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
     return (
         <div className="tool-options">
-            <div className="tool-options-group">
-                <span className="tool-options-label" style={{ fontWeight: 600 }}>{label}</span>
-            </div>
-            <div className="tool-options-divider" />
+            <span className="tool-options-label" style={{ fontWeight: 600, color: 'var(--text-tertiary)', marginRight: 12 }}>{label}</span>
             {renderToolSpecificOptions()}
         </div>
     )

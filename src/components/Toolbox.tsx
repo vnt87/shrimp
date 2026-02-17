@@ -15,12 +15,23 @@ interface ToolboxProps {
     onToolSelect?: (toolId: string) => void
 }
 
+import { useIntegrationStore } from '../hooks/useIntegrationStore'
+
 export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxProps) {
     const { foregroundColor, backgroundColor, setForegroundColor, setBackgroundColor, swapColors, resetColors } = useEditor()
     const { t } = useLanguage()
+    const { isAIEnabled } = useIntegrationStore()
     const [colorPickerTarget, setColorPickerTarget] = useState<'fg' | 'bg' | null>(null)
     const [hoveredToolId, setHoveredToolId] = useState<string | null>(null)
     const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null)
+
+    // Filter tools based on enabled features
+    const visibleToolGroups = toolGroups.map(group =>
+        group.filter(tool => {
+            if (tool.id === 'gen-fill') return isAIEnabled;
+            return true;
+        })
+    ).filter(group => group.length > 0);
 
     const shortcuts: Record<string, string> = {
         'rect-select': 'R', 'ellipse-select': 'E', 'move': 'V', 'crop': 'C',
@@ -44,7 +55,7 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
             <div className="toolbox-handle" />
 
             <div className="toolbox-tools">
-                {toolGroups.map((group, gi) => (
+                {visibleToolGroups.map((group, gi) => (
                     <div key={gi}>
                         {group.map((tool, ti) => {
                             const Icon = tool.icon
@@ -67,7 +78,7 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
                                 </div>
                             )
                         })}
-                        {gi < toolGroups.length - 1 && <div className="toolbox-divider" />}
+                        {gi < visibleToolGroups.length - 1 && <div className="toolbox-divider" />}
                     </div>
                 ))}
             </div>
