@@ -16,7 +16,6 @@ import {
     CircleDashed,
     Scale3d,
     Stamp,
-    Sparkles,
     LucideIcon
 } from 'lucide-react'
 
@@ -31,7 +30,6 @@ export const shortcuts: Record<string, string> = {
     'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
     'gradient': 'Shift+G',
     'picker': 'I', 'text': 'T', 'zoom': 'Z', 'paths': 'P', 'clone': 'S',
-    'gen-fill': 'Shift+F',
 }
 
 // Tool groups with dividers between them
@@ -41,7 +39,6 @@ export const toolGroups: ToolDefinition[][] = [
         { id: 'ellipse-select', icon: CircleDashed, label: 'tool.ellipse_select' },
         { id: 'lasso-select', icon: LassoSelect, label: 'tool.lasso_select' },
         { id: 'wand-select', icon: Wand2, label: 'tool.wand_select' },
-        { id: 'gen-fill', icon: Sparkles, label: 'tool.gen_fill' },
     ],
     [
         { id: 'paths', icon: PenTool, label: 'tool.paths' },

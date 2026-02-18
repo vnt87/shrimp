@@ -9,6 +9,7 @@ import PixiLayerSprite from './PixiLayerSprite'
 import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
 import PathOverlay from './PathOverlay'
+import GenFillModal from './GenFillModal'
 import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
@@ -650,6 +651,7 @@ export default function Canvas({
         // documents // unused
         setHistogramData,
         addLayer,
+        genFillModalOpen,
     } = useEditor()
 
     const windowSize = useWindowSize()
@@ -2464,6 +2466,10 @@ export default function Canvas({
                                         toolOptions={toolOptions}
                                     />
                                 )}
+
+                                {/* GenFillModal — fixed-position floating panel anchored below the selection.
+                                    Rendered outside the transformed container so it is in screen space. */}
+                                {genFillModalOpen && selection && <GenFillModal />}
 
                                 {/* Scrollbars would go here if we implemented custom ones */}
 

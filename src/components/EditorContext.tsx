@@ -228,6 +228,10 @@ interface EditorContextType {
     setTransientTransform: (layerId: string, transform: TransformData | null) => void
     commitTransform: (layerId: string, transform: TransformData) => void
 
+    // Generative Fill modal visibility flag
+    genFillModalOpen: boolean
+    setGenFillModalOpen: (open: boolean) => void
+
     // Cursor Info (for InfoPanel)
     cursorInfo: { x: number, y: number, color: string | null }
     setCursorInfo: (info: { x: number, y: number, color: string | null }) => void
@@ -485,6 +489,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setSelectedLayerIds([activeLayerId])
         }
     }, [activeLayerId])
+
+    // Generative Fill modal visibility
+    const [genFillModalOpen, setGenFillModalOpen] = useState(false)
 
     const [cursorInfo, setCursorInfo] = useState<{ x: number, y: number, color: string | null }>({ x: 0, y: 0, color: null })
     const [viewTransform, setViewTransform] = useState<{ scale: number, offsetX: number, offsetY: number }>({ scale: 1, offsetX: 0, offsetY: 0 })
@@ -2074,6 +2081,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             activeChannels,
             toggleChannel,
             setActiveChannels,
+
+            // Generative Fill modal
+            genFillModalOpen,
+            setGenFillModalOpen,
 
             // Gradients
             availableGradients,
