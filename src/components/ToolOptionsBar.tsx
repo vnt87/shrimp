@@ -20,7 +20,11 @@ import {
     PenLine,
     Trash2,
     Blend,
-    Sparkles
+    Sparkles,
+    Square,
+    Circle,
+    Minus,
+    Pentagon
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
@@ -74,6 +78,11 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         'paths': t('tool.paths'),
         'clone': t('tool.clone'),
         'heal': t('tool.heal'),
+        'smudge': t('tool.smudge'),
+        'blur-sharpen': t('tool.blur_sharpen'),
+        'dodge-burn': t('tool.dodge_burn'),
+        'transform': t('tool.transform'),
+        'shapes': t('tool.shapes'),
     }
 
     const label = toolLabels[activeTool] || activeTool
@@ -749,6 +758,132 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
+    const renderShapeOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
+                {[
+                    { mode: 'rect', icon: Square, hint: t('tooloptions.shape.rect') },
+                    { mode: 'ellipse', icon: Circle, hint: t('tooloptions.shape.ellipse') },
+                    { mode: 'polygon', icon: Pentagon, hint: t('tooloptions.shape.polygon') },
+                    { mode: 'line', icon: Minus, hint: t('tooloptions.shape.line') }
+                ].map(({ mode, icon: Icon, hint }) => (
+                    <button
+                        key={mode}
+                        className={`pref-btn ${toolOptions.shapeType === mode ? 'pref-btn-primary' : ''}`}
+                        onClick={() => onToolOptionChange('shapeType', mode as any)}
+                        title={hint}
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: toolOptions.shapeType === mode ? 'var(--accent-active)' : 'transparent', color: toolOptions.shapeType === mode ? 'white' : 'var(--text-secondary)' }}
+                    >
+                        <Icon size={14} />
+                    </button>
+                ))}
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-checkbox-group">
+                <input type="checkbox" id="shapeFill" checked={toolOptions.shapeFill} onChange={(e) => onToolOptionChange('shapeFill', e.target.checked)} />
+                <label htmlFor="shapeFill">{t('tooloptions.shape.fill')}</label>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-checkbox-group">
+                <input type="checkbox" id="shapeStroke" checked={toolOptions.shapeStroke} onChange={(e) => onToolOptionChange('shapeStroke', e.target.checked)} />
+                <label htmlFor="shapeStroke">{t('tooloptions.shape.stroke')}</label>
+            </div>
+            {toolOptions.shapeStroke && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('shapeStrokeWidth', t('tooloptions.shape.stroke_width'), 1, 50, 1, 'px')}
+                </>
+            )}
+            {toolOptions.shapeType === 'rect' && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('shapeCornerRadius', t('tooloptions.shape.corner_radius'), 0, 100, 1, 'px')}
+                </>
+            )}
+            {toolOptions.shapeType === 'polygon' && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('shapeSides', t('tooloptions.shape.sides'), 3, 20, 1, '')}
+                </>
+            )}
+        </>
+    )
+
+    const renderSmudgeOptions = () => (
+        <>
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('smudgeStrength', t('tooloptions.smudge.strength'), 1, 100, 1, '%')}
+            <div className="tool-options-divider" />
+            <div className="tool-options-checkbox-group">
+                <input type="checkbox" id="smudgeSampleAll" checked={toolOptions.smudgeSampleAll} onChange={(e) => onToolOptionChange('smudgeSampleAll', e.target.checked)} />
+                <label htmlFor="smudgeSampleAll">{t('tooloptions.smudge.sample_all')}</label>
+            </div>
+        </>
+    )
+
+    const renderBlurSharpenOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
+                {[
+                    { mode: 'blur', label: t('tooloptions.blur_sharpen.blur') },
+                    { mode: 'sharpen', label: t('tooloptions.blur_sharpen.sharpen') }
+                ].map(({ mode, label }) => (
+                    <button
+                        key={mode}
+                        className={`pref-btn ${toolOptions.blurMode === mode ? 'pref-btn-primary' : ''}`}
+                        onClick={() => onToolOptionChange('blurMode', mode as any)}
+                        style={{ height: 24, padding: '0 8px', fontSize: 11, background: toolOptions.blurMode === mode ? 'var(--accent-active)' : 'transparent', color: toolOptions.blurMode === mode ? 'white' : 'var(--text-secondary)' }}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+            <div className="tool-options-divider" />
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('blurStrength', t('tooloptions.blur_sharpen.strength'), 1, 100, 1, '%')}
+        </>
+    )
+
+    const renderDodgeBurnOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
+                {[
+                    { mode: 'dodge', label: t('tooloptions.dodge_burn.dodge') },
+                    { mode: 'burn', label: t('tooloptions.dodge_burn.burn') }
+                ].map(({ mode, label }) => (
+                    <button
+                        key={mode}
+                        className={`pref-btn ${toolOptions.dodgeMode === mode ? 'pref-btn-primary' : ''}`}
+                        onClick={() => onToolOptionChange('dodgeMode', mode as any)}
+                        style={{ height: 24, padding: '0 8px', fontSize: 11, background: toolOptions.dodgeMode === mode ? 'var(--accent-active)' : 'transparent', color: toolOptions.dodgeMode === mode ? 'white' : 'var(--text-secondary)' }}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="slider-label">{t('tooloptions.dodge_burn.range')}</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.dodgeRange}
+                    onChange={(e) => onToolOptionChange('dodgeRange', e.target.value as any)}
+                >
+                    <option value="shadows">{t('tooloptions.dodge_burn.shadows')}</option>
+                    <option value="midtones">{t('tooloptions.dodge_burn.midtones')}</option>
+                    <option value="highlights">{t('tooloptions.dodge_burn.highlights')}</option>
+                </select>
+            </div>
+            <div className="tool-options-divider" />
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('dodgeExposure', t('tooloptions.dodge_burn.exposure'), 1, 100, 1, '%')}
+        </>
+    )
+
     const handleSelectionFromPath = () => {
         if (!activePath) return
         const selection = pathToSelectionPolygon(activePath, 1, true)
@@ -913,6 +1048,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
 
 
+
+
     /**
      * Render fill-related buttons for selection tools.
      * - Generative Fill: enabled only when there is an active selection AND AI is configured.
@@ -1034,6 +1171,14 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             case 'rect-select':
             case 'ellipse-select':
                 return renderSelectionOptions()
+            case 'shapes':
+                return renderShapeOptions()
+            case 'smudge':
+                return renderSmudgeOptions()
+            case 'blur-sharpen':
+                return renderBlurSharpenOptions()
+            case 'dodge-burn':
+                return renderDodgeBurnOptions()
             default:
                 return (
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>

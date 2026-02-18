@@ -461,4 +461,40 @@ export const vi: Record<TranslationKey, string> = {
     'toolbox.bg_title': 'Màu nền',
     'toolbox.reset_title': 'Đặt lại về màu mặc định (D)',
     'toolbox.swap_title': 'Hoán đổi màu (X)',
+
+    // Shape Tool Options
+    'tool.shapes': 'Hình dạng',
+    'tooloptions.shape.type': 'Hình dạng',
+    'tooloptions.shape.rect': 'Chữ nhật',
+    'tooloptions.shape.ellipse': 'Elip',
+    'tooloptions.shape.polygon': 'Đa giác',
+    'tooloptions.shape.line': 'Đường thẳng',
+    'tooloptions.shape.fill': 'Tô',
+    'tooloptions.shape.stroke': 'Viền',
+    'tooloptions.shape.stroke_width': 'Độ dày',
+    'tooloptions.shape.corner_radius': 'Bán kính góc',
+    'tooloptions.shape.sides': 'Số cạnh',
+
+    // Smudge Tool Options
+    'tool.smudge': 'Làm nhòe',
+    'tooloptions.smudge.strength': 'Cường độ',
+    'tooloptions.smudge.sample_all': 'Mẫu tất cả lớp',
+
+    // Blur/Sharpen Tool Options
+    'tool.blur_sharpen': 'Mờ / Sắc nét',
+    'tooloptions.blur_sharpen.mode': 'Chế độ',
+    'tooloptions.blur_sharpen.blur': 'Làm mờ',
+    'tooloptions.blur_sharpen.sharpen': 'Làm nét',
+    'tooloptions.blur_sharpen.strength': 'Cường độ',
+
+    // Dodge/Burn Tool Options
+    'tool.dodge_burn': 'Làm sáng / Tối',
+    'tooloptions.dodge_burn.mode': 'Chế độ',
+    'tooloptions.dodge_burn.dodge': 'Làm sáng',
+    'tooloptions.dodge_burn.burn': 'Làm tối',
+    'tooloptions.dodge_burn.range': 'Vùng',
+    'tooloptions.dodge_burn.shadows': 'Vùng tối',
+    'tooloptions.dodge_burn.midtones': 'Vùng trung gian',
+    'tooloptions.dodge_burn.highlights': 'Vùng sáng',
+    'tooloptions.dodge_burn.exposure': 'Phơi sáng',
 }

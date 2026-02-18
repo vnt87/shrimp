@@ -67,22 +67,23 @@ export default function IntegrationsDialog({ open, onClose }: IntegrationsDialog
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                                 <FormSection title="Provider Configuration">
                                     <InputRow label="Protocol">
-                                        <div className="toggle-group" style={{ display: 'flex', gap: 4, background: 'var(--bg-1)', padding: 4, borderRadius: 6, border: '1px solid var(--border-color)' }}>
+                                        <div className="toggle-group" style={{ display: 'flex', gap: 2, background: 'var(--bg-input)', padding: 2, borderRadius: 6 }}>
                                             {(['openai', 'anthropic', 'gemini'] as const).map(provider => (
                                                 <button
                                                     key={provider}
                                                     onClick={() => settings.updateSettings({ aiProvider: provider })}
                                                     style={{
                                                         flex: 1,
-                                                        padding: '6px 12px',
+                                                        padding: '4px 12px',
                                                         borderRadius: 4,
                                                         border: 'none',
-                                                        background: settings.aiProvider === provider ? 'var(--accent)' : 'transparent',
+                                                        background: settings.aiProvider === provider ? 'var(--accent-active)' : 'transparent',
                                                         color: settings.aiProvider === provider ? 'white' : 'var(--text-secondary)',
                                                         fontSize: 12,
                                                         fontWeight: 500,
                                                         cursor: 'pointer',
-                                                        textTransform: 'capitalize'
+                                                        textTransform: 'capitalize',
+                                                        height: 24
                                                     }}
                                                 >
                                                     {provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Google Gemini'}

@@ -17,6 +17,10 @@ import {
     Scale3d,
     Stamp,
     Bandage,
+    Square,
+    Pointer,
+    Droplet,
+    SunMoon,
     LucideIcon
 } from 'lucide-react'
 
@@ -31,6 +35,7 @@ export const shortcuts: Record<string, string> = {
     'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
     'gradient': 'Shift+G',
     'picker': 'I', 'text': 'T', 'zoom': 'Z', 'paths': 'P', 'clone': 'S', 'heal': 'H',
+    'shapes': 'U', 'smudge': 'S', 'dodge-burn': 'O',
 }
 
 // Tool groups with dividers between them
@@ -64,6 +69,12 @@ export const toolGroups: ToolDefinition[][] = [
     ],
     [
         { id: 'text', icon: Type, label: 'tool.text' },
+        { id: 'shapes', icon: Square, label: 'tool.shapes' },
+    ],
+    [
+        { id: 'smudge', icon: Pointer, label: 'tool.smudge' },
+        { id: 'blur-sharpen', icon: Droplet, label: 'tool.blur_sharpen' },
+        { id: 'dodge-burn', icon: SunMoon, label: 'tool.dodge_burn' },
     ],
     [
         { id: 'transform', icon: Scale3d, label: 'tool.transform' },
