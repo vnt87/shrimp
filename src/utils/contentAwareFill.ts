@@ -69,11 +69,26 @@ export async function loadCAFModule(): Promise<CAFModuleInstance> {
     if (_loadingPromise) return _loadingPromise
 
     _loadingPromise = (async (): Promise<CAFModuleInstance> => {
-        // Dynamic import of the Emscripten-generated JS glue code.
-        // Vite serves public/ at the root; @vite-ignore silences the dynamic-import warning.
-        // @ts-ignore — /wasm/caf.js is a static asset, not a TS module; types live in src/types/caf-module.d.ts
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        const { default: createModule } = await import(/* @vite-ignore */ '/wasm/caf.js')
+        // Vite v6 blocks direct import() of files inside /public.
+        // Workaround: fetch the Emscripten JS glue as text, wrap it in a Blob,
+        // then import the Blob URL — this bypasses Vite's import analysis and
+        // works in both the main thread and a Web Worker context.
+        const response = await fetch('/wasm/caf.js')
+        if (!response.ok) throw new Error(`Failed to fetch /wasm/caf.js (${response.status})`)
+        const jsText = await response.text()
+        const blob = new Blob([jsText], { type: 'text/javascript' })
+        const blobUrl = URL.createObjectURL(blob)
+        let createModule: ((opts?: object) => Promise<CAFModuleInstance>) | undefined
+        try {
+            // @ts-ignore — blob URL has no TypeScript module declaration
+            const mod = await import(/* @vite-ignore */ blobUrl)
+            createModule = mod.default ?? mod
+        } finally {
+            URL.revokeObjectURL(blobUrl)
+        }
+        if (typeof createModule !== 'function') {
+            throw new Error('caf.js did not export a factory function')
+        }
         const mod = await createModule() as CAFModuleInstance
         _moduleInstance = mod
         return mod
