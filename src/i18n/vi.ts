@@ -431,6 +431,22 @@ export const vi: Record<TranslationKey, string> = {
     'tooloptions.gen_fill.no_selection_hint': 'Tạo vùng chọn trước để tô một vùng',
     'tooloptions.gen_fill.size_hint': 'Kích thước',
 
+    // Content-Aware Fill Tool (on-device, no AI/internet required)
+    'tool.content_aware_fill': 'Tô Nội Dung Thông Minh',
+    'tooloptions.caf.title': 'Tô Nội Dung Thông Minh',
+    'tooloptions.caf.apply': 'Áp Dụng',
+    'tooloptions.caf.applying': 'Đang xử lý…',
+    'tooloptions.caf.cancel': 'Hủy',
+    'tooloptions.caf.patch_size': 'Kích Thước Mảnh',
+    'tooloptions.caf.iterations': 'Số Vòng Lặp',
+    'tooloptions.caf.output_mode': 'Đầu ra',
+    'tooloptions.caf.output_mode.new_layer': 'Lớp mới',
+    'tooloptions.caf.output_mode.fill_selection': 'Tô vùng chọn',
+    'tooloptions.caf.hint': 'Tô vùng chọn dựa trên các pixel xung quanh (PatchMatch). Không cần internet.',
+    'tooloptions.caf.no_selection_hint': 'Tạo vùng chọn trước để sử dụng Tô Nội Dung Thông Minh',
+    'tooloptions.caf.wasm_loading': 'Đang tải engine…',
+    'tooloptions.caf.wasm_unavailable': 'Engine thiết bị không khả dụng, dùng JS fallback',
+
     // Info Panel
     'info.x': 'X:',
     'info.y': 'Y:',

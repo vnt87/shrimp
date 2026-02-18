@@ -10,6 +10,7 @@ import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
 import PathOverlay from './PathOverlay'
 import GenFillModal from './GenFillModal'
+import ContentAwareFillModal from './ContentAwareFillModal'
 import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
@@ -654,6 +655,7 @@ export default function Canvas({
         setHistogramData,
         addLayer,
         genFillModalOpen,
+        cafModalOpen,
     } = useEditor()
 
     const windowSize = useWindowSize()
@@ -2571,6 +2573,9 @@ export default function Canvas({
                                 {/* GenFillModal — fixed-position floating panel anchored below the selection.
                                     Rendered outside the transformed container so it is in screen space. */}
                                 {genFillModalOpen && selection && <GenFillModal />}
+
+                                {/* ContentAwareFillModal — on-device fill, no external API required */}
+                                {cafModalOpen && selection && <ContentAwareFillModal />}
 
                                 {/* Scrollbars would go here if we implemented custom ones */}
 

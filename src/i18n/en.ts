@@ -430,6 +430,22 @@ export const en = {
     'tooloptions.gen_fill.no_selection_hint': 'Draw a selection first to fill a region',
     'tooloptions.gen_fill.size_hint': 'Size',
 
+    // Content-Aware Fill Tool (on-device, no AI/internet required)
+    'tool.content_aware_fill': 'Content-Aware Fill',
+    'tooloptions.caf.title': 'Content-Aware Fill',
+    'tooloptions.caf.apply': 'Apply Fill',
+    'tooloptions.caf.applying': 'Filling…',
+    'tooloptions.caf.cancel': 'Cancel',
+    'tooloptions.caf.patch_size': 'Patch Size',
+    'tooloptions.caf.iterations': 'Iterations',
+    'tooloptions.caf.output_mode': 'Output',
+    'tooloptions.caf.output_mode.new_layer': 'New Layer',
+    'tooloptions.caf.output_mode.fill_selection': 'Fill Selection',
+    'tooloptions.caf.hint': 'Fills the selection using surrounding pixels (PatchMatch). No internet required.',
+    'tooloptions.caf.no_selection_hint': 'Draw a selection first to use Content-Aware Fill',
+    'tooloptions.caf.wasm_loading': 'Loading engine…',
+    'tooloptions.caf.wasm_unavailable': 'On-device engine unavailable, using JS fallback',
+
     // Info Panel
     'info.x': 'X:',
     'info.y': 'Y:',

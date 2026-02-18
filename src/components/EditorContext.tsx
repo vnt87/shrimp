@@ -232,6 +232,10 @@ interface EditorContextType {
     genFillModalOpen: boolean
     setGenFillModalOpen: (open: boolean) => void
 
+    // Content-Aware Fill modal visibility flag
+    cafModalOpen: boolean
+    setCAFModalOpen: (open: boolean) => void
+
     // Cursor Info (for InfoPanel)
     cursorInfo: { x: number, y: number, color: string | null }
     setCursorInfo: (info: { x: number, y: number, color: string | null }) => void
@@ -492,6 +496,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     // Generative Fill modal visibility
     const [genFillModalOpen, setGenFillModalOpen] = useState(false)
+
+    // Content-Aware Fill modal visibility
+    const [cafModalOpen, setCAFModalOpen] = useState(false)
 
     const [cursorInfo, setCursorInfo] = useState<{ x: number, y: number, color: string | null }>({ x: 0, y: 0, color: null })
     const [viewTransform, setViewTransform] = useState<{ scale: number, offsetX: number, offsetY: number }>({ scale: 1, offsetX: 0, offsetY: 0 })
@@ -2085,6 +2092,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             // Generative Fill modal
             genFillModalOpen,
             setGenFillModalOpen,
+
+            // Content-Aware Fill modal
+            cafModalOpen,
+            setCAFModalOpen,
 
             // Gradients
             availableGradients,

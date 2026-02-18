@@ -49,7 +49,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         layers,
         activeGradient,
         selection,
-        setGenFillModalOpen
+        setGenFillModalOpen,
+        setCAFModalOpen,
     } = useEditor()
     const { t } = useLanguage()
     // AI integration status — used to gate the Generative Fill button
@@ -913,15 +914,16 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
 
     /**
-     * Render the Generative Fill button for selection tools.
-     * Enabled only when there is an active selection AND AI is configured.
+     * Render fill-related buttons for selection tools.
+     * - Generative Fill: enabled only when there is an active selection AND AI is configured.
+     * - Content-Aware Fill: enabled whenever there is an active selection (on-device, no AI needed).
      * isAIEnabled and setGenFillModalOpen are read at component top level (rules of hooks).
      */
     const renderSelectionOptions = () => {
         const hasSelection = !!(selection && selection.width > 0 && selection.height > 0)
         const canGenFill = hasSelection && isAIEnabled
 
-        // Build tooltip — explains why the button is disabled when it is
+        // Build tooltip — explains why the GenFill button is disabled when it is
         const disabledReason = !isAIEnabled
             ? 'Enable AI in Integrations to use Generative Fill'
             : !hasSelection
@@ -933,7 +935,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 {/* Generative Fill button — enabled only when selection is active + AI is on */}
                 {canGenFill ? (
                     <Suspense fallback={<button className="pref-btn pref-btn-primary" style={{ height: 26, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}><Sparkles size={13} /><span>Generative Fill</span></button>}>
-                        <SparkleButton 
+                        <SparkleButton
                             onClick={() => setGenFillModalOpen(true)}
                             style={{
                                 height: 26,
@@ -972,6 +974,32 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                         <span>Generative Fill</span>
                     </button>
                 )}
+
+                {/* Content-Aware Fill — on-device PatchMatch inpainting, no AI or internet needed */}
+                <button
+                    className="pref-btn pref-btn-secondary"
+                    disabled={!hasSelection}
+                    title={hasSelection ? 'Fill selection using on-device PatchMatch algorithm (no internet required)' : 'Draw a selection first'}
+                    onClick={() => setCAFModalOpen(true)}
+                    style={{
+                        height: 26,
+                        padding: '0 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        opacity: hasSelection ? 1 : 0.5,
+                        cursor: hasSelection ? 'pointer' : 'default',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m15 5 4 4" /><path d="M13 7 8.7 2.7a2.12 2.12 0 0 0-3 3L10 10" />
+                        <path d="m17 7-1.5-1.5" /><path d="M10 10 2.5 17.5a2.12 2.12 0 0 0 3 3L13 13" />
+                    </svg>
+                    <span>Content-Aware Fill</span>
+                </button>
             </div>
         )
     }
