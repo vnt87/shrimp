@@ -63,7 +63,7 @@ emcc "$SCRIPT_DIR/caf_wrapper.cpp" \
     -s WASM=1 \
     -s MODULARIZE=1 \
     -s EXPORT_NAME="CAFModule" \
-    -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+    -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPU8","HEAP8"]' \
     -s EXPORTED_FUNCTIONS='["_malloc","_free"]' \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s INITIAL_MEMORY=33554432 \
