@@ -24,7 +24,13 @@ import {
     Square,
     Circle,
     Minus,
-    Pentagon
+    Pentagon,
+    AlignStartVertical,
+    AlignCenterVertical,
+    AlignEndVertical,
+    AlignStartHorizontal,
+    AlignCenterHorizontal,
+    AlignEndHorizontal
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import ColorPickerDialog from './ColorPickerDialog'
@@ -1208,12 +1214,12 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         let newY = layer.y
 
         switch (alignment) {
-            case 'left':     newX = 0; break
+            case 'left': newX = 0; break
             case 'center-h': newX = (canvasSize.width - lw) / 2; break
-            case 'right':    newX = canvasSize.width - lw; break
-            case 'top':      newY = 0; break
+            case 'right': newX = canvasSize.width - lw; break
+            case 'top': newY = 0; break
             case 'center-v': newY = (canvasSize.height - lh) / 2; break
-            case 'bottom':   newY = canvasSize.height - lh; break
+            case 'bottom': newY = canvasSize.height - lh; break
         }
 
         updateLayerPosition(activeLayerId, newX, newY, true)
@@ -1223,66 +1229,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
      * Inline SVG icons for the 6 layer-alignment buttons.
      * Each icon shows two rectangles (of differing widths/heights) aligned to an edge or centre.
      */
-    const AlignLeftEdgesIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            {/* Left guide line */}
-            <rect x="1" y="1" width="1.5" height="12" opacity="0.9" />
-            {/* Short bar (top) */}
-            <rect x="2.5" y="2.5" width="6" height="3.5" opacity="0.7" rx="0.5" />
-            {/* Long bar (bottom) */}
-            <rect x="2.5" y="8" width="9" height="3.5" opacity="0.7" rx="0.5" />
-        </svg>
-    )
-    const AlignCenterHIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            {/* Center guide line */}
-            <rect x="6.25" y="1" width="1.5" height="12" opacity="0.9" />
-            {/* Short bar */}
-            <rect x="3" y="2.5" width="8" height="3.5" opacity="0.7" rx="0.5" />
-            {/* Long bar */}
-            <rect x="1.5" y="8" width="11" height="3.5" opacity="0.7" rx="0.5" />
-        </svg>
-    )
-    const AlignRightEdgesIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            {/* Right guide line */}
-            <rect x="11.5" y="1" width="1.5" height="12" opacity="0.9" />
-            {/* Short bar */}
-            <rect x="5.5" y="2.5" width="6" height="3.5" opacity="0.7" rx="0.5" />
-            {/* Long bar */}
-            <rect x="2.5" y="8" width="9" height="3.5" opacity="0.7" rx="0.5" />
-        </svg>
-    )
-    const AlignTopEdgesIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            {/* Top guide line */}
-            <rect x="1" y="1" width="12" height="1.5" opacity="0.9" />
-            {/* Narrow bar */}
-            <rect x="2.5" y="2.5" width="3.5" height="6" opacity="0.7" rx="0.5" />
-            {/* Wide bar */}
-            <rect x="8"   y="2.5" width="3.5" height="9" opacity="0.7" rx="0.5" />
-        </svg>
-    )
-    const AlignCenterVIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            {/* Centre guide line */}
-            <rect x="1" y="6.25" width="12" height="1.5" opacity="0.9" />
-            {/* Short bar */}
-            <rect x="2.5" y="3" width="3.5" height="8" opacity="0.7" rx="0.5" />
-            {/* Tall bar */}
-            <rect x="8"   y="1.5" width="3.5" height="11" opacity="0.7" rx="0.5" />
-        </svg>
-    )
-    const AlignBottomEdgesIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            {/* Bottom guide line */}
-            <rect x="1" y="11.5" width="12" height="1.5" opacity="0.9" />
-            {/* Narrow bar */}
-            <rect x="2.5" y="5.5" width="3.5" height="6" opacity="0.7" rx="0.5" />
-            {/* Wide bar */}
-            <rect x="8"   y="2.5" width="3.5" height="9" opacity="0.7" rx="0.5" />
-        </svg>
-    )
+
 
     /** Renders the Move tool's option bar — matching the Photoshop Move tool options. */
     const renderMoveOptions = () => {
@@ -1348,12 +1295,12 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     title={canAlign ? 'Align active layer relative to canvas' : 'Select a layer to align'}
                 >
                     {[
-                        { key: 'left',     Icon: AlignLeftEdgesIcon,  tip: 'Align left edges to canvas' },
-                        { key: 'center-h', Icon: AlignCenterHIcon,    tip: 'Centre horizontally in canvas' },
-                        { key: 'right',    Icon: AlignRightEdgesIcon,  tip: 'Align right edges to canvas' },
-                        { key: 'top',      Icon: AlignTopEdgesIcon,    tip: 'Align top edges to canvas' },
-                        { key: 'center-v', Icon: AlignCenterVIcon,     tip: 'Centre vertically in canvas' },
-                        { key: 'bottom',   Icon: AlignBottomEdgesIcon, tip: 'Align bottom edges to canvas' },
+                        { key: 'left', Icon: AlignStartVertical, tip: 'Align left edges to canvas' },
+                        { key: 'center-h', Icon: AlignCenterVertical, tip: 'Centre horizontally in canvas' },
+                        { key: 'right', Icon: AlignEndVertical, tip: 'Align right edges to canvas' },
+                        { key: 'top', Icon: AlignStartHorizontal, tip: 'Align top edges to canvas' },
+                        { key: 'center-v', Icon: AlignCenterHorizontal, tip: 'Centre vertically in canvas' },
+                        { key: 'bottom', Icon: AlignEndHorizontal, tip: 'Align bottom edges to canvas' },
                     ].map(({ key, Icon, tip }) => (
                         <button
                             key={key}
@@ -1372,7 +1319,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                                 opacity: canAlign ? 1 : 0.4,
                             }}
                         >
-                            <Icon />
+                            <Icon size={14} />
                         </button>
                     ))}
                 </div>

@@ -1,4 +1,4 @@
-import { FoldVertical, UnfoldVertical, X } from 'lucide-react'
+import { Minus, UnfoldVertical, X } from 'lucide-react'
 import { useLayout, LayoutState } from './LayoutContext'
 
 interface PanelMenuProps {
@@ -25,7 +25,7 @@ export default function PanelMenu({ panelId }: PanelMenuProps) {
                     color: 'var(--text-secondary)'
                 }}
             >
-                {isMinimized ? <UnfoldVertical size={13} /> : <FoldVertical size={13} />}
+                {isMinimized ? <UnfoldVertical size={13} /> : <Minus size={13} />}
             </div>
             <div
                 className="panel-header-action"
