@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Sparkles, X, RotateCcw, Check, AlertCircle } from 'lucide-react'
 import { useEditor } from './EditorContext'
 import { AIService } from '../services/AIService'
@@ -22,6 +22,8 @@ export default function GenFillModal() {
         viewTransform,
         setGenFillModalOpen,
         addLayer,
+        layers,
+        activeLayerId,
     } = useEditor()
 
     // --- local state ---
@@ -30,6 +32,9 @@ export default function GenFillModal() {
     const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [position, setPosition] = useState({ x: 0, y: 0, caretOffset: 160 })
+
+    /** Canvas ref for the idle-state selection preview */
+    const previewCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
     const MODAL_WIDTH = 320
 
@@ -240,6 +245,51 @@ export default function GenFillModal() {
 
     const { w: previewW, h: previewH } = getPreviewDimensions()
 
+    // -------------------------------------------------------------------------
+    // Idle-state preview: draw the selected image region onto the canvas so the
+    // user can see what area they're about to fill before hitting Generate.
+    // -------------------------------------------------------------------------
+    useEffect(() => {
+        const canvas = previewCanvasRef.current
+        if (!canvas || !selection || isGenerating || generatedUrl) return
+
+        const activeLayer = layers.find(l => l.id === activeLayerId)
+        if (!activeLayer?.data) return
+
+        // Size the canvas to the computed preview dimensions
+        canvas.width  = previewW
+        canvas.height = previewH
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        // Checkerboard background for transparent areas
+        const tileSize = 8
+        for (let y = 0; y < previewH; y += tileSize) {
+            for (let x = 0; x < previewW; x += tileSize) {
+                ctx.fillStyle = ((x / tileSize + y / tileSize) % 2 === 0)
+                    ? '#cccccc' : '#ffffff'
+                ctx.fillRect(x, y, tileSize, tileSize)
+            }
+        }
+
+        // Blit selection region from layer, scaled to fit preview
+        ctx.drawImage(
+            activeLayer.data,
+            selection.x, selection.y, selection.width, selection.height,
+            0, 0, previewW, previewH
+        )
+
+        // Ellipse clip for ellipse selections
+        if (selection.type === 'ellipse') {
+            ctx.globalCompositeOperation = 'destination-in'
+            ctx.beginPath()
+            ctx.ellipse(previewW / 2, previewH / 2, previewW / 2, previewH / 2, 0, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.globalCompositeOperation = 'source-over'
+        }
+    }, [selection, layers, activeLayerId, previewW, previewH, isGenerating, generatedUrl])
+
     return (
         <div
             style={{
@@ -381,6 +431,39 @@ export default function GenFillModal() {
                                 loadingDelay={0}
                             />
                         </div>
+                    </div>
+                )}
+
+                {/* Idle-state image preview — shows the selection area content so the
+                    user can see what will be replaced before clicking Generate.
+                    Hidden once generation starts (ImageLoader takes over). */}
+                {!isGenerating && !generatedUrl && selection && (
+                    <div style={{
+                        borderRadius: 5,
+                        overflow: 'hidden',
+                        border: '1px solid var(--border-main)',
+                        background: 'var(--bg-2)',
+                        marginBottom: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        padding: 8,
+                        gap: 6,
+                    }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                            Selection: {Math.round(selection.width)} × {Math.round(selection.height)} px
+                        </span>
+                        <canvas
+                            ref={previewCanvasRef}
+                            style={{
+                                width: previewW,
+                                height: previewH,
+                                display: 'block',
+                                borderRadius: selection.type === 'ellipse' ? '50%' : 4,
+                                border: '1px solid var(--border-main)',
+                                imageRendering: 'pixelated',
+                            }}
+                        />
                     </div>
                 )}
 

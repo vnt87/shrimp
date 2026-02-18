@@ -297,7 +297,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
             case 'Open...':
                 if (fileInputRef.current) {
-                    fileInputRef.current.accept = '.shrimp,image/*'
+                    fileInputRef.current.accept = '.shrimp,.psd,.pdf,.svg,.tif,.tiff,.heic,.heif,image/*'
                     fileInputRef.current.onchange = async (e: any) => {
                         const file = e.target.files[0]
                         if (file) {
@@ -310,26 +310,34 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                                     alert('Failed to load file')
                                 }
                             } else {
-                                const reader = new FileReader()
-                                reader.onload = () => {
-                                    const img = new Image()
-                                    img.onload = () => {
-                                        const canvas = document.createElement('canvas')
-                                        canvas.width = img.width
-                                        canvas.height = img.height
-                                        const ctx = canvas.getContext('2d')
-                                        ctx?.drawImage(img, 0, 0)
-                                        openImage(file.name, canvas)
+                                const { ImportManager } = await import('../utils/importManager')
+                                const result = await ImportManager.importFile(file)
+                                if (result.error) {
+                                    alert(`Failed to import: ${result.error}`)
+                                } else if (result.layers) {
+                                    // Default to opening the first layer on a new canvas for simple imports
+                                    // More complex imports (PSD/SVG) will return 'content'
+                                    if (result.content) {
+                                        loadDocument(result.content, file.name)
+                                        // Merge layers if they were extracted but not in content (e.g. rasterized SVG layer)
+                                        if (result.layers.length > 0) {
+                                            result.layers.forEach(layer => addLayer(layer.name, layer.data || undefined))
+                                        }
+                                    } else {
+                                        const firstLayer = result.layers[0]
+                                        openImage(file.name, firstLayer.data!)
+                                        // Add remaining layers if any
+                                        for (let i = 1; i < result.layers.length; i++) {
+                                            addLayer(result.layers[i].name, result.layers[i].data!)
+                                        }
                                     }
-                                    img.src = reader.result as string
                                 }
-                                reader.readAsDataURL(file)
                             }
                         }
                     }
                     fileInputRef.current.click()
                 }
-                break
+                break;
             case 'Save':
                 if (activeDocument) {
                     saveToShrimpFile(activeDocument.history.present, `${activeDocument.name}.shrimp`)
@@ -337,26 +345,20 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 break
             case 'Open as Layers...':
                 if (fileInputRef.current) {
-                    fileInputRef.current.accept = 'image/*'
-                    fileInputRef.current.onchange = (e: any) => {
+                    fileInputRef.current.accept = '.psd,.pdf,.svg,.tif,.tiff,.heic,.heif,image/*'
+                    fileInputRef.current.onchange = async (e: any) => {
                         const file = e.target.files[0]
                         if (file) {
-                            const reader = new FileReader()
-                            reader.onload = () => {
-                                const img = new Image()
-                                img.onload = () => {
-                                    const canvas = document.createElement('canvas')
-                                    canvas.width = img.width
-                                    canvas.height = img.height
-                                    const ctx = canvas.getContext('2d')
-                                    ctx?.drawImage(img, 0, 0)
-                                    // For now, Open as Layers just opens as new image as well,
-                                    // properly implementing "add layer from file" would require a new context method
-                                    openImage(file.name, canvas)
+                            const { ImportManager } = await import('../utils/importManager')
+                            const result = await ImportManager.importFile(file)
+                            if (result.error) {
+                                alert(`Failed to import: ${result.error}`)
+                            } else if (result.layers) {
+                                result.layers.forEach(layer => addLayer(layer.name, layer.data || undefined))
+                                if (result.content && result.content.paths.length > 0) {
+                                    // Merge paths too
                                 }
-                                img.src = reader.result as string
                             }
-                            reader.readAsDataURL(file)
                         }
                     }
                     fileInputRef.current.click()

@@ -20,9 +20,20 @@ import {
     PenLine,
     Trash2,
     Blend,
-    Sparkles
+    Sparkles,
+    Square,
+    Circle,
+    Minus,
+    Pentagon,
+    AlignStartVertical,
+    AlignCenterVertical,
+    AlignEndVertical,
+    AlignStartHorizontal,
+    AlignCenterHorizontal,
+    AlignEndHorizontal
 } from 'lucide-react'
 import FontSelector from './FontSelector'
+import ColorPickerDialog from './ColorPickerDialog'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useIntegrationStore } from '../hooks/useIntegrationStore'
@@ -49,7 +60,11 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         layers,
         activeGradient,
         selection,
-        setGenFillModalOpen
+        setGenFillModalOpen,
+        setCAFModalOpen,
+        // Move tool needs: active layer id, position update, and layer list
+        activeLayerId,
+        updateLayerPosition,
     } = useEditor()
     const { t } = useLanguage()
     // AI integration status — used to gate the Generative Fill button
@@ -73,10 +88,17 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         'paths': t('tool.paths'),
         'clone': t('tool.clone'),
         'heal': t('tool.heal'),
+        'smudge': t('tool.smudge'),
+        'blur-sharpen': t('tool.blur_sharpen'),
+        'dodge-burn': t('tool.dodge_burn'),
+        'transform': t('tool.transform'),
+        'shapes': t('tool.shapes'),
     }
 
     const label = toolLabels[activeTool] || activeTool
     const [isCmdPressed, setIsCmdPressed] = useState(false)
+    /** Controls whether the Photoshop-style color picker dialog is open for the text tool color */
+    const [textColorPickerOpen, setTextColorPickerOpen] = useState(false)
 
     const {
         brushPresets, addBrushPreset,
@@ -595,13 +617,38 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             <div className="tool-options-divider" />
             <div className="tool-options-slider-group">
                 <span className="slider-label">{t('tooloptions.text.color')}</span>
-                <input
-                    type="color"
-                    className="tool-options-color"
-                    style={{ width: 100, height: 24, padding: 0, border: 'none' }}
-                    value={toolOptions.textColor}
-                    onChange={(e) => onToolOptionChange('textColor', e.target.value)}
+
+                {/*
+                 * Circle color swatch — clicking opens the Photoshop-style ColorPickerDialog.
+                 * The circle is 20×20 px with the current textColor as its background.
+                 * A thin ring border makes it visible even against matching backgrounds.
+                 */}
+                <button
+                    onClick={() => setTextColorPickerOpen(true)}
+                    title={t('tooloptions.text.color')}
+                    style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        background: toolOptions.textColor,
+                        border: '2px solid var(--border-main)',
+                        boxShadow: '0 0 0 1px rgba(0,0,0,0.3)',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        padding: 0,
+                    }}
                 />
+
+                {/* Photoshop-style color picker dialog — mounted only while open */}
+                {textColorPickerOpen && (
+                    <ColorPickerDialog
+                        title={t('tooloptions.text.color')}
+                        color={toolOptions.textColor}
+                        onChange={(c) => onToolOptionChange('textColor', c)}
+                        onClose={() => setTextColorPickerOpen(false)}
+                    />
+                )}
+
                 <button
                     className="pref-btn pref-btn-secondary"
                     style={{ height: 24, fontSize: 10, padding: '0 6px', minWidth: 'auto' }}
@@ -747,6 +794,132 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             </>
         )
     }
+
+    const renderShapeOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
+                {[
+                    { mode: 'rect', icon: Square, hint: t('tooloptions.shape.rect') },
+                    { mode: 'ellipse', icon: Circle, hint: t('tooloptions.shape.ellipse') },
+                    { mode: 'polygon', icon: Pentagon, hint: t('tooloptions.shape.polygon') },
+                    { mode: 'line', icon: Minus, hint: t('tooloptions.shape.line') }
+                ].map(({ mode, icon: Icon, hint }) => (
+                    <button
+                        key={mode}
+                        className={`pref-btn ${toolOptions.shapeType === mode ? 'pref-btn-primary' : ''}`}
+                        onClick={() => onToolOptionChange('shapeType', mode as any)}
+                        title={hint}
+                        style={{ height: 24, width: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: 'none', background: toolOptions.shapeType === mode ? 'var(--accent-active)' : 'transparent', color: toolOptions.shapeType === mode ? 'white' : 'var(--text-secondary)' }}
+                    >
+                        <Icon size={14} />
+                    </button>
+                ))}
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-checkbox-group">
+                <input type="checkbox" id="shapeFill" checked={toolOptions.shapeFill} onChange={(e) => onToolOptionChange('shapeFill', e.target.checked)} />
+                <label htmlFor="shapeFill">{t('tooloptions.shape.fill')}</label>
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-checkbox-group">
+                <input type="checkbox" id="shapeStroke" checked={toolOptions.shapeStroke} onChange={(e) => onToolOptionChange('shapeStroke', e.target.checked)} />
+                <label htmlFor="shapeStroke">{t('tooloptions.shape.stroke')}</label>
+            </div>
+            {toolOptions.shapeStroke && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('shapeStrokeWidth', t('tooloptions.shape.stroke_width'), 1, 50, 1, 'px')}
+                </>
+            )}
+            {toolOptions.shapeType === 'rect' && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('shapeCornerRadius', t('tooloptions.shape.corner_radius'), 0, 100, 1, 'px')}
+                </>
+            )}
+            {toolOptions.shapeType === 'polygon' && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('shapeSides', t('tooloptions.shape.sides'), 3, 20, 1, '')}
+                </>
+            )}
+        </>
+    )
+
+    const renderSmudgeOptions = () => (
+        <>
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('smudgeStrength', t('tooloptions.smudge.strength'), 1, 100, 1, '%')}
+            <div className="tool-options-divider" />
+            <div className="tool-options-checkbox-group">
+                <input type="checkbox" id="smudgeSampleAll" checked={toolOptions.smudgeSampleAll} onChange={(e) => onToolOptionChange('smudgeSampleAll', e.target.checked)} />
+                <label htmlFor="smudgeSampleAll">{t('tooloptions.smudge.sample_all')}</label>
+            </div>
+        </>
+    )
+
+    const renderBlurSharpenOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
+                {[
+                    { mode: 'blur', label: t('tooloptions.blur_sharpen.blur') },
+                    { mode: 'sharpen', label: t('tooloptions.blur_sharpen.sharpen') }
+                ].map(({ mode, label }) => (
+                    <button
+                        key={mode}
+                        className={`pref-btn ${toolOptions.blurMode === mode ? 'pref-btn-primary' : ''}`}
+                        onClick={() => onToolOptionChange('blurMode', mode as any)}
+                        style={{ height: 24, padding: '0 8px', fontSize: 11, background: toolOptions.blurMode === mode ? 'var(--accent-active)' : 'transparent', color: toolOptions.blurMode === mode ? 'white' : 'var(--text-secondary)' }}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+            <div className="tool-options-divider" />
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('blurStrength', t('tooloptions.blur_sharpen.strength'), 1, 100, 1, '%')}
+        </>
+    )
+
+    const renderDodgeBurnOptions = () => (
+        <>
+            <div className="tool-options-group" style={{ display: 'flex', background: 'var(--bg-input)', padding: 2, borderRadius: 6, gap: 2 }}>
+                {[
+                    { mode: 'dodge', label: t('tooloptions.dodge_burn.dodge') },
+                    { mode: 'burn', label: t('tooloptions.dodge_burn.burn') }
+                ].map(({ mode, label }) => (
+                    <button
+                        key={mode}
+                        className={`pref-btn ${toolOptions.dodgeMode === mode ? 'pref-btn-primary' : ''}`}
+                        onClick={() => onToolOptionChange('dodgeMode', mode as any)}
+                        style={{ height: 24, padding: '0 8px', fontSize: 11, background: toolOptions.dodgeMode === mode ? 'var(--accent-active)' : 'transparent', color: toolOptions.dodgeMode === mode ? 'white' : 'var(--text-secondary)' }}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="slider-label">{t('tooloptions.dodge_burn.range')}</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.dodgeRange}
+                    onChange={(e) => onToolOptionChange('dodgeRange', e.target.value as any)}
+                >
+                    <option value="shadows">{t('tooloptions.dodge_burn.shadows')}</option>
+                    <option value="midtones">{t('tooloptions.dodge_burn.midtones')}</option>
+                    <option value="highlights">{t('tooloptions.dodge_burn.highlights')}</option>
+                </select>
+            </div>
+            <div className="tool-options-divider" />
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('dodgeExposure', t('tooloptions.dodge_burn.exposure'), 1, 100, 1, '%')}
+        </>
+    )
 
     const handleSelectionFromPath = () => {
         if (!activePath) return
@@ -912,16 +1085,19 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
 
 
+
+
     /**
-     * Render the Generative Fill button for selection tools.
-     * Enabled only when there is an active selection AND AI is configured.
+     * Render fill-related buttons for selection tools.
+     * - Generative Fill: enabled only when there is an active selection AND AI is configured.
+     * - Content-Aware Fill: enabled whenever there is an active selection (on-device, no AI needed).
      * isAIEnabled and setGenFillModalOpen are read at component top level (rules of hooks).
      */
     const renderSelectionOptions = () => {
         const hasSelection = !!(selection && selection.width > 0 && selection.height > 0)
         const canGenFill = hasSelection && isAIEnabled
 
-        // Build tooltip — explains why the button is disabled when it is
+        // Build tooltip — explains why the GenFill button is disabled when it is
         const disabledReason = !isAIEnabled
             ? 'Enable AI in Integrations to use Generative Fill'
             : !hasSelection
@@ -933,7 +1109,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 {/* Generative Fill button — enabled only when selection is active + AI is on */}
                 {canGenFill ? (
                     <Suspense fallback={<button className="pref-btn pref-btn-primary" style={{ height: 26, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}><Sparkles size={13} /><span>Generative Fill</span></button>}>
-                        <SparkleButton 
+                        <SparkleButton
                             onClick={() => setGenFillModalOpen(true)}
                             style={{
                                 height: 26,
@@ -972,7 +1148,182 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                         <span>Generative Fill</span>
                     </button>
                 )}
+
+                {/* Content-Aware Fill — on-device PatchMatch inpainting, no AI or internet needed */}
+                <button
+                    className="pref-btn pref-btn-secondary"
+                    disabled={!hasSelection}
+                    title={hasSelection ? 'Fill selection using on-device PatchMatch algorithm (no internet required)' : 'Draw a selection first'}
+                    onClick={() => setCAFModalOpen(true)}
+                    style={{
+                        height: 26,
+                        padding: '0 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        opacity: hasSelection ? 1 : 0.5,
+                        cursor: hasSelection ? 'pointer' : 'default',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m15 5 4 4" /><path d="M13 7 8.7 2.7a2.12 2.12 0 0 0-3 3L10 10" />
+                        <path d="m17 7-1.5-1.5" /><path d="M10 10 2.5 17.5a2.12 2.12 0 0 0 3 3L13 13" />
+                    </svg>
+                    <span>Content-Aware Fill</span>
+                </button>
             </div>
+        )
+    }
+
+    // ─── Move Tool Helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Returns the pixel dimensions of a layer (data canvas or text estimate).
+     */
+    const getLayerSize = (layerId: string): { width: number; height: number } | null => {
+        const layer = layers.find(l => l.id === layerId)
+        if (!layer) return null
+        if (layer.data) return { width: layer.data.width, height: layer.data.height }
+        // Text layer: rough estimate from text + style
+        if (layer.type === 'text' && layer.text) {
+            const s = layer.textStyle || { fontSize: 24 }
+            const estWidth = layer.text.length * s.fontSize * 0.6
+            const lines = layer.text.split('\n')
+            const estHeight = lines.length * s.fontSize * 1.4
+            return { width: estWidth, height: estHeight }
+        }
+        return null
+    }
+
+    /**
+     * Align the active layer relative to the canvas in the given direction.
+     * Directions: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom'
+     */
+    const alignActiveLayer = (alignment: string) => {
+        if (!activeLayerId) return
+        const layer = layers.find(l => l.id === activeLayerId)
+        if (!layer) return
+        const size = getLayerSize(activeLayerId)
+        const lw = size?.width ?? 0
+        const lh = size?.height ?? 0
+
+        let newX = layer.x
+        let newY = layer.y
+
+        switch (alignment) {
+            case 'left': newX = 0; break
+            case 'center-h': newX = (canvasSize.width - lw) / 2; break
+            case 'right': newX = canvasSize.width - lw; break
+            case 'top': newY = 0; break
+            case 'center-v': newY = (canvasSize.height - lh) / 2; break
+            case 'bottom': newY = canvasSize.height - lh; break
+        }
+
+        updateLayerPosition(activeLayerId, newX, newY, true)
+    }
+
+    /**
+     * Inline SVG icons for the 6 layer-alignment buttons.
+     * Each icon shows two rectangles (of differing widths/heights) aligned to an edge or centre.
+     */
+
+
+    /** Renders the Move tool's option bar — matching the Photoshop Move tool options. */
+    const renderMoveOptions = () => {
+        const canAlign = !!activeLayerId && layers.length > 0
+
+        return (
+            <>
+                {/* ── Auto-Select ──────────────────────────────────────────── */}
+                <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {/* Checkbox label acts as a toggle */}
+                    <div className="tool-options-checkbox-group" style={{ margin: 0 }}>
+                        <input
+                            type="checkbox"
+                            id="moveAutoSelect"
+                            checked={toolOptions.moveAutoSelect}
+                            onChange={(e) => onToolOptionChange('moveAutoSelect', e.target.checked)}
+                        />
+                        <label htmlFor="moveAutoSelect" style={{ whiteSpace: 'nowrap' }}>Auto-Select:</label>
+                    </div>
+                    {/* Layer / Group target — only relevant when auto-select is on */}
+                    <select
+                        className="tool-options-select"
+                        disabled={!toolOptions.moveAutoSelect}
+                        value={toolOptions.moveAutoSelectTarget}
+                        onChange={(e) => onToolOptionChange('moveAutoSelectTarget', e.target.value as 'layer' | 'group')}
+                        style={{
+                            height: 24,
+                            fontSize: 11,
+                            background: 'var(--bg-input)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-main)',
+                            borderRadius: 4,
+                            opacity: toolOptions.moveAutoSelect ? 1 : 0.45,
+                        }}
+                    >
+                        <option value="layer">Layer</option>
+                        <option value="group">Group</option>
+                    </select>
+                </div>
+
+                <div className="tool-options-divider" />
+
+                {/* ── Show Transform Controls ──────────────────────────────── */}
+                <div className="tool-options-checkbox-group">
+                    <input
+                        type="checkbox"
+                        id="moveShowTransform"
+                        checked={toolOptions.moveShowTransformControls}
+                        onChange={(e) => onToolOptionChange('moveShowTransformControls', e.target.checked)}
+                    />
+                    <label htmlFor="moveShowTransform" style={{ whiteSpace: 'nowrap' }}>
+                        Show Transform Controls
+                    </label>
+                </div>
+
+                <div className="tool-options-divider" />
+
+                {/* ── Alignment Buttons ────────────────────────────────────── */}
+                {/* Six buttons: align left, centre-H, right edges; align top, centre-V, bottom edges */}
+                <div
+                    className="tool-options-group"
+                    style={{ display: 'flex', alignItems: 'center', gap: 2 }}
+                    title={canAlign ? 'Align active layer relative to canvas' : 'Select a layer to align'}
+                >
+                    {[
+                        { key: 'left', Icon: AlignStartVertical, tip: 'Align left edges to canvas' },
+                        { key: 'center-h', Icon: AlignCenterVertical, tip: 'Centre horizontally in canvas' },
+                        { key: 'right', Icon: AlignEndVertical, tip: 'Align right edges to canvas' },
+                        { key: 'top', Icon: AlignStartHorizontal, tip: 'Align top edges to canvas' },
+                        { key: 'center-v', Icon: AlignCenterHorizontal, tip: 'Centre vertically in canvas' },
+                        { key: 'bottom', Icon: AlignEndHorizontal, tip: 'Align bottom edges to canvas' },
+                    ].map(({ key, Icon, tip }) => (
+                        <button
+                            key={key}
+                            className="pref-btn pref-btn-secondary"
+                            disabled={!canAlign}
+                            title={tip}
+                            onClick={() => alignActiveLayer(key)}
+                            style={{
+                                width: 26,
+                                minWidth: 26,
+                                height: 24,
+                                padding: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: canAlign ? 1 : 0.4,
+                            }}
+                        >
+                            <Icon size={14} />
+                        </button>
+                    ))}
+                </div>
+            </>
         )
     }
 
@@ -1002,10 +1353,20 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderZoomOptions()
             case 'paths':
                 return renderPathOptions()
+            case 'move':
+                return renderMoveOptions()
             case 'lasso-select':
             case 'rect-select':
             case 'ellipse-select':
                 return renderSelectionOptions()
+            case 'shapes':
+                return renderShapeOptions()
+            case 'smudge':
+                return renderSmudgeOptions()
+            case 'blur-sharpen':
+                return renderBlurSharpenOptions()
+            case 'dodge-burn':
+                return renderDodgeBurnOptions()
             default:
                 return (
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>

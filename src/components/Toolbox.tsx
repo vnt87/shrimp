@@ -37,7 +37,8 @@ export default function Toolbox({ activeTool = 'move', onToolSelect }: ToolboxPr
         'rect-select': 'R', 'ellipse-select': 'E', 'move': 'V', 'crop': 'C',
         'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
         'gradient': 'Shift+G',
-        'picker': 'I', 'text': 'T', 'zoom': 'Z', 'paths': 'P',
+        'picker': 'I', 'text': 'T', 'zoom': 'Z', 'paths': 'P', 'clone': 'S', 'heal': 'H',
+        'shapes': 'U', 'smudge': 'S', 'dodge-burn': 'O',
     }
 
     const getToolTipLabel = (toolId: string): string => {

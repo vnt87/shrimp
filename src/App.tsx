@@ -57,6 +57,27 @@ export interface ToolOptions {
     // Heal options
     healSampleMode: 'current' | 'all'
     healStrength: number
+    // Shape options
+    shapeType: 'rect' | 'ellipse' | 'polygon' | 'line'
+    shapeFill: boolean
+    shapeStroke: boolean
+    shapeStrokeWidth: number
+    shapeCornerRadius: number
+    shapeSides: number
+    // Smudge options
+    smudgeStrength: number
+    smudgeSampleAll: boolean
+    // Blur/Sharpen options
+    blurMode: 'blur' | 'sharpen'
+    blurStrength: number
+    // Dodge/Burn options
+    dodgeMode: 'dodge' | 'burn'
+    dodgeRange: 'shadows' | 'midtones' | 'highlights'
+    dodgeExposure: number
+    // Move tool options
+    moveAutoSelect: boolean          // Auto-select topmost layer under cursor on click
+    moveAutoSelectTarget: 'layer' | 'group'  // Whether to pick individual layer or group
+    moveShowTransformControls: boolean       // Show bounding-box handles (like Transform tool)
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -96,6 +117,23 @@ const defaultToolOptions: ToolOptions = {
     cloneTarget: 'active',
     healSampleMode: 'current',
     healStrength: 80,
+    shapeType: 'rect',
+    shapeFill: true,
+    shapeStroke: false,
+    shapeStrokeWidth: 2,
+    shapeCornerRadius: 0,
+    shapeSides: 5,
+    smudgeStrength: 50,
+    smudgeSampleAll: false,
+    blurMode: 'blur',
+    blurStrength: 50,
+    dodgeMode: 'dodge',
+    dodgeRange: 'midtones',
+    dodgeExposure: 50,
+    // Move tool defaults — match Photoshop defaults (auto-select off, no transform handles)
+    moveAutoSelect: false,
+    moveAutoSelectTarget: 'layer',
+    moveShowTransformControls: false,
 }
 
 export default function App() {
@@ -153,6 +191,9 @@ export default function App() {
                 case 'z': setActiveTool('zoom'); break
                 case 'p': setActiveTool('paths'); break
                 case 'h': setActiveTool('heal'); break
+                case 'u': setActiveTool('shapes'); break
+                case 's': setActiveTool('smudge'); break
+                case 'o': setActiveTool('dodge-burn'); break
                 case 'escape': setActiveTool('move'); break
                 case '[':
                     setToolOptions(prev => ({

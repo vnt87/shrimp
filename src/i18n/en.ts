@@ -430,6 +430,22 @@ export const en = {
     'tooloptions.gen_fill.no_selection_hint': 'Draw a selection first to fill a region',
     'tooloptions.gen_fill.size_hint': 'Size',
 
+    // Content-Aware Fill Tool (on-device, no AI/internet required)
+    'tool.content_aware_fill': 'Content-Aware Fill',
+    'tooloptions.caf.title': 'Content-Aware Fill',
+    'tooloptions.caf.apply': 'Apply Fill',
+    'tooloptions.caf.applying': 'Filling…',
+    'tooloptions.caf.cancel': 'Cancel',
+    'tooloptions.caf.patch_size': 'Patch Size',
+    'tooloptions.caf.iterations': 'Iterations',
+    'tooloptions.caf.output_mode': 'Output',
+    'tooloptions.caf.output_mode.new_layer': 'New Layer',
+    'tooloptions.caf.output_mode.fill_selection': 'Fill Selection',
+    'tooloptions.caf.hint': 'Fills the selection using surrounding pixels (PatchMatch). No internet required.',
+    'tooloptions.caf.no_selection_hint': 'Draw a selection first to use Content-Aware Fill',
+    'tooloptions.caf.wasm_loading': 'Loading engine…',
+    'tooloptions.caf.wasm_unavailable': 'On-device engine unavailable, using JS fallback',
+
     // Info Panel
     'info.x': 'X:',
     'info.y': 'Y:',
@@ -444,6 +460,42 @@ export const en = {
     'toolbox.bg_title': 'Background Color',
     'toolbox.reset_title': 'Reset to Default Colors (D)',
     'toolbox.swap_title': 'Swap Colors (X)',
+
+    // Shape Tool Options
+    'tool.shapes': 'Shapes',
+    'tooloptions.shape.type': 'Shape',
+    'tooloptions.shape.rect': 'Rectangle',
+    'tooloptions.shape.ellipse': 'Ellipse',
+    'tooloptions.shape.polygon': 'Polygon',
+    'tooloptions.shape.line': 'Line',
+    'tooloptions.shape.fill': 'Fill',
+    'tooloptions.shape.stroke': 'Stroke',
+    'tooloptions.shape.stroke_width': 'Weight',
+    'tooloptions.shape.corner_radius': 'Radius',
+    'tooloptions.shape.sides': 'Sides',
+
+    // Smudge Tool Options
+    'tool.smudge': 'Smudge',
+    'tooloptions.smudge.strength': 'Strength',
+    'tooloptions.smudge.sample_all': 'Sample All Layers',
+
+    // Blur/Sharpen Tool Options
+    'tool.blur_sharpen': 'Blur / Sharpen',
+    'tooloptions.blur_sharpen.mode': 'Mode',
+    'tooloptions.blur_sharpen.blur': 'Blur',
+    'tooloptions.blur_sharpen.sharpen': 'Sharpen',
+    'tooloptions.blur_sharpen.strength': 'Strength',
+
+    // Dodge/Burn Tool Options
+    'tool.dodge_burn': 'Dodge / Burn',
+    'tooloptions.dodge_burn.mode': 'Mode',
+    'tooloptions.dodge_burn.dodge': 'Dodge',
+    'tooloptions.dodge_burn.burn': 'Burn',
+    'tooloptions.dodge_burn.range': 'Range',
+    'tooloptions.dodge_burn.shadows': 'Shadows',
+    'tooloptions.dodge_burn.midtones': 'Midtones',
+    'tooloptions.dodge_burn.highlights': 'Highlights',
+    'tooloptions.dodge_burn.exposure': 'Exposure',
 }
 
 export type TranslationKey = keyof typeof en

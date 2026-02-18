@@ -10,6 +10,7 @@ import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
 import PathOverlay from './PathOverlay'
 import GenFillModal from './GenFillModal'
+import ContentAwareFillModal from './ContentAwareFillModal'
 import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
@@ -18,6 +19,7 @@ import { cloneCanvas, renderGradientToLayer } from '../utils/gradient'
 import { healBrushDabFast } from '../utils/healing'
 import { HistogramData } from './EditorContext'
 import HistogramWorker from '../workers/histogram.worker?worker'
+import { applyDodgeBurn, applyBlurSharpen, smudgePatch } from '../utils/pixelTools'
 
 // Register Pixi components for @pixi/react
 extend({ Container, Sprite, Graphics, Text })
@@ -423,7 +425,7 @@ function TempCloneLayer({ canvasRef }: { canvasRef: React.RefObject<HTMLCanvasEl
  * Inner Pixi scene that renders layers and selection overlay.
  * Must be a child of <Application> to use useApplication().
  */
-function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerId, isAltPressed, layersContainerRef, tempStrokeCanvas }: {
+function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerId, isAltPressed, layersContainerRef, tempStrokeCanvas, shapePreview }: {
     transform: CanvasTransform
     cursorRef: React.MutableRefObject<{ x: number, y: number }>
     toolOptions: any
@@ -432,55 +434,72 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
     isAltPressed?: boolean
     layersContainerRef: React.MutableRefObject<any>
     tempStrokeCanvas: React.MutableRefObject<HTMLCanvasElement | null>
+    shapePreview: { start: { x: number, y: number }, current: { x: number, y: number } } | null
 }) {
-    const { activeDocumentId, activeChannels, layers, selection, activeLayerId } = useEditor()
+    const { activeDocumentId, activeChannels, layers, selection, activeLayerId, foregroundColor } = useEditor()
     const activeDocId = activeDocumentId
 
     // Calculate channel filter
     const channelFilter = useMemo(() => {
-        if (activeChannels.length === 3) return null // All channels active (RGB)
-
+        // ... (existing filter logic)
+        if (activeChannels.length === 3) return null
         const filter = new ColorMatrixFilter()
-
-        const r = activeChannels.includes('r')
-        const g = activeChannels.includes('g')
-        const b = activeChannels.includes('b')
-
-        // If only one channel is active, show it as grayscale intensity
+        const r = activeChannels.includes('r'), g = activeChannels.includes('g'), b = activeChannels.includes('b')
         if (activeChannels.length === 1) {
-            if (r) {
-                filter.matrix = [
-                    1, 0, 0, 0, 0,
-                    1, 0, 0, 0, 0,
-                    1, 0, 0, 0, 0,
-                    0, 0, 0, 1, 0
-                ]
-            } else if (g) {
-                filter.matrix = [
-                    0, 1, 0, 0, 0,
-                    0, 1, 0, 0, 0,
-                    0, 1, 0, 0, 0,
-                    0, 0, 0, 1, 0
-                ]
-            } else if (b) {
-                filter.matrix = [
-                    0, 0, 1, 0, 0,
-                    0, 0, 1, 0, 0,
-                    0, 0, 1, 0, 0,
-                    0, 0, 0, 1, 0
-                ]
-            }
+            if (r) filter.matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+            else if (g) filter.matrix = [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0]
+            else if (b) filter.matrix = [0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]
         } else {
-            // Otherwise just mask out inactive channels
-            filter.matrix = [
-                r ? 1 : 0, 0, 0, 0, 0,
-                0, g ? 1 : 0, 0, 0, 0,
-                0, 0, b ? 1 : 0, 0, 0,
-                0, 0, 0, 1, 0
-            ]
+            filter.matrix = [r ? 1 : 0, 0, 0, 0, 0, 0, g ? 1 : 0, 0, 0, 0, 0, 0, b ? 1 : 0, 0, 0, 0, 0, 0, 1, 0]
         }
         return filter
     }, [activeChannels])
+
+    const drawShapePreview = useCallback((g: any) => {
+        g.clear()
+        if (!shapePreview || !toolOptions) return
+
+        const { start, current } = shapePreview
+        const x = Math.min(start.x, current.x)
+        const y = Math.min(start.y, current.y)
+        const width = Math.abs(current.x - start.x)
+        const height = Math.abs(current.y - start.y)
+
+        const fgHex = parseInt(foregroundColor.replace('#', ''), 16)
+
+        if (toolOptions.shapeFill && toolOptions.shapeType !== 'line') {
+            g.beginFill(fgHex, 0.5)
+        }
+
+        g.lineStyle(2, fgHex, 0.8)
+
+        const type = toolOptions.shapeType
+        if (type === 'rect') {
+            const r = toolOptions.shapeCornerRadius
+            if (r > 0) g.drawRoundedRect(x, y, width, height, r)
+            else g.drawRect(x, y, width, height)
+        } else if (type === 'ellipse') {
+            g.drawEllipse(x + width / 2, y + height / 2, width / 2, height / 2)
+        } else if (type === 'line') {
+            g.moveTo(start.x, start.y)
+            g.lineTo(current.x, current.y)
+        } else if (type === 'polygon') {
+            const sides = toolOptions.shapeSides
+            const centerX = x + width / 2
+            const centerY = y + height / 2
+            const radiusX = width / 2
+            const radiusY = height / 2
+            for (let i = 0; i < sides; i++) {
+                const angle = (i / sides) * Math.PI * 2 - Math.PI / 2
+                const px = centerX + radiusX * Math.cos(angle)
+                const py = centerY + radiusY * Math.sin(angle)
+                if (i === 0) g.moveTo(px, py)
+                else g.lineTo(px, py)
+            }
+            g.closePath()
+        }
+        if (toolOptions.shapeFill && type !== 'line') g.endFill()
+    }, [shapePreview, toolOptions, foregroundColor])
 
     if (!activeDocId) return null
 
@@ -505,18 +524,26 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
             {/* Selection overlay */}
             {selection && <SelectionOverlay selection={selection} />}
 
+            {/* Shape Preview */}
+            {shapePreview && <graphics draw={drawShapePreview} />}
+
             {/* Brush Cursor Overlay */}
             <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} isAltPressed={isAltPressed} />
 
             {/* Clone Source Indicator (also used for heal tool) */}
             {(activeTool === 'clone' || activeTool === 'heal') && <CloneSourceCursor source={useEditor().cloneSource} />}
 
-            {/* Transform Overlay (Pixi) */}
-            {
-                activeTool === 'transform' && (
-                    <TransformOverlayWrapper layerId={activeLayerId} />
-                )
-            }
+            {/*
+              * Transform Overlay (Pixi)
+              * Shown for the dedicated Transform tool, OR when the Move tool has
+              * "Show Transform Controls" checked — matching Photoshop behaviour
+              * where the bounding-box handles appear directly on the canvas while
+              * the Move tool is active.
+              */}
+            {(activeTool === 'transform' ||
+                (activeTool === 'move' && toolOptions?.moveShowTransformControls)) && (
+                <TransformOverlayWrapper layerId={activeLayerId} />
+            )}
         </pixiContainer>
     )
 }
@@ -654,6 +681,7 @@ export default function Canvas({
         setHistogramData,
         addLayer,
         genFillModalOpen,
+        cafModalOpen,
     } = useEditor()
 
     const windowSize = useWindowSize()
@@ -940,6 +968,17 @@ export default function Canvas({
         end: { x: number; y: number }
     } | null>(null)
 
+    // Shape state
+    const isDrawingShape = useRef(false)
+    const shapeStartPoint = useRef<{ x: number, y: number } | null>(null)
+    const [shapePreview, setShapePreview] = useState<{
+        start: { x: number, y: number },
+        current: { x: number, y: number }
+    } | null>(null)
+
+    // Smudge tool state
+    const smudgeBuffer = useRef<ImageData | null>(null)
+
     // --- Drawing helper: draw stroke segment ---
     const drawStrokeTo = useCallback((canvasX: number, canvasY: number, isFirst: boolean, history: boolean = true) => {
         let ctx: CanvasRenderingContext2D | null = null
@@ -990,6 +1029,9 @@ export default function Canvas({
         const isEraser = activeTool === 'eraser'
         const isPencil = activeTool === 'pencil'
         const isClone = activeTool === 'clone'
+        const isSmudge = activeTool === 'smudge'
+        const isBlurSharpen = activeTool === 'blur-sharpen'
+        const isDodgeBurn = activeTool === 'dodge-burn'
 
         // If cloning but no source, do nothing or warn? 
         if (isClone && !cloneSource) {
@@ -1011,7 +1053,7 @@ export default function Canvas({
         }
 
         // Apply hardness via shadow
-        if (!isPencil && !isClone && hardness < 1) {
+        if (!isPencil && !isClone && !isSmudge && !isBlurSharpen && !isDodgeBurn && hardness < 1) {
             ctx.shadowBlur = size * (1 - hardness) * 0.5
             ctx.shadowColor = isEraser ? 'rgba(0,0,0,1)' : foregroundColor
         }
@@ -1020,7 +1062,7 @@ export default function Canvas({
         // (lx, ly calculated above)
 
         if (isClone && cloneSource) {
-            // Clone Stamp Implementation
+            // ... existing clone logic ...
             const dx = cloneSource.x - dragStart.current.canvasX
             const dy = cloneSource.y - dragStart.current.canvasY
 
@@ -1042,9 +1084,6 @@ export default function Canvas({
                 srcX = sourceX
                 srcY = sourceY
             } else {
-                // Sample Current Layer (or rather, the Active Layer at start)
-                // If we are cloning to new layer, we might want to sample from the active layer still?
-                // Yes, standard behavior is "current layer" means the layer selected in panel.
                 const sourceLayer = layers.find(l => l.id === activeLayerId)
                 if (sourceLayer && sourceLayer.data) {
                     srcImage = sourceLayer.data
@@ -1058,6 +1097,32 @@ export default function Canvas({
                     srcX - size / 2, srcY - size / 2, size, size,
                     lx - size / 2, ly - size / 2, size, size
                 )
+            }
+        } else if (isSmudge || isBlurSharpen || isDodgeBurn) {
+            // Pixel Manipulation Tools
+            const radius = Math.round(size / 2)
+            const sampleX = Math.round(lx - radius)
+            const sampleY = Math.round(ly - radius)
+
+            try {
+                const imageData = ctx.getImageData(sampleX, sampleY, size, size)
+
+                if (isSmudge) {
+                    if (smudgeBuffer.current) {
+                        const smudged = smudgePatch(imageData, smudgeBuffer.current, toolOptions?.smudgeStrength ?? 50)
+                        ctx.putImageData(smudged, sampleX, sampleY)
+                    }
+                    // Update smudge buffer with current pixels for next dab
+                    smudgeBuffer.current = imageData
+                } else if (isBlurSharpen) {
+                    const blurred = applyBlurSharpen(imageData, toolOptions?.blurMode ?? 'blur', toolOptions?.blurStrength ?? 50)
+                    ctx.putImageData(blurred, sampleX, sampleY)
+                } else if (isDodgeBurn) {
+                    applyDodgeBurn(imageData, toolOptions?.dodgeMode ?? 'dodge', toolOptions?.dodgeRange ?? 'midtones', toolOptions?.dodgeExposure ?? 50)
+                    ctx.putImageData(imageData, sampleX, sampleY)
+                }
+            } catch (e) {
+                // Out of bounds or other issues
             }
         } else if (isFirst || !lastDrawPoint.current) {
             // Single dot
@@ -1091,32 +1156,32 @@ export default function Canvas({
     const drawHealStroke = useCallback((canvasX: number, canvasY: number, _isFirst: boolean, history: boolean = true) => {
         if (!activeLayerId) return
         if (!cloneSource) return
-        
+
         const currentLayer = layers.find((l: Layer) => l.id === activeLayerId)
         if (!currentLayer || !currentLayer.data || currentLayer.locked) return
-        
+
         const ctx = currentLayer.data.getContext('2d')
         if (!ctx) return
 
         const size = toolOptions?.brushSize ?? 10
         const strength = (toolOptions?.healStrength ?? 100) / 100
-        
+
         // Calculate source position relative to drag start
         const dx = cloneSource.x - dragStart.current.canvasX
         const dy = cloneSource.y - dragStart.current.canvasY
-        
+
         const sourceX = canvasX + dx
         const sourceY = canvasY + dy
-        
+
         // Layer coordinates
         const lx = canvasX - currentLayer.x
         const ly = canvasY - currentLayer.y
-        
+
         // Get source image
         let srcImage: HTMLCanvasElement | OffscreenCanvas | null = null
         let srcX = 0
         let srcY = 0
-        
+
         if (dragStart.current.cloneSourceCanvas) {
             // Sample All Layers
             srcImage = dragStart.current.cloneSourceCanvas
@@ -1131,9 +1196,9 @@ export default function Canvas({
                 srcY = sourceY - sourceLayer.y
             }
         }
-        
+
         if (!srcImage) return
-        
+
         // Apply healing brush dab - returns ImageData
         const healedImageData = healBrushDabFast(
             srcImage,
@@ -1143,22 +1208,22 @@ export default function Canvas({
             size,
             strength
         )
-        
+
         // Create a temp canvas to hold the healed ImageData
         const tempCanvas = document.createElement('canvas')
         tempCanvas.width = healedImageData.width
         tempCanvas.height = healedImageData.height
         const tempCtx = tempCanvas.getContext('2d')
         if (!tempCtx) return
-        
+
         tempCtx.putImageData(healedImageData, 0, 0)
-        
+
         // Draw the healed patch onto the layer
         const halfSize = Math.floor(healedImageData.width / 2)
         ctx.save()
         ctx.drawImage(tempCanvas, lx - halfSize, ly - halfSize)
         ctx.restore()
-        
+
         // Clone the canvas to trigger React state update
         const newCanvas = document.createElement('canvas')
         newCanvas.width = currentLayer.data.width
@@ -1166,7 +1231,7 @@ export default function Canvas({
         const newCtx = newCanvas.getContext('2d')
         newCtx?.drawImage(currentLayer.data, 0, 0)
         updateLayerData(activeLayerId, newCanvas, history)
-        
+
         lastDrawPoint.current = { x: canvasX, y: canvasY }
     }, [activeLayerId, layers, toolOptions, cloneSource, updateLayerData])
 
@@ -1196,6 +1261,81 @@ export default function Canvas({
         }
         return false
     }, [selection])
+
+    /**
+     * Helper to draw a shape onto a Canvas 2D context.
+     */
+    const drawShapeToCanvas = useCallback((ctx: CanvasRenderingContext2D, start: { x: number, y: number }, end: { x: number, y: number }, options: ToolOptions) => {
+        const x = Math.min(start.x, end.x)
+        const y = Math.min(start.y, end.y)
+        const width = Math.abs(end.x - start.x)
+        const height = Math.abs(end.y - start.y)
+
+        ctx.save()
+        ctx.fillStyle = foregroundColor
+        ctx.strokeStyle = foregroundColor
+        ctx.lineWidth = options.shapeStrokeWidth
+        ctx.lineJoin = 'round'
+
+        const type = options.shapeType
+        const fill = options.shapeFill
+        const stroke = options.shapeStroke
+
+        ctx.beginPath()
+        if (type === 'rect') {
+            const r = options.shapeCornerRadius
+            if (r > 0) {
+                ctx.roundRect(x, y, width, height, r)
+            } else {
+                ctx.rect(x, y, width, height)
+            }
+        } else if (type === 'ellipse') {
+            ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2)
+        } else if (type === 'line') {
+            ctx.moveTo(start.x, start.y)
+            ctx.lineTo(end.x, end.y)
+        } else if (type === 'polygon') {
+            const sides = options.shapeSides
+            const centerX = x + width / 2
+            const centerY = y + height / 2
+            const radiusX = width / 2
+            const radiusY = height / 2
+            for (let i = 0; i < sides; i++) {
+                const angle = (i / sides) * Math.PI * 2 - Math.PI / 2
+                const px = centerX + radiusX * Math.cos(angle)
+                const py = centerY + radiusY * Math.sin(angle)
+                if (i === 0) ctx.moveTo(px, py)
+                else ctx.lineTo(px, py)
+            }
+            ctx.closePath()
+        }
+
+        if (fill && type !== 'line') ctx.fill()
+        if (stroke || type === 'line') ctx.stroke()
+        ctx.restore()
+    }, [foregroundColor])
+
+    const drawShapeToLayer = useCallback((start: { x: number, y: number }, end: { x: number, y: number }, history: boolean = true) => {
+        if (!activeLayerId) return
+        const layer = layers.find(l => l.id === activeLayerId)
+        if (!layer || !layer.data || layer.locked) return
+
+        const ctx = layer.data.getContext('2d')
+        if (!ctx) return
+
+        // Convert canvas coords to layer coords
+        const lS = { x: start.x - layer.x, y: start.y - layer.y }
+        const lE = { x: end.x - layer.x, y: end.y - layer.y }
+
+        drawShapeToCanvas(ctx, lS, lE, toolOptions!)
+
+        // Trigger update
+        const newCanvas = document.createElement('canvas')
+        newCanvas.width = layer.data.width
+        newCanvas.height = layer.data.height
+        newCanvas.getContext('2d')?.drawImage(layer.data, 0, 0)
+        updateLayerData(activeLayerId, newCanvas, history)
+    }, [activeLayerId, layers, toolOptions, drawShapeToCanvas, updateLayerData])
 
     const renderGradientPreview = useCallback((endPoint: { x: number; y: number }, history: boolean) => {
         if (!activeLayerId || !gradientStart.current || !gradientBaseCanvas.current) return
@@ -1831,57 +1971,132 @@ export default function Canvas({
             }
             return
         }
-        if (activeTool === 'move' && activeLayerId) {
-            const layer = layers.find(l => l.id === activeLayerId)
+        if (activeTool === 'move') {
+            // ── Auto-Select: find the topmost non-locked visible layer at cursor ──
+            // Triggered either when moveAutoSelect is on, or when clicking on a text
+            // layer that isn't currently active (legacy behaviour).
+            const autoSelect = toolOptions?.moveAutoSelect ?? false
 
-            // Check if clicking on another text layer to auto-select it
-            // This allows moving text layers even if not currently selected
-            const clickedTextLayer = [...layers].reverse().find(l => {
-                if (!l.visible) return false;
+            /**
+             * Walk layers (topmost rendered first = reversed array) and return the
+             * first layer whose opaque pixel is under the cursor.  For groups this
+             * descends into children unless moveAutoSelectTarget === 'group'.
+             */
+            const findLayerAtPoint = (list: import('./EditorContext').Layer[]): import('./EditorContext').Layer | null => {
+                const target = toolOptions?.moveAutoSelectTarget ?? 'layer'
+                // Iterate in reverse so we check topmost (visually) layers first
+                for (let i = list.length - 1; i >= 0; i--) {
+                    const l = list[i]
+                    if (!l.visible || l.locked) continue
 
-                // For text layers, we need a better hit test than just x/y
-                if (l.type === 'text' && l.text) {
-                    const s = l.textStyle || { fontSize: 24 }
-                    const estWidth = l.text.length * s.fontSize * 0.6
-                    const lines = l.text.split('\n')
-                    const estHeight = lines.length * s.fontSize * 1.4
-                    return canvasX >= l.x && canvasX <= l.x + estWidth &&
-                        canvasY >= l.y && canvasY <= l.y + estHeight
+                    if (l.type === 'group' && l.children) {
+                        if (target === 'group') {
+                            // Hit-test any child, but return the group itself
+                            const child = findLayerAtPoint(l.children)
+                            if (child) return l
+                        } else {
+                            // Descend into the group and return the child
+                            const child = findLayerAtPoint(l.children)
+                            if (child) return child
+                        }
+                    } else if (l.type === 'text' && l.text) {
+                        // Bounding box estimate for text layers
+                        const s = l.textStyle || { fontSize: 24 }
+                        const estWidth = l.text.length * s.fontSize * 0.6
+                        const lines = l.text.split('\n')
+                        const estHeight = lines.length * s.fontSize * 1.4
+                        if (canvasX >= l.x && canvasX <= l.x + estWidth &&
+                            canvasY >= l.y && canvasY <= l.y + estHeight) {
+                            return l
+                        }
+                    } else if (l.data) {
+                        // Check bounds first (fast path)
+                        const lx = Math.round(canvasX - l.x)
+                        const ly = Math.round(canvasY - l.y)
+                        if (lx >= 0 && ly >= 0 && lx < l.data.width && ly < l.data.height) {
+                            // Sample alpha to skip fully transparent pixels
+                            try {
+                                const ctx = l.data.getContext('2d')
+                                if (ctx) {
+                                    const px = ctx.getImageData(lx, ly, 1, 1)
+                                    if (px.data[3] > 0) return l
+                                }
+                            } catch {
+                                // getImageData may throw for tainted canvases
+                                return l
+                            }
+                        }
+                    }
                 }
-
-                return false;
-            })
-
-            if (clickedTextLayer && clickedTextLayer.id !== activeLayerId) {
-                setActiveLayer(clickedTextLayer.id)
-                setIsDragging(true)
-                dragStart.current = {
-                    x: e.clientX,
-                    y: e.clientY,
-                    offsetX: 0,
-                    offsetY: 0,
-                    layerX: clickedTextLayer.x,
-                    layerY: clickedTextLayer.y,
-                    canvasX,
-                    canvasY
-                }
-                return;
+                return null
             }
 
-            if (layer) {
-                setIsDragging(true)
-                dragStart.current = {
-                    x: e.clientX,
-                    y: e.clientY,
-                    offsetX: 0,
-                    offsetY: 0,
-                    layerX: layer.x,
-                    layerY: layer.y,
-                    canvasX,
-                    canvasY
+            // When auto-select is on, pick the layer under the cursor
+            if (autoSelect) {
+                const found = findLayerAtPoint(layers)
+                if (found && found.id !== activeLayerId) {
+                    setActiveLayer(found.id)
+                    // Start dragging the newly selected layer
+                    setIsDragging(true)
+                    dragStart.current = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        offsetX: 0,
+                        offsetY: 0,
+                        layerX: found.x,
+                        layerY: found.y,
+                        canvasX,
+                        canvasY
+                    }
+                    return
+                }
+            } else {
+                // Legacy: auto-select text layers even when moveAutoSelect is off
+                // (kept for backward compatibility so clicking a text layer still
+                //  selects it without needing to go to the Layers panel first)
+                const clickedTextLayer = findLayerAtPoint(
+                    layers.filter(l => l.type === 'text')
+                )
+                if (clickedTextLayer && clickedTextLayer.id !== activeLayerId) {
+                    setActiveLayer(clickedTextLayer.id)
+                    setIsDragging(true)
+                    dragStart.current = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        offsetX: 0,
+                        offsetY: 0,
+                        layerX: clickedTextLayer.x,
+                        layerY: clickedTextLayer.y,
+                        canvasX,
+                        canvasY
+                    }
+                    return
                 }
             }
-        } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone' || activeTool === 'heal') {
+
+            // Start drag for the currently active layer (regardless of auto-select)
+            if (activeLayerId) {
+                const layer = layers.find(l => l.id === activeLayerId)
+                if (layer) {
+                    setIsDragging(true)
+                    dragStart.current = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        offsetX: 0,
+                        offsetY: 0,
+                        layerX: layer.x,
+                        layerY: layer.y,
+                        canvasX,
+                        canvasY
+                    }
+                }
+            }
+        } else if (activeTool === 'shapes') {
+            setIsDragging(true)
+            isDrawingShape.current = true
+            shapeStartPoint.current = { x: canvasX, y: canvasY }
+            setShapePreview({ start: { x: canvasX, y: canvasY }, current: { x: canvasX, y: canvasY } })
+        } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone' || activeTool === 'heal' || activeTool === 'smudge' || activeTool === 'blur-sharpen' || activeTool === 'dodge-burn') {
             setIsDragging(true)
             isDrawing.current = true
             lastDrawPoint.current = null
@@ -1941,7 +2156,7 @@ export default function Canvas({
                 cloneSourceCanvas,
                 isDrawingToNewLayer: toolOptions?.cloneTarget === 'new'
             }
-            
+
             // For heal tool, call drawHealStroke instead
             if (activeTool === 'heal') {
                 drawHealStroke(canvasX, canvasY, true, false)
@@ -2169,7 +2384,9 @@ export default function Canvas({
                 end: endPoint
             })
             scheduleGradientPreview(endPoint)
-        } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone')) {
+        } else if (isDrawingShape.current) {
+            setShapePreview(prev => prev ? { ...prev, current: { x: canvasX, y: canvasY } } : null)
+        } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone' || activeTool === 'smudge' || activeTool === 'blur-sharpen' || activeTool === 'dodge-burn')) {
             drawStrokeTo(canvasX, canvasY, false, false)
         } else if (isDrawing.current && activeTool === 'heal') {
             drawHealStroke(canvasX, canvasY, false, false)
@@ -2294,6 +2511,20 @@ export default function Canvas({
                 removeGuide(draggingGuideId)
             }
             setDraggingGuideId(null)
+        }
+
+        if (isDrawingShape.current && shapeStartPoint.current && viewportRef) {
+            const rect = viewportRef.getBoundingClientRect()
+            const cX = (e.clientX - rect.left - transform.offsetX) / transform.scale
+            const cY = (e.clientY - rect.top - transform.offsetY) / transform.scale
+            drawShapeToLayer(shapeStartPoint.current, { x: cX, y: cY }, true)
+            isDrawingShape.current = false
+            shapeStartPoint.current = null
+            setShapePreview(null)
+        }
+
+        if (activeTool === 'smudge') {
+            smudgeBuffer.current = null
         }
 
     }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition, renderGradientPreview, clearGradientState, viewportRef, addLayer])
@@ -2472,6 +2703,7 @@ export default function Canvas({
                                         isAltPressed={isAltPressed}
                                         layersContainerRef={layersContainerRef}
                                         tempStrokeCanvas={tempStrokeCanvas}
+                                        shapePreview={shapePreview}
                                     />
                                     {pixiApp && (
                                         <HistogramExtractor
@@ -2571,6 +2803,9 @@ export default function Canvas({
                                 {/* GenFillModal — fixed-position floating panel anchored below the selection.
                                     Rendered outside the transformed container so it is in screen space. */}
                                 {genFillModalOpen && selection && <GenFillModal />}
+
+                                {/* ContentAwareFillModal — on-device fill, no external API required */}
+                                {cafModalOpen && selection && <ContentAwareFillModal />}
 
                                 {/* Scrollbars would go here if we implemented custom ones */}
 

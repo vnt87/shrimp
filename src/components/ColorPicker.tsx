@@ -3,17 +3,19 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 interface ColorPickerProps {
     color: string
     onChange: (color: string) => void
-    onClose: () => void
     style?: React.CSSProperties
 }
 
-// Convert hex to HSV
+// ─── Color Conversion Utilities ───────────────────────────────────────────────
+
+/** Convert a 6-digit hex string to HSV tuple [h(0-360), s(0-100), v(0-100)] */
 function hexToHsv(hex: string): [number, number, number] {
     const r = parseInt(hex.slice(1, 3), 16) / 255
     const g = parseInt(hex.slice(3, 5), 16) / 255
     const b = parseInt(hex.slice(5, 7), 16) / 255
 
-    const max = Math.max(r, g, b), min = Math.min(r, g, b)
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
     const v = max
     const d = max - min
     const s = max === 0 ? 0 : d / max
@@ -31,7 +33,7 @@ function hexToHsv(hex: string): [number, number, number] {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(v * 100)]
 }
 
-// Convert HSV to hex
+/** Convert HSV [h(0-360), s(0-100), v(0-100)] to 6-digit hex string */
 function hsvToHex(h: number, s: number, v: number): string {
     s /= 100
     v /= 100
@@ -55,60 +57,93 @@ function hsvToHex(h: number, s: number, v: number): string {
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
-export default function ColorPicker({ color, onChange, onClose, style }: ColorPickerProps) {
+/** Parse hex → {r, g, b} each 0-255 */
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+    return {
+        r: parseInt(hex.slice(1, 3), 16),
+        g: parseInt(hex.slice(3, 5), 16),
+        b: parseInt(hex.slice(5, 7), 16),
+    }
+}
+
+/** Convert {r, g, b} each 0-255 → hex */
+function rgbToHex(r: number, g: number, b: number): string {
+    const toHex = (n: number) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0')
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+/**
+ * PhotoshopColorPicker
+ *
+ * A custom color picker modelled after the Adobe Photoshop color picker UI:
+ * - Large saturation/value (SV) square on the left
+ * - Thin vertical hue strip beside the SV square
+ * - "new / current" stacked color preview on the right of the hue strip
+ * - Numeric fields for H (°), S (%), V (%) and R, G, B (0-255) + hex #
+ *
+ * All state is internal; `onChange` is called on every interaction.
+ */
+export default function ColorPicker({ color, onChange, style }: ColorPickerProps) {
+    // ── State ──────────────────────────────────────────────────────────────────
+    /** Current HSV values [hue 0-360, sat 0-100, val 0-100] */
     const [hsv, setHsv] = useState<[number, number, number]>(() => hexToHsv(color))
-    const [hexInput, setHexInput] = useState(color)
-    const satValueRef = useRef<HTMLDivElement>(null)
-    const hueRef = useRef<HTMLDivElement>(null)
+    /** Controlled hex input string (may be partial while user is typing) */
+    const [hexInput, setHexInput] = useState(color.replace('#', '').toUpperCase())
+    /** The "current" (original) color shown in the preview — never changes after mount */
+    const originalColor = useRef(color)
+
+    // Drag state: which area is being dragged
     const [dragging, setDragging] = useState<'sv' | 'hue' | null>(null)
+
+    // DOM refs for hit-testing
+    const svRef = useRef<HTMLDivElement>(null)
+    const hueRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
-    const [recentColors] = useState<string[]>([
-        '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff',
-        '#ffff00', '#ff00ff', '#00ffff', '#ff8800', '#8800ff'
-    ])
+    // ── Derived values ─────────────────────────────────────────────────────────
+    const [h, s, v] = hsv
+    const currentHex = hsvToHex(h, s, v)
+    const { r, g, b } = hexToRgb(currentHex)
 
-    // Close on outside click
-    useEffect(() => {
-        const handleClick = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                onClose()
-            }
-        }
-        setTimeout(() => document.addEventListener('mousedown', handleClick), 0)
-        return () => document.removeEventListener('mousedown', handleClick)
-    }, [onClose])
-
-    const updateColor = useCallback((h: number, s: number, v: number) => {
-        setHsv([h, s, v])
-        const hex = hsvToHex(h, s, v)
-        setHexInput(hex)
+    // ── Core update helper ─────────────────────────────────────────────────────
+    /** Update all state from a new HSV triple and fire onChange */
+    const applyHsv = useCallback((newH: number, newS: number, newV: number) => {
+        const clamped: [number, number, number] = [
+            Math.round(Math.max(0, Math.min(360, newH))),
+            Math.round(Math.max(0, Math.min(100, newS))),
+            Math.round(Math.max(0, Math.min(100, newV))),
+        ]
+        setHsv(clamped)
+        const hex = hsvToHex(...clamped)
+        setHexInput(hex.slice(1).toUpperCase())
         onChange(hex)
     }, [onChange])
 
-    const handleSatValueMouse = useCallback((e: React.MouseEvent | MouseEvent) => {
-        if (!satValueRef.current) return
-        const rect = satValueRef.current.getBoundingClientRect()
+    // ── SV area drag logic ─────────────────────────────────────────────────────
+    const handleSvPointer = useCallback((e: React.MouseEvent | MouseEvent) => {
+        if (!svRef.current) return
+        const rect = svRef.current.getBoundingClientRect()
         const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
         const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
-        const s = Math.round(x * 100)
-        const v = Math.round((1 - y) * 100)
-        updateColor(hsv[0], s, v)
-    }, [hsv, updateColor])
+        applyHsv(h, x * 100, (1 - y) * 100)
+    }, [h, applyHsv])
 
-    const handleHueMouse = useCallback((e: React.MouseEvent | MouseEvent) => {
+    // ── Hue strip drag logic ───────────────────────────────────────────────────
+    const handleHuePointer = useCallback((e: React.MouseEvent | MouseEvent) => {
         if (!hueRef.current) return
         const rect = hueRef.current.getBoundingClientRect()
-        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-        const h = Math.round(x * 360)
-        updateColor(h, hsv[1], hsv[2])
-    }, [hsv, updateColor])
+        const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+        applyHsv(y * 360, s, v)
+    }, [s, v, applyHsv])
 
+    // ── Global mouse move / up while dragging ──────────────────────────────────
     useEffect(() => {
         if (!dragging) return
         const handleMove = (e: MouseEvent) => {
-            if (dragging === 'sv') handleSatValueMouse(e)
-            else if (dragging === 'hue') handleHueMouse(e)
+            if (dragging === 'sv') handleSvPointer(e)
+            else if (dragging === 'hue') handleHuePointer(e)
         }
         const handleUp = () => setDragging(null)
         document.addEventListener('mousemove', handleMove)
@@ -117,128 +152,239 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
             document.removeEventListener('mousemove', handleMove)
             document.removeEventListener('mouseup', handleUp)
         }
-    }, [dragging, handleSatValueMouse, handleHueMouse])
+    }, [dragging, handleSvPointer, handleHuePointer])
 
-    const handleHexChange = (val: string) => {
+    // ── Hex input handler ──────────────────────────────────────────────────────
+    const handleHexInput = (raw: string) => {
+        const val = raw.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 6)
         setHexInput(val)
-        if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-            const [h, s, v] = hexToHsv(val)
-            setHsv([h, s, v])
-            onChange(val)
+        if (val.length === 6) {
+            const [nh, ns, nv] = hexToHsv(`#${val}`)
+            setHsv([nh, ns, nv])
+            onChange(`#${val}`)
         }
     }
+
+    // ── RGB input handler ──────────────────────────────────────────────────────
+    const handleRgbChange = (channel: 'r' | 'g' | 'b', raw: string) => {
+        const val = Math.max(0, Math.min(255, parseInt(raw) || 0))
+        const newR = channel === 'r' ? val : r
+        const newG = channel === 'g' ? val : g
+        const newB = channel === 'b' ? val : b
+        const hex = rgbToHex(newR, newG, newB)
+        const [nh, ns, nv] = hexToHsv(hex)
+        setHsv([nh, ns, nv])
+        setHexInput(hex.slice(1).toUpperCase())
+        onChange(hex)
+    }
+
+    // ── HSV input handler ──────────────────────────────────────────────────────
+    const handleHsvChange = (channel: 'h' | 's' | 'v', raw: string) => {
+        const parsed = parseInt(raw) || 0
+        if (channel === 'h') applyHsv(parsed, s, v)
+        else if (channel === 's') applyHsv(h, parsed, v)
+        else applyHsv(h, s, parsed)
+    }
+
+    // ── Shared number input style ──────────────────────────────────────────────
+    const numInputStyle: React.CSSProperties = {
+        width: 52,
+        padding: '2px 4px',
+        borderRadius: 3,
+        border: '1px solid var(--border-color, #555)',
+        background: 'var(--bg-input, #2a2a2a)',
+        color: 'var(--text-primary, #eee)',
+        fontSize: 12,
+        textAlign: 'right',
+    }
+
+    const labelStyle: React.CSSProperties = {
+        fontSize: 12,
+        color: 'var(--text-secondary, #aaa)',
+        minWidth: 16,
+        textAlign: 'right',
+    }
+
+    const unitStyle: React.CSSProperties = {
+        fontSize: 11,
+        color: 'var(--text-secondary, #aaa)',
+        minWidth: 14,
+    }
+
+    // ── Sizes ──────────────────────────────────────────────────────────────────
+    const SV_SIZE = 240   // width & height of the SV square (px)
+    const HUE_W = 20     // width of the hue strip (px)
+    const HUE_H = SV_SIZE // hue strip is same height as SV square
 
     return (
         <div
             ref={containerRef}
             style={{
-                position: 'absolute',
-                zIndex: 1000,
-                background: 'var(--bg-panel)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 8,
-                padding: 12,
-                width: 220,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                ...style
+                display: 'flex',
+                gap: 12,
+                alignItems: 'flex-start',
+                ...style,
             }}
         >
-            {/* Saturation/Value Area */}
-            <div
-                ref={satValueRef}
-                onMouseDown={e => { setDragging('sv'); handleSatValueMouse(e) }}
-                style={{
-                    width: '100%',
-                    height: 140,
-                    borderRadius: 4,
-                    position: 'relative',
-                    cursor: 'crosshair',
-                    background: `
-                        linear-gradient(to top, #000, transparent),
-                        linear-gradient(to right, #fff, hsl(${hsv[0]}, 100%, 50%))
-                    `,
-                    marginBottom: 8
-                }}
-            >
-                <div style={{
-                    position: 'absolute',
-                    left: `${hsv[1]}%`,
-                    top: `${100 - hsv[2]}%`,
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    border: '2px solid white',
-                    boxShadow: '0 0 2px rgba(0,0,0,0.8)',
-                    transform: 'translate(-50%, -50%)',
-                    pointerEvents: 'none'
-                }} />
-            </div>
+            {/* ── Left column: SV square + hue strip ────────────────────────────── */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
 
-            {/* Hue Slider */}
-            <div
-                ref={hueRef}
-                onMouseDown={e => { setDragging('hue'); handleHueMouse(e) }}
-                style={{
-                    width: '100%',
-                    height: 14,
-                    borderRadius: 7,
-                    cursor: 'pointer',
-                    position: 'relative',
-                    background: 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)',
-                    marginBottom: 10
-                }}
-            >
-                <div style={{
-                    position: 'absolute',
-                    left: `${(hsv[0] / 360) * 100}%`,
-                    top: '50%',
-                    width: 10,
-                    height: 16,
-                    borderRadius: 3,
-                    border: '2px solid white',
-                    boxShadow: '0 0 2px rgba(0,0,0,0.5)',
-                    transform: 'translate(-50%, -50%)',
-                    pointerEvents: 'none',
-                    background: `hsl(${hsv[0]}, 100%, 50%)`
-                }} />
-            </div>
-
-            {/* Hex Input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div style={{
-                    width: 28, height: 28, borderRadius: 4,
-                    border: '1px solid var(--border-color)',
-                    background: hexInput
-                }} />
-                <input
-                    type="text"
-                    value={hexInput}
-                    onChange={e => handleHexChange(e.target.value)}
-                    maxLength={7}
+                {/* Saturation / Value square */}
+                <div
+                    ref={svRef}
+                    onMouseDown={e => { setDragging('sv'); handleSvPointer(e) }}
                     style={{
-                        flex: 1, padding: '4px 6px', borderRadius: 4,
-                        border: '1px solid var(--border-color)', background: 'var(--bg-input)',
-                        color: 'var(--text-primary)', fontSize: 12, fontFamily: 'monospace'
+                        width: SV_SIZE,
+                        height: SV_SIZE,
+                        borderRadius: 4,
+                        position: 'relative',
+                        cursor: 'crosshair',
+                        flexShrink: 0,
+                        /* Composite gradient: black→transparent (bottom), white→hue (right) */
+                        background: `
+                            linear-gradient(to top, #000 0%, transparent 100%),
+                            linear-gradient(to right, #fff 0%, hsl(${h}, 100%, 50%) 100%)
+                        `,
+                        border: '1px solid rgba(0,0,0,0.4)',
+                        boxSizing: 'border-box',
                     }}
-                />
+                >
+                    {/* Crosshair cursor */}
+                    <div style={{
+                        position: 'absolute',
+                        left: `${s}%`,
+                        top: `${100 - v}%`,
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        border: '2px solid white',
+                        boxShadow: '0 0 0 1px rgba(0,0,0,0.6)',
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'none',
+                    }} />
+                </div>
+
+                {/* Vertical hue strip */}
+                <div
+                    ref={hueRef}
+                    onMouseDown={e => { setDragging('hue'); handleHuePointer(e) }}
+                    style={{
+                        width: HUE_W,
+                        height: HUE_H,
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        position: 'relative',
+                        flexShrink: 0,
+                        background: 'linear-gradient(to bottom, #f00 0%, #ff0 16.67%, #0f0 33.33%, #0ff 50%, #00f 66.67%, #f0f 83.33%, #f00 100%)',
+                        border: '1px solid rgba(0,0,0,0.4)',
+                        boxSizing: 'border-box',
+                    }}
+                >
+                    {/* Hue thumb — two small horizontal bars like Photoshop */}
+                    <div style={{
+                        position: 'absolute',
+                        top: `${(h / 360) * 100}%`,
+                        left: -4,
+                        right: -4,
+                        height: 4,
+                        borderRadius: 2,
+                        background: 'white',
+                        boxShadow: '0 0 0 1px rgba(0,0,0,0.6)',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                    }} />
+                </div>
             </div>
 
-            {/* Recent Colors */}
-            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                {recentColors.map((c, i) => (
-                    <div
-                        key={i}
+            {/* ── Right column: new/current preview + numeric inputs ─────────────── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 120 }}>
+
+                {/* new / current color preview */}
+                <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary, #aaa)', marginBottom: 2, textAlign: 'center' }}>new</span>
+                    <div style={{
+                        width: '100%',
+                        height: 36,
+                        borderRadius: '4px 4px 0 0',
+                        background: currentHex,
+                        border: '1px solid rgba(0,0,0,0.4)',
+                        borderBottom: 'none',
+                    }} />
+                    <div style={{
+                        width: '100%',
+                        height: 36,
+                        borderRadius: '0 0 4px 4px',
+                        background: originalColor.current,
+                        border: '1px solid rgba(0,0,0,0.4)',
+                        cursor: 'pointer',
+                    }}
+                        title="Click to revert to original color"
                         onClick={() => {
-                            const [h, s, v] = hexToHsv(c)
-                            updateColor(h, s, v)
-                        }}
-                        style={{
-                            width: 18, height: 18, borderRadius: 3,
-                            background: c, cursor: 'pointer',
-                            border: c === hexInput ? '2px solid var(--accent-color)' : '1px solid var(--border-color)'
+                            // Revert to the original color
+                            const [oh, os, ov] = hexToHsv(originalColor.current)
+                            applyHsv(oh, os, ov)
                         }}
                     />
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary, #aaa)', marginTop: 2, textAlign: 'center' }}>current</span>
+                </div>
+
+                {/* ── HSV inputs ─────────────────────────────────────────────────── */}
+                {([
+                    { ch: 'h', label: 'H', val: h, unit: '°', min: 0, max: 360 },
+                    { ch: 's', label: 'S', val: s, unit: '%', min: 0, max: 100 },
+                    { ch: 'v', label: 'V', val: v, unit: '%', min: 0, max: 100 },
+                ] as const).map(({ ch, label, val, unit }) => (
+                    <div key={ch} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={labelStyle}>{label}</span>
+                        <input
+                            type="number"
+                            style={numInputStyle}
+                            value={val}
+                            min={0}
+                            max={ch === 'h' ? 360 : 100}
+                            onChange={e => handleHsvChange(ch, e.target.value)}
+                        />
+                        <span style={unitStyle}>{unit}</span>
+                    </div>
                 ))}
+
+                {/* ── RGB inputs ─────────────────────────────────────────────────── */}
+                {([
+                    { ch: 'r', label: 'R', val: r },
+                    { ch: 'g', label: 'G', val: g },
+                    { ch: 'b', label: 'B', val: b },
+                ] as const).map(({ ch, label, val }) => (
+                    <div key={ch} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={labelStyle}>{label}</span>
+                        <input
+                            type="number"
+                            style={numInputStyle}
+                            value={val}
+                            min={0}
+                            max={255}
+                            onChange={e => handleRgbChange(ch, e.target.value)}
+                        />
+                    </div>
+                ))}
+
+                {/* ── Hex input ──────────────────────────────────────────────────── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={labelStyle}>#</span>
+                    <input
+                        type="text"
+                        value={hexInput}
+                        maxLength={6}
+                        onChange={e => handleHexInput(e.target.value)}
+                        style={{
+                            ...numInputStyle,
+                            width: 66,
+                            textAlign: 'left',
+                            fontFamily: 'monospace',
+                            letterSpacing: '0.05em',
+                        }}
+                        placeholder="RRGGBB"
+                    />
+                </div>
             </div>
         </div>
     )
