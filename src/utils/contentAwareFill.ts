@@ -70,26 +70,35 @@ export async function loadCAFModule(): Promise<CAFModuleInstance> {
 
     _loadingPromise = (async (): Promise<CAFModuleInstance> => {
         // Vite v6 blocks direct import() of files inside /public.
-        // Workaround: fetch the Emscripten JS glue as text, wrap it in a Blob,
-        // then import the Blob URL — this bypasses Vite's import analysis and
-        // works in both the main thread and a Web Worker context.
+        // Workaround: fetch the Emscripten JS glue as text, append an ESM
+        // `export default CAFModule;` (the file only has CJS/AMD exports),
+        // wrap it in a Blob URL, and dynamically import it.
         const response = await fetch('/wasm/caf.js')
         if (!response.ok) throw new Error(`Failed to fetch /wasm/caf.js (${response.status})`)
         const jsText = await response.text()
-        const blob = new Blob([jsText], { type: 'text/javascript' })
+
+        // Append ESM default export — the IIFE declares `var CAFModule` in
+        // module scope; this makes it importable as a standard ES module.
+        const esmText = jsText + '\nexport default CAFModule;'
+        const blob = new Blob([esmText], { type: 'text/javascript' })
         const blobUrl = URL.createObjectURL(blob)
         let createModule: ((opts?: object) => Promise<CAFModuleInstance>) | undefined
         try {
             // @ts-ignore — blob URL has no TypeScript module declaration
-            const mod = await import(/* @vite-ignore */ blobUrl)
-            createModule = mod.default ?? mod
+            const cafModule = await import(/* @vite-ignore */ blobUrl)
+            createModule = cafModule.default
         } finally {
+            // Revoke immediately — the module is already parsed and held in memory
             URL.revokeObjectURL(blobUrl)
         }
         if (typeof createModule !== 'function') {
             throw new Error('caf.js did not export a factory function')
         }
-        const mod = await createModule() as CAFModuleInstance
+        // Pass locateFile so Emscripten finds caf.wasm at /wasm/caf.wasm
+        // (without this, it would try to resolve relative to the Blob URL).
+        const mod = await createModule({
+            locateFile: (path: string) => `/wasm/${path}`
+        }) as CAFModuleInstance
         _moduleInstance = mod
         return mod
     })()

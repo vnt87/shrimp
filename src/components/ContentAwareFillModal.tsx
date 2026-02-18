@@ -40,6 +40,8 @@ export default function ContentAwareFillModal() {
     const cancelledRef = useRef(false)
 
     const MODAL_WIDTH = 300
+    /** Canvas element used to render a live preview of the selected region */
+    const previewCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
     // -------------------------------------------------------------------------
     // Worker lifecycle
@@ -237,6 +239,55 @@ export default function ContentAwareFillModal() {
     const previewStyle = getPreviewStyle()
 
     // -------------------------------------------------------------------------
+    // Preview canvas — draws the selected image region so the user can see
+    // exactly what will be filled, rather than just an empty placeholder box.
+    // -------------------------------------------------------------------------
+
+    useEffect(() => {
+        const canvas = previewCanvasRef.current
+        if (!canvas || !selection) return
+
+        const activeLayer = layers.find(l => l.id === activeLayerId)
+        if (!activeLayer?.data) return
+
+        // Draw the cropped selection region from the active layer into the
+        // preview canvas, scaling it to fit within previewStyle dimensions.
+        const pw = (previewStyle.width as number) || 260
+        const ph = (previewStyle.height as number) || 60
+        canvas.width  = pw
+        canvas.height = ph
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        // Checkerboard background to indicate transparent areas
+        const tileSize = 8
+        for (let y = 0; y < ph; y += tileSize) {
+            for (let x = 0; x < pw; x += tileSize) {
+                ctx.fillStyle = ((x / tileSize + y / tileSize) % 2 === 0)
+                    ? '#cccccc' : '#ffffff'
+                ctx.fillRect(x, y, tileSize, tileSize)
+            }
+        }
+
+        // Blit the selection region from the layer canvas
+        ctx.drawImage(
+            activeLayer.data,
+            selection.x, selection.y, selection.width, selection.height,
+            0, 0, pw, ph
+        )
+
+        // Ellipse clip mask if the selection shape is elliptical
+        if (selection.type === 'ellipse') {
+            ctx.globalCompositeOperation = 'destination-in'
+            ctx.beginPath()
+            ctx.ellipse(pw / 2, ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.globalCompositeOperation = 'source-over'
+        }
+    }, [selection, layers, activeLayerId, previewStyle.width, previewStyle.height])
+
+    // -------------------------------------------------------------------------
     // Render
     // -------------------------------------------------------------------------
 
@@ -351,16 +402,21 @@ export default function ContentAwareFillModal() {
                         </span>
                     )}
 
-                    {/* Selection shape preview (aspect-ratio box) */}
-                    <div style={{
-                        ...previewStyle,
-                        background: 'var(--bg-input)',
-                        border: '1px dashed var(--border-main)',
-                        borderRadius: selection?.type === 'ellipse' ? '50%' : 4,
-                        opacity: isProcessing ? 0.5 : 1,
-                        transition: 'opacity 0.2s',
-                        flexShrink: 0,
-                    }} />
+                    {/* Selection region preview — renders the actual image pixels
+                        from the active layer, cropped to the selection bounds.   */}
+                    <canvas
+                        ref={previewCanvasRef}
+                        style={{
+                            ...previewStyle,
+                            borderRadius: selection?.type === 'ellipse' ? '50%' : 4,
+                            border: '1px solid var(--border-main)',
+                            opacity: isProcessing ? 0.5 : 1,
+                            transition: 'opacity 0.2s',
+                            flexShrink: 0,
+                            display: 'block',
+                            imageRendering: 'pixelated',
+                        }}
+                    />
 
                     {/* Progress bar */}
                     {isProcessing && (
