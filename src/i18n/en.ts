@@ -412,6 +412,19 @@ export const en = {
     'tooloptions.selection_tools': 'Selection tools',
     'tooloptions.no_options': 'No options for this tool',
 
+    // Generative Fill Tool
+    'tool.gen_fill': 'Generative Fill',
+    'tooloptions.gen_fill.prompt_placeholder': 'Describe what to generate or fill...',
+    'tooloptions.gen_fill.generate': 'Generate',
+    'tooloptions.gen_fill.generating': 'Generating...',
+    'tooloptions.gen_fill.output_mode': 'Output',
+    'tooloptions.gen_fill.output_mode.new_layer': 'New Layer',
+    'tooloptions.gen_fill.output_mode.fill_selection': 'Fill Selection',
+    'tooloptions.gen_fill.error_no_prompt': 'Please enter a prompt.',
+    'tooloptions.gen_fill.error_failed': 'Generation failed. Check AI settings.',
+    'tooloptions.gen_fill.no_selection_hint': 'Draw a selection first to fill a region',
+    'tooloptions.gen_fill.size_hint': 'Size',
+
     // Info Panel
     'info.x': 'X:',
     'info.y': 'Y:',

@@ -6,3 +6,7 @@ dist/
 prawn*/
 .vercel
 test-image-gen.js
+.roo
+.kilocode
+.cline
+.claude

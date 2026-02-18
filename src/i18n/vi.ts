@@ -413,6 +413,19 @@ export const vi: Record<TranslationKey, string> = {
     'tooloptions.selection_tools': 'Công cụ vùng chọn',
     'tooloptions.no_options': 'Không có tùy chọn cho công cụ này',
 
+    // Generative Fill Tool
+    'tool.gen_fill': 'Tô sinh ảnh AI',
+    'tooloptions.gen_fill.prompt_placeholder': 'Mô tả nội dung cần tạo hoặc tô...',
+    'tooloptions.gen_fill.generate': 'Tạo',
+    'tooloptions.gen_fill.generating': 'Đang tạo...',
+    'tooloptions.gen_fill.output_mode': 'Đầu ra',
+    'tooloptions.gen_fill.output_mode.new_layer': 'Lớp mới',
+    'tooloptions.gen_fill.output_mode.fill_selection': 'Tô vùng chọn',
+    'tooloptions.gen_fill.error_no_prompt': 'Vui lòng nhập mô tả.',
+    'tooloptions.gen_fill.error_failed': 'Tạo ảnh thất bại. Kiểm tra cài đặt AI.',
+    'tooloptions.gen_fill.no_selection_hint': 'Tạo vùng chọn trước để tô một vùng',
+    'tooloptions.gen_fill.size_hint': 'Kích thước',
+
     // Info Panel
     'info.x': 'X:',
     'info.y': 'Y:',

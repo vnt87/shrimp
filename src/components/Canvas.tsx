@@ -502,15 +502,6 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
             {/* Selection overlay */}
             {selection && <SelectionOverlay selection={selection} />}
 
-            {/* Crop Overlay */}
-            {activeTool === 'crop' && <CropOverlay
-                scale={transform.scale}
-                offsetX={transform.offsetX}
-                offsetY={transform.offsetY}
-                onCrop={() => { }} // dummy for now, Canvas handles interaction
-                onCancel={() => { }}
-            />}
-
             {/* Brush Cursor Overlay */}
             <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} isAltPressed={isAltPressed} />
 
@@ -2435,10 +2426,10 @@ export default function Canvas({
                                         position: 'absolute',
                                         top: 0,
                                         left: 0,
-                                        width: '100%', // Fill the infinite canvas space? No, transformed.
-                                        // Wait, if we transform this container, its origin (0,0) moves.
-                                        // The content inside expects (0,0) to be the image (0,0).
-                                        // So we should just apply the transform here.
+                                        // Width and height must be set so child elements using 100% dimensions
+                                        // (e.g. CropOverlay's SVG) correctly cover the full viewport area.
+                                        width: '100%',
+                                        height: '100%',
                                         transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
                                         transformOrigin: '0 0',
                                         pointerEvents: 'none', // Pass events to Pixi unless interacting with handles

@@ -31,6 +31,7 @@ export const shortcuts: Record<string, string> = {
     'brush': 'B', 'pencil': 'N', 'eraser': 'Shift+E', 'bucket': 'G',
     'gradient': 'Shift+G',
     'picker': 'I', 'text': 'T', 'zoom': 'Z', 'paths': 'P', 'clone': 'S',
+    'gen-fill': 'Shift+F',
 }
 
 // Tool groups with dividers between them

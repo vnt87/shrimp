@@ -68,8 +68,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         'text': t('tool.text'),
         'zoom': t('tool.zoom'),
         'paths': t('tool.paths'),
-        'clone': t('tool.clone') || 'Clone Stamp',
-        'gen-fill': t('tool.gen_fill' as any) || 'Generative Fill',
+        'clone': t('tool.clone'),
+        'gen-fill': t('tool.gen_fill'),
     }
 
     const label = toolLabels[activeTool] || activeTool
@@ -885,67 +885,230 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
 
 
-    const handleGenFill = async () => {
-        if (!genPrompt) return
-        setIsGenerating(true)
-        try {
-            const url = await AIService.generateImage(genPrompt, '1024x1024')
-            const img = new window.Image()
-            img.crossOrigin = "Anonymous"
-            img.src = url
-            await new Promise((resolve, reject) => {
-                img.onload = resolve
-                img.onerror = reject
-            })
-            const canvas = document.createElement('canvas')
-            canvas.width = img.width
-            canvas.height = img.height
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-                if (selection && selection.type === 'rect') {
-                    // Draw only within selection
-                    ctx.drawImage(img, selection.x, selection.y, selection.width, selection.height)
-                    addLayer(`AI: ${genPrompt}`, canvas)
-                } else {
-                    ctx.drawImage(img, 0, 0)
-                    addLayer(`AI: ${genPrompt}`, canvas)
-                }
+    /**
+     * Determine the nearest supported API image size based on the target region
+     * dimensions. Supported sizes: 1024x1024, 1344x768, 768x1344.
+     */
+    const pickApiSize = (w: number, h: number): string => {
+        if (w === 0 || h === 0) return '1024x1024'
+        const ratio = w / h
+        // Landscape threshold: wider than 1.2:1
+        if (ratio > 1.2) return '1344x768'
+        // Portrait threshold: taller than 1.2:1
+        if (ratio < 1 / 1.2) return '768x1344'
+        return '1024x1024'
+    }
+
+    /**
+     * Apply a clipping mask matching the current selection shape to a canvas
+     * context, so generated content is composited only inside the selection.
+     */
+    const applySelectionClip = (ctx: CanvasRenderingContext2D) => {
+        if (!selection) return
+        ctx.beginPath()
+        if (selection.type === 'rect') {
+            ctx.rect(selection.x, selection.y, selection.width, selection.height)
+        } else if (selection.type === 'ellipse') {
+            const rx = selection.width / 2
+            const ry = selection.height / 2
+            const cx = selection.x + rx
+            const cy = selection.y + ry
+            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
+        } else if (selection.type === 'path' && selection.path && selection.path.length > 2) {
+            ctx.moveTo(selection.path[0].x, selection.path[0].y)
+            for (let i = 1; i < selection.path.length; i++) {
+                ctx.lineTo(selection.path[i].x, selection.path[i].y)
             }
-        } catch (e) {
-            console.error(e)
-            // Ideally assume toast context exists or alert
-            // alert("Generative Fill Failed") 
-            // Silent fail or console error for now to avoid annoying alerts.
+            ctx.closePath()
+        } else {
+            // Fallback: no clip needed
+            return
+        }
+        ctx.clip()
+    }
+
+    // Error message state for gen-fill
+    const [genFillError, setGenFillError] = useState<string | null>(null)
+
+    /**
+     * Core generative fill handler.
+     * Fixes:
+     *  - Uses selection bounds / canvas size to pick the correct API size
+     *  - Composites the generated image correctly into a canvas-sized layer
+     *  - Applies selection clip for rect, ellipse, and path selections
+     *  - Shows visible error feedback on failure
+     */
+    const handleGenFill = async () => {
+        if (!genPrompt.trim()) {
+            setGenFillError(t('tooloptions.gen_fill.error_no_prompt'))
+            return
+        }
+
+        setIsGenerating(true)
+        setGenFillError(null)
+
+        try {
+            // Determine the target region: use selection bounds if present, else full canvas
+            const targetW = selection ? selection.width : canvasSize.width
+            const targetH = selection ? selection.height : canvasSize.height
+            const apiSize = pickApiSize(targetW, targetH)
+
+            const url = await AIService.generateImage(genPrompt, apiSize)
+
+            // Load the generated image
+            const img = new window.Image()
+            img.crossOrigin = 'Anonymous'
+            img.src = url
+            await new Promise<void>((resolve, reject) => {
+                img.onload = () => resolve()
+                img.onerror = () => reject(new Error('Failed to load generated image'))
+            })
+
+            // Create a canvas the same size as the document canvas
+            const outputCanvas = document.createElement('canvas')
+            outputCanvas.width = canvasSize.width
+            outputCanvas.height = canvasSize.height
+            const ctx = outputCanvas.getContext('2d')
+            if (!ctx) throw new Error('Could not get canvas context')
+
+            if (selection && (selection.width > 0 || selection.height > 0)) {
+                // Composite the generated image scaled to fit the selection bounds,
+                // clipped to the exact selection shape (rect / ellipse / path).
+                ctx.save()
+                applySelectionClip(ctx)
+                ctx.drawImage(
+                    img,
+                    selection.x,
+                    selection.y,
+                    selection.width,
+                    selection.height
+                )
+                ctx.restore()
+            } else {
+                // No active selection — place the image centred on the canvas,
+                // scaled to fit while preserving aspect ratio.
+                const scale = Math.min(
+                    canvasSize.width / img.width,
+                    canvasSize.height / img.height
+                )
+                const dw = img.width * scale
+                const dh = img.height * scale
+                const dx = (canvasSize.width - dw) / 2
+                const dy = (canvasSize.height - dh) / 2
+                ctx.drawImage(img, dx, dy, dw, dh)
+            }
+
+            // Add as a new layer, named after the prompt (truncated)
+            const layerName = `AI: ${genPrompt.substring(0, 40)}`
+            addLayer(layerName, outputCanvas)
+        } catch (e: any) {
+            console.error('[GenFill] Generation failed:', e)
+            setGenFillError(e?.message || t('tooloptions.gen_fill.error_failed'))
         } finally {
             setIsGenerating(false)
         }
     }
 
-    const renderGenFillOptions = () => (
-        <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-            <div style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
-                <Sparkles size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                <input
-                    type="text"
-                    className="tool-options-text-input"
-                    placeholder={t('tooloptions.gen_fill.prompt_placeholder' as any) || "Describe what to generate..."}
-                    value={genPrompt}
-                    onChange={(e) => setGenPrompt(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleGenFill()}
-                    style={{ width: '100%', paddingLeft: 28 }}
-                />
+    const renderGenFillOptions = () => {
+        // Determine the effective generation size label for user feedback
+        const targetW = selection ? selection.width : canvasSize.width
+        const targetH = selection ? selection.height : canvasSize.height
+        const apiSize = pickApiSize(targetW, targetH)
+        const hasSelection = !!(selection && (selection.width > 0 || selection.height > 0))
+
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' }}>
+                {/* Prompt input with sparkle icon */}
+                <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 420 }}>
+                    <Sparkles
+                        size={14}
+                        style={{
+                            position: 'absolute',
+                            left: 8,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: 'var(--text-secondary)',
+                            pointerEvents: 'none'
+                        }}
+                    />
+                    <input
+                        type="text"
+                        className="tool-options-text-input"
+                        placeholder={t('tooloptions.gen_fill.prompt_placeholder')}
+                        value={genPrompt}
+                        onChange={(e) => { setGenPrompt(e.target.value); setGenFillError(null) }}
+                        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') handleGenFill() }}
+                        style={{ width: '100%', paddingLeft: 28 }}
+                        disabled={isGenerating}
+                    />
+                </div>
+
+                {/* Size hint badge — shows which API size will be used */}
+                <span
+                    title={t('tooloptions.gen_fill.size_hint')}
+                    style={{
+                        fontSize: 10,
+                        color: 'var(--text-secondary)',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-main)',
+                        borderRadius: 3,
+                        padding: '2px 5px',
+                        whiteSpace: 'nowrap',
+                        fontFamily: 'monospace'
+                    }}
+                >
+                    {apiSize}
+                </span>
+
+                {/* Selection indicator */}
+                {hasSelection && (
+                    <span style={{ fontSize: 10, color: 'var(--accent-active)', whiteSpace: 'nowrap' }}>
+                        ✦ {selection!.type}
+                    </span>
+                )}
+
+                {/* Generate button */}
+                <button
+                    className="pref-btn pref-btn-primary"
+                    onClick={handleGenFill}
+                    disabled={isGenerating || !genPrompt.trim()}
+                    style={{
+                        height: 24,
+                        padding: '0 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        whiteSpace: 'nowrap',
+                        opacity: (isGenerating || !genPrompt.trim()) ? 0.6 : 1
+                    }}
+                >
+                    {isGenerating
+                        ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                        : <Sparkles size={14} />
+                    }
+                    <span>{isGenerating
+                        ? t('tooloptions.gen_fill.generating')
+                        : t('tooloptions.gen_fill.generate')
+                    }</span>
+                </button>
+
+                {/* Inline error message */}
+                {genFillError && (
+                    <span style={{
+                        fontSize: 11,
+                        color: '#ff5555',
+                        background: 'rgba(255,85,85,0.1)',
+                        border: '1px solid rgba(255,85,85,0.3)',
+                        borderRadius: 3,
+                        padding: '2px 8px',
+                        whiteSpace: 'nowrap'
+                    }}>
+                        ⚠ {genFillError}
+                    </span>
+                )}
             </div>
-            <button
-                className="pref-btn pref-btn-primary"
-                onClick={handleGenFill}
-                disabled={isGenerating || !genPrompt.trim()}
-                style={{ height: 24, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-                {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                <span>{t('tooloptions.gen_fill.generate' as any) || "Generate"}</span>
-            </button>
-        </div>
-    )
+        )
+    }
 
     const renderToolSpecificOptions = () => {
         switch (activeTool) {

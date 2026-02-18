@@ -98,6 +98,20 @@ export default function App() {
     const [activeTool, setActiveTool] = useState<string>('move')
     const [toolOptions, setToolOptions] = useState<ToolOptions>(defaultToolOptions)
 
+    // Prevent the browser from zooming the entire UI when the user performs a
+    // pinch gesture (or Ctrl+Wheel) anywhere outside the canvas viewport.
+    // Pinch-to-zoom on the canvas is handled by Canvas.tsx's handleWheel instead.
+    useEffect(() => {
+        const preventBrowserZoom = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault()
+            }
+        }
+        // { passive: false } is required to be able to call preventDefault()
+        document.addEventListener('wheel', preventBrowserZoom, { passive: false })
+        return () => document.removeEventListener('wheel', preventBrowserZoom)
+    }, [])
+
     const updateToolOption = useCallback(<K extends keyof ToolOptions>(key: K, value: ToolOptions[K]) => {
         setToolOptions(prev => ({ ...prev, [key]: value }))
     }, [])
