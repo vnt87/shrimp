@@ -250,6 +250,18 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         return () => window.removeEventListener('keydown', handleGlobalKeyDown)
     }, [])
 
+    // Cmd+D for deselect
+    useEffect(() => {
+        const handleDeselectKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+                e.preventDefault()
+                selectNone()
+            }
+        }
+        window.addEventListener('keydown', handleDeselectKeyDown)
+        return () => window.removeEventListener('keydown', handleDeselectKeyDown)
+    }, [selectNone])
+
     const handleMenuAction = (option: string | MenuOption) => {
         const command = typeof option === 'string' ? option : option.command || option.label
 

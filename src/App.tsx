@@ -54,6 +54,9 @@ export interface ToolOptions {
     // Clone options
     cloneSampleMode: 'current' | 'all'
     cloneTarget: 'active' | 'new'
+    // Heal options
+    healSampleMode: 'current' | 'all'
+    healStrength: number
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -91,6 +94,8 @@ const defaultToolOptions: ToolOptions = {
     pathPolygonal: false,
     cloneSampleMode: 'current',
     cloneTarget: 'active',
+    healSampleMode: 'current',
+    healStrength: 80,
 }
 
 export default function App() {
@@ -147,6 +152,7 @@ export default function App() {
                 case 't': setActiveTool('text'); break
                 case 'z': setActiveTool('zoom'); break
                 case 'p': setActiveTool('paths'); break
+                case 'h': setActiveTool('heal'); break
                 case 'escape': setActiveTool('move'); break
                 case '[':
                     setToolOptions(prev => ({

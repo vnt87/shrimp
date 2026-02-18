@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Sparkles, X, RotateCcw, Check, AlertCircle } from 'lucide-react'
 import { useEditor } from './EditorContext'
 import { AIService } from '../services/AIService'

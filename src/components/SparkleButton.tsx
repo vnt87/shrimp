@@ -111,9 +111,10 @@ const options: ISourceOptions = {
 interface SparkleButtonProps {
     onClick: () => void;
     children: React.ReactNode;
+    style?: React.CSSProperties;
 }
 
-export const SparkleButton = ({ onClick, children }: SparkleButtonProps) => {
+export const SparkleButton = ({ onClick, children, style }: SparkleButtonProps) => {
     const [particleState, setParticlesReady] = useState<"loaded" | "ready">();
     const [isHovering, setIsHovering] = useState(false);
 
@@ -140,6 +141,7 @@ export const SparkleButton = ({ onClick, children }: SparkleButtonProps) => {
                 position: 'relative',
                 overflow: 'hidden', // Contain particles
                 // We keep the standard class styles but need relative positioning for particles
+                ...style,
             }}
         >
             <Sparkles size={16} className={`filled-icon ${isHovering ? 'animate-pulse' : ''}`} style={{ zIndex: 10, position: 'relative' }} />

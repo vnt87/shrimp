@@ -1,5 +1,5 @@
 import type { ToolOptions } from '../App'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import {
     Bold,
     Italic,
@@ -26,6 +26,7 @@ import FontSelector from './FontSelector'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useIntegrationStore } from '../hooks/useIntegrationStore'
+const SparkleButton = lazy(() => import('./SparkleButton').then(module => ({ default: module.SparkleButton })))
 
 interface ToolOptionsBarProps {
     activeTool: string
@@ -71,6 +72,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         'zoom': t('tool.zoom'),
         'paths': t('tool.paths'),
         'clone': t('tool.clone'),
+        'heal': t('tool.heal'),
     }
 
     const label = toolLabels[activeTool] || activeTool
@@ -237,6 +239,32 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     <option value="new">{t('tooloptions.target.new')}</option>
                 </select>
             </div>
+        </>
+    )
+
+    const renderHealOptions = () => (
+        <>
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('healStrength', t('tooloptions.heal.strength'), 0, 100, 1, '%')}
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">{t('tooloptions.sample')}</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.healSampleMode}
+                    onChange={(e) => onToolOptionChange('healSampleMode', e.target.value as any)}
+                >
+                    <option value="current">{t('tooloptions.sample.current')}</option>
+                    <option value="all">{t('tooloptions.sample.all')}</option>
+                </select>
+            </div>
+            <div className="tool-options-divider" />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+                <Sparkles size={13} />
+                {t('tooloptions.heal.hint')}
+            </span>
         </>
     )
 
@@ -903,27 +931,47 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         return (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {/* Generative Fill button — enabled only when selection is active + AI is on */}
-                <button
-                    className={`pref-btn ${canGenFill ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
-                    disabled={!canGenFill}
-                    title={canGenFill ? 'Generative Fill' : disabledReason}
-                    onClick={() => canGenFill && setGenFillModalOpen(true)}
-                    style={{
-                        height: 26,
-                        padding: '0 12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 12,
-                        fontWeight: 500,
-                        opacity: canGenFill ? 1 : 0.5,
-                        cursor: canGenFill ? 'pointer' : 'default',
-                        whiteSpace: 'nowrap'
-                    }}
-                >
-                    <Sparkles size={13} />
-                    <span>Generative Fill</span>
-                </button>
+                {canGenFill ? (
+                    <Suspense fallback={<button className="pref-btn pref-btn-primary" style={{ height: 26, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}><Sparkles size={13} /><span>Generative Fill</span></button>}>
+                        <SparkleButton 
+                            onClick={() => setGenFillModalOpen(true)}
+                            style={{
+                                height: 26,
+                                padding: '0 12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                fontSize: 12,
+                                fontWeight: 500,
+                                whiteSpace: 'nowrap',
+                                borderRadius: 'var(--radius-sm)'
+                            }}
+                        >
+                            Generative Fill
+                        </SparkleButton>
+                    </Suspense>
+                ) : (
+                    <button
+                        className="pref-btn pref-btn-secondary"
+                        disabled
+                        title={disabledReason}
+                        style={{
+                            height: 26,
+                            padding: '0 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            opacity: 0.5,
+                            cursor: 'default',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        <Sparkles size={13} />
+                        <span>Generative Fill</span>
+                    </button>
+                )}
             </div>
         )
     }
@@ -946,6 +994,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderPickerOptions()
             case 'clone':
                 return renderCloneOptions()
+            case 'heal':
+                return renderHealOptions()
             case 'crop':
                 return renderCropOptions()
             case 'zoom':

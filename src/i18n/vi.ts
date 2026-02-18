@@ -233,11 +233,12 @@ export const vi: Record<TranslationKey, string> = {
     'tool.eraser': 'Tẩy',
     'tool.bucket': 'Đổ màu',
     'tool.gradient': 'Chuyển sắc',
-    'tool.picker': 'Chọn màu',
+    'tool.picker': 'Nhỏ giọt mắt',
     'tool.text': 'Văn bản',
     'tool.zoom': 'Phóng to/Thu nhỏ',
     'tool.paths': 'Đường dẫn',
     'tool.clone': 'Con dấu sao chép',
+    'tool.heal': 'Cọ chữa lành',
     'tooloptions.sample': 'Mẫu',
     'tooloptions.sample.current': 'Lớp hiện tại',
     'tooloptions.sample.all': 'Tất cả các lớp',
@@ -412,6 +413,10 @@ export const vi: Record<TranslationKey, string> = {
     'tooloptions.path.stroke_name': 'Viền Đường dẫn',
     'tooloptions.selection_tools': 'Công cụ vùng chọn',
     'tooloptions.no_options': 'Không có tùy chọn cho công cụ này',
+
+    // Healing Brush Tool
+    'tooloptions.heal.strength': 'Cường độ',
+    'tooloptions.heal.hint': 'Alt+Click để chọn nguồn, sau đó vẽ để chữa lành',
 
     // Generative Fill Tool
     'tool.gen_fill': 'Tô sinh ảnh AI',

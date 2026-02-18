@@ -232,11 +232,12 @@ export const en = {
     'tool.eraser': 'Eraser',
     'tool.bucket': 'Bucket Fill',
     'tool.gradient': 'Gradient',
-    'tool.picker': 'Color Picker',
+    'tool.picker': 'Eye Dropper',
     'tool.text': 'Text',
     'tool.zoom': 'Zoom',
     'tool.paths': 'Paths',
     'tool.clone': 'Clone Stamp',
+    'tool.heal': 'Healing Brush',
     'tooloptions.sample': 'Sample',
     'tooloptions.sample.current': 'Current Layer',
     'tooloptions.sample.all': 'All Layers',
@@ -411,6 +412,10 @@ export const en = {
     'tooloptions.path.stroke_name': 'Path Stroke',
     'tooloptions.selection_tools': 'Selection tools',
     'tooloptions.no_options': 'No options for this tool',
+
+    // Healing Brush Tool
+    'tooloptions.heal.strength': 'Strength',
+    'tooloptions.heal.hint': 'Alt+Click to set source, then paint to heal',
 
     // Generative Fill Tool
     'tool.gen_fill': 'Generative Fill',
