@@ -9,11 +9,13 @@ import PixiLayerSprite from './PixiLayerSprite'
 import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
 import PathOverlay from './PathOverlay'
+import GenFillModal from './GenFillModal'
 import type { ToolOptions } from '../App'
 import TransformOverlay from './TransformOverlay'
 import { useGoogleFont } from '../hooks/useGoogleFont'
 import ContextMenu from './ContextMenu'
 import { cloneCanvas, renderGradientToLayer } from '../utils/gradient'
+import { healBrushDabFast } from '../utils/healing'
 import { HistogramData } from './EditorContext'
 import HistogramWorker from '../workers/histogram.worker?worker'
 
@@ -315,7 +317,8 @@ function BrushCursor({
 
             // Only show for drawing tools
             // Hide if Clone Stamp + Alt (Source Selection Mode) -> We want crosshair
-            const visible = ['brush', 'pencil', 'eraser', 'clone'].includes(activeTool) && !(activeTool === 'clone' && isAltPressed)
+            // Also show for heal tool
+            const visible = ['brush', 'pencil', 'eraser', 'clone', 'heal'].includes(activeTool) && !(activeTool === 'clone' && isAltPressed) && !(activeTool === 'heal' && isAltPressed)
             graphicsRef.current.visible = visible
 
             if (visible) {
@@ -502,20 +505,11 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
             {/* Selection overlay */}
             {selection && <SelectionOverlay selection={selection} />}
 
-            {/* Crop Overlay */}
-            {activeTool === 'crop' && <CropOverlay
-                scale={transform.scale}
-                offsetX={transform.offsetX}
-                offsetY={transform.offsetY}
-                onCrop={() => { }} // dummy for now, Canvas handles interaction
-                onCancel={() => { }}
-            />}
-
             {/* Brush Cursor Overlay */}
             <BrushCursor cursorRef={cursorRef} toolOptions={toolOptions} activeTool={activeTool} isAltPressed={isAltPressed} />
 
-            {/* Clone Source Indicator */}
-            {activeTool === 'clone' && <CloneSourceCursor source={useEditor().cloneSource} />}
+            {/* Clone Source Indicator (also used for heal tool) */}
+            {(activeTool === 'clone' || activeTool === 'heal') && <CloneSourceCursor source={useEditor().cloneSource} />}
 
             {/* Transform Overlay (Pixi) */}
             {
@@ -659,6 +653,7 @@ export default function Canvas({
         // documents // unused
         setHistogramData,
         addLayer,
+        genFillModalOpen,
     } = useEditor()
 
     const windowSize = useWindowSize()
@@ -1091,6 +1086,89 @@ export default function Canvas({
             updateLayerData(activeLayerId!, newCanvas, history)
         }
     }, [activeLayerId, layers, activeTool, toolOptions, foregroundColor, updateLayerData, cloneSource])
+
+    // --- Healing Brush stroke ---
+    const drawHealStroke = useCallback((canvasX: number, canvasY: number, _isFirst: boolean, history: boolean = true) => {
+        if (!activeLayerId) return
+        if (!cloneSource) return
+        
+        const currentLayer = layers.find((l: Layer) => l.id === activeLayerId)
+        if (!currentLayer || !currentLayer.data || currentLayer.locked) return
+        
+        const ctx = currentLayer.data.getContext('2d')
+        if (!ctx) return
+
+        const size = toolOptions?.brushSize ?? 10
+        const strength = (toolOptions?.healStrength ?? 100) / 100
+        
+        // Calculate source position relative to drag start
+        const dx = cloneSource.x - dragStart.current.canvasX
+        const dy = cloneSource.y - dragStart.current.canvasY
+        
+        const sourceX = canvasX + dx
+        const sourceY = canvasY + dy
+        
+        // Layer coordinates
+        const lx = canvasX - currentLayer.x
+        const ly = canvasY - currentLayer.y
+        
+        // Get source image
+        let srcImage: HTMLCanvasElement | OffscreenCanvas | null = null
+        let srcX = 0
+        let srcY = 0
+        
+        if (dragStart.current.cloneSourceCanvas) {
+            // Sample All Layers
+            srcImage = dragStart.current.cloneSourceCanvas
+            srcX = sourceX
+            srcY = sourceY
+        } else {
+            // Sample Current Layer
+            const sourceLayer = layers.find(l => l.id === activeLayerId)
+            if (sourceLayer && sourceLayer.data) {
+                srcImage = sourceLayer.data
+                srcX = sourceX - sourceLayer.x
+                srcY = sourceY - sourceLayer.y
+            }
+        }
+        
+        if (!srcImage) return
+        
+        // Apply healing brush dab - returns ImageData
+        const healedImageData = healBrushDabFast(
+            srcImage,
+            currentLayer.data,
+            srcX, srcY,
+            lx, ly,
+            size,
+            strength
+        )
+        
+        // Create a temp canvas to hold the healed ImageData
+        const tempCanvas = document.createElement('canvas')
+        tempCanvas.width = healedImageData.width
+        tempCanvas.height = healedImageData.height
+        const tempCtx = tempCanvas.getContext('2d')
+        if (!tempCtx) return
+        
+        tempCtx.putImageData(healedImageData, 0, 0)
+        
+        // Draw the healed patch onto the layer
+        const halfSize = Math.floor(healedImageData.width / 2)
+        ctx.save()
+        ctx.drawImage(tempCanvas, lx - halfSize, ly - halfSize)
+        ctx.restore()
+        
+        // Clone the canvas to trigger React state update
+        const newCanvas = document.createElement('canvas')
+        newCanvas.width = currentLayer.data.width
+        newCanvas.height = currentLayer.data.height
+        const newCtx = newCanvas.getContext('2d')
+        newCtx?.drawImage(currentLayer.data, 0, 0)
+        updateLayerData(activeLayerId, newCanvas, history)
+        
+        lastDrawPoint.current = { x: canvasX, y: canvasY }
+    }, [activeLayerId, layers, toolOptions, cloneSource, updateLayerData])
 
     const isPointInSelection = useCallback((x: number, y: number) => {
         if (!selection) return false
@@ -1730,6 +1808,12 @@ export default function Canvas({
             return
         }
 
+        // Healing Brush Source Setting
+        if (activeTool === 'heal' && isAltPressed) {
+            setCloneSource({ x: canvasX, y: canvasY })
+            return
+        }
+
         // Panning (Space held or Middle click)
         if (isSpaceHeld || e.button === 1) {
             e.preventDefault()
@@ -1797,7 +1881,7 @@ export default function Canvas({
                     canvasY
                 }
             }
-        } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone') {
+        } else if (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone' || activeTool === 'heal') {
             setIsDragging(true)
             isDrawing.current = true
             lastDrawPoint.current = null
@@ -1817,12 +1901,14 @@ export default function Canvas({
             }
 
             let cloneSourceCanvas: HTMLCanvasElement | undefined
-            if (activeTool === 'clone') {
-                if (toolOptions?.cloneSampleMode === 'all' && pixiAppRef.current && layersContainerRef.current) {
+            if (activeTool === 'clone' || activeTool === 'heal') {
+                // For heal tool, we need the merged canvas for sampling
+                const sampleMode = activeTool === 'heal' ? toolOptions?.healSampleMode : toolOptions?.cloneSampleMode
+                if (sampleMode === 'all' && pixiAppRef.current && layersContainerRef.current) {
                     cloneSourceCanvas = pixiAppRef.current.renderer.extract.canvas(layersContainerRef.current) as HTMLCanvasElement
                 }
 
-                if (toolOptions?.cloneTarget === 'new') {
+                if (activeTool === 'clone' && toolOptions?.cloneTarget === 'new') {
                     // Initialize or clear temp canvas
                     if (!tempStrokeCanvas.current) {
                         tempStrokeCanvas.current = document.createElement('canvas')
@@ -1855,7 +1941,13 @@ export default function Canvas({
                 cloneSourceCanvas,
                 isDrawingToNewLayer: toolOptions?.cloneTarget === 'new'
             }
-            drawStrokeTo(canvasX, canvasY, true, false)
+            
+            // For heal tool, call drawHealStroke instead
+            if (activeTool === 'heal') {
+                drawHealStroke(canvasX, canvasY, true, false)
+            } else {
+                drawStrokeTo(canvasX, canvasY, true, false)
+            }
         } else if (activeTool === 'rect-select' || activeTool === 'ellipse-select') {
             setIsDragging(true)
             isSelecting.current = true
@@ -2079,6 +2171,8 @@ export default function Canvas({
             scheduleGradientPreview(endPoint)
         } else if (isDrawing.current && (activeTool === 'brush' || activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone')) {
             drawStrokeTo(canvasX, canvasY, false, false)
+        } else if (isDrawing.current && activeTool === 'heal') {
+            drawHealStroke(canvasX, canvasY, false, false)
         }
 
     }, [isPanning, isDragging, activeTool, activeLayerId, transform, onCursorMove, updateLayerPosition, setSelection, tempGuide, draggingGuideId, guides, updateGuide, drawStrokeTo, scheduleGradientPreview, setCursorInfo])
@@ -2428,39 +2522,24 @@ export default function Canvas({
                                     </div>
                                 )}
 
-                                {/* React overlays (HTML) - now transformed to match Pixi */}
+                                {/* React overlays (HTML) - transformed to match Pixi canvas coordinate space.
+                                    NOTE: CropOverlay is intentionally NOT placed here because it needs to
+                                    cover the full viewport with its dark-dimming SVG. Placing it inside a
+                                    CSS-transformed parent causes the SVG "100% width/height" to only visually
+                                    cover the transformed canvas region rather than the full screen. */}
                                 <div
                                     className="overlays"
                                     style={{
                                         position: 'absolute',
                                         top: 0,
                                         left: 0,
-                                        width: '100%', // Fill the infinite canvas space? No, transformed.
-                                        // Wait, if we transform this container, its origin (0,0) moves.
-                                        // The content inside expects (0,0) to be the image (0,0).
-                                        // So we should just apply the transform here.
+                                        width: '100%',
+                                        height: '100%',
                                         transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
                                         transformOrigin: '0 0',
-                                        pointerEvents: 'none', // Pass events to Pixi unless interacting with handles
+                                        pointerEvents: 'none',
                                     }}
                                 >
-                                    {activeTool === 'crop' && (
-                                        <div style={{ pointerEvents: 'auto' }}>
-                                            <CropOverlay
-                                                onCrop={(rect) => {
-                                                    cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
-                                                    onToolChange?.('move')
-                                                }}
-                                                onCancel={() => onToolChange?.('move')}
-                                                scale={1}
-                                                zoomLevel={transform.scale}
-                                                offsetX={0}
-                                                offsetY={0}
-                                                toolOptions={toolOptions}
-                                            />
-                                        </div>
-                                    )}
-
                                     {activeTool === 'paths' && (
                                         <div style={{ pointerEvents: 'auto' }}>
                                             <PathOverlay
@@ -2469,9 +2548,29 @@ export default function Canvas({
                                             />
                                         </div>
                                     )}
-
-
                                 </div>
+
+                                {/* CropOverlay lives OUTSIDE the transformed container so its dark
+                                    overlay SVG fills the true viewport. It receives real screen-space
+                                    transform values and converts canvas coords → screen coords itself. */}
+                                {activeTool === 'crop' && (
+                                    <CropOverlay
+                                        onCrop={(rect) => {
+                                            cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
+                                            onToolChange?.('move')
+                                        }}
+                                        onCancel={() => onToolChange?.('move')}
+                                        scale={transform.scale}
+                                        zoomLevel={1}
+                                        offsetX={transform.offsetX}
+                                        offsetY={transform.offsetY}
+                                        toolOptions={toolOptions}
+                                    />
+                                )}
+
+                                {/* GenFillModal — fixed-position floating panel anchored below the selection.
+                                    Rendered outside the transformed container so it is in screen space. */}
+                                {genFillModalOpen && selection && <GenFillModal />}
 
                                 {/* Scrollbars would go here if we implemented custom ones */}
 

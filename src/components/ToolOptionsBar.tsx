@@ -1,5 +1,5 @@
 import type { ToolOptions } from '../App'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import {
     Bold,
     Italic,
@@ -19,11 +19,14 @@ import {
     PaintBucket,
     PenLine,
     Trash2,
-    Blend
+    Blend,
+    Sparkles
 } from 'lucide-react'
 import FontSelector from './FontSelector'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useIntegrationStore } from '../hooks/useIntegrationStore'
+const SparkleButton = lazy(() => import('./SparkleButton').then(module => ({ default: module.SparkleButton })))
 
 interface ToolOptionsBarProps {
     activeTool: string
@@ -44,9 +47,13 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         foregroundColor,
         canvasSize,
         layers,
-        activeGradient
+        activeGradient,
+        selection,
+        setGenFillModalOpen
     } = useEditor()
     const { t } = useLanguage()
+    // AI integration status — used to gate the Generative Fill button
+    const { isAIEnabled } = useIntegrationStore()
 
     const toolLabels: Record<string, string> = {
         'move': t('tool.move'),
@@ -64,7 +71,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         'text': t('tool.text'),
         'zoom': t('tool.zoom'),
         'paths': t('tool.paths'),
-        'clone': t('tool.clone') || 'Clone Stamp',
+        'clone': t('tool.clone'),
+        'heal': t('tool.heal'),
     }
 
     const label = toolLabels[activeTool] || activeTool
@@ -231,6 +239,32 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                     <option value="new">{t('tooloptions.target.new')}</option>
                 </select>
             </div>
+        </>
+    )
+
+    const renderHealOptions = () => (
+        <>
+            {renderSlider('brushSize', t('tooloptions.size'), 1, 200, 1, 'px')}
+            <div className="tool-options-divider" />
+            {renderSlider('healStrength', t('tooloptions.heal.strength'), 0, 100, 1, '%')}
+            <div className="tool-options-divider" />
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label">{t('tooloptions.sample')}</span>
+                <select
+                    className="tool-options-select"
+                    style={{ height: 24, fontSize: 11, background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-main)', borderRadius: 4 }}
+                    value={toolOptions.healSampleMode}
+                    onChange={(e) => onToolOptionChange('healSampleMode', e.target.value as any)}
+                >
+                    <option value="current">{t('tooloptions.sample.current')}</option>
+                    <option value="all">{t('tooloptions.sample.all')}</option>
+                </select>
+            </div>
+            <div className="tool-options-divider" />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+                <Sparkles size={13} />
+                {t('tooloptions.heal.hint')}
+            </span>
         </>
     )
 
@@ -876,6 +910,72 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         </>
     )
 
+
+
+    /**
+     * Render the Generative Fill button for selection tools.
+     * Enabled only when there is an active selection AND AI is configured.
+     * isAIEnabled and setGenFillModalOpen are read at component top level (rules of hooks).
+     */
+    const renderSelectionOptions = () => {
+        const hasSelection = !!(selection && selection.width > 0 && selection.height > 0)
+        const canGenFill = hasSelection && isAIEnabled
+
+        // Build tooltip — explains why the button is disabled when it is
+        const disabledReason = !isAIEnabled
+            ? 'Enable AI in Integrations to use Generative Fill'
+            : !hasSelection
+                ? 'Draw a selection first'
+                : ''
+
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Generative Fill button — enabled only when selection is active + AI is on */}
+                {canGenFill ? (
+                    <Suspense fallback={<button className="pref-btn pref-btn-primary" style={{ height: 26, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}><Sparkles size={13} /><span>Generative Fill</span></button>}>
+                        <SparkleButton 
+                            onClick={() => setGenFillModalOpen(true)}
+                            style={{
+                                height: 26,
+                                padding: '0 12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                fontSize: 12,
+                                fontWeight: 500,
+                                whiteSpace: 'nowrap',
+                                borderRadius: 'var(--radius-sm)'
+                            }}
+                        >
+                            Generative Fill
+                        </SparkleButton>
+                    </Suspense>
+                ) : (
+                    <button
+                        className="pref-btn pref-btn-secondary"
+                        disabled
+                        title={disabledReason}
+                        style={{
+                            height: 26,
+                            padding: '0 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            opacity: 0.5,
+                            cursor: 'default',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        <Sparkles size={13} />
+                        <span>Generative Fill</span>
+                    </button>
+                )}
+            </div>
+        )
+    }
+
     const renderToolSpecificOptions = () => {
         switch (activeTool) {
             case 'brush':
@@ -894,6 +994,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderPickerOptions()
             case 'clone':
                 return renderCloneOptions()
+            case 'heal':
+                return renderHealOptions()
             case 'crop':
                 return renderCropOptions()
             case 'zoom':
@@ -903,12 +1005,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             case 'lasso-select':
             case 'rect-select':
             case 'ellipse-select':
-                // Maybe add antialiasing toggle later
-                return (
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                        {t('tooloptions.selection_tools')}
-                    </span>
-                )
+                return renderSelectionOptions()
             default:
                 return (
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
@@ -920,10 +1017,7 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
     return (
         <div className="tool-options">
-            <div className="tool-options-group">
-                <span className="tool-options-label" style={{ fontWeight: 600 }}>{label}</span>
-            </div>
-            <div className="tool-options-divider" />
+            <span className="tool-options-label" style={{ fontWeight: 600, color: 'var(--text-tertiary)', marginRight: 12 }}>{label}</span>
             {renderToolSpecificOptions()}
         </div>
     )

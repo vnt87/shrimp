@@ -15,14 +15,17 @@ import {
     Undo2,
     Redo2,
     SlidersHorizontal,
+    Sparkles,
 } from 'lucide-react'
 import React, { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { useEditor, Layer, type LayerFilter } from './EditorContext'
 import PanelMenu from './PanelMenu'
 const FiltersDialog = lazy(() => import('./FiltersDialog'))
+const GenerateImageDialog = lazy(() => import('./GenerateImageDialog'))
 import { getFilterCatalogEntry, isSupportedFilterType } from '../data/filterCatalog'
 import { useLanguage } from '../i18n/LanguageContext'
 import { TranslationKey } from '../i18n/en'
+import { useIntegrationStore } from '../hooks/useIntegrationStore'
 
 // --- Layer Thumbnail ---
 function LayerThumbnail({ layer }: { layer: Layer }) {
@@ -297,11 +300,13 @@ export default function LayersPanel() {
         toggleChannel,
         setActiveChannels
     } = useEditor()
+    const { isAIEnabled } = useIntegrationStore()
     const [activeTab, setActiveTab] = useState<'layers' | 'channels' | 'paths' | 'history'>('layers')
     const { t } = useLanguage()
     const [renamingPathId, setRenamingPathId] = useState<string | null>(null)
     const [renamingPathValue, setRenamingPathValue] = useState('')
     const [showFiltersDialog, setShowFiltersDialog] = useState(false)
+    const [showAiDialog, setShowAiDialog] = useState(false)
     const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
 
     // Determine active layer object for lock/opacity controls
@@ -626,6 +631,15 @@ export default function LayersPanel() {
                                 >
                                     <Plus size={16} />
                                 </div>
+                                {isAIEnabled && (
+                                    <div
+                                        className="dialogue-action-btn"
+                                        title={t('layers.btn.new_ai' as any) || 'New AI Layer'}
+                                        onClick={() => setShowAiDialog(true)}
+                                    >
+                                        <Sparkles size={16} />
+                                    </div>
+                                )}
                                 <div
                                     className={`dialogue-action-btn${!activeLayerId ? ' disabled' : ''}`}
                                     title={t('layers.btn.duplicate')}
@@ -884,6 +898,35 @@ export default function LayersPanel() {
                         <FiltersDialog
                             initialFilterType={initialFilterType}
                             onClose={() => setShowFiltersDialog(false)}
+                        />
+                    )
+                }
+                {
+                    showAiDialog && (
+                        <GenerateImageDialog
+                            onClose={() => setShowAiDialog(false)}
+                            onLayerCreate={async (url) => {
+                                try {
+                                    const img = new window.Image()
+                                    img.crossOrigin = "Anonymous"
+                                    img.src = url
+                                    await new Promise((resolve, reject) => {
+                                        img.onload = resolve
+                                        img.onerror = reject
+                                    })
+
+                                    const canvas = document.createElement('canvas')
+                                    canvas.width = img.width
+                                    canvas.height = img.height
+                                    const ctx = canvas.getContext('2d')
+                                    if (ctx) {
+                                        ctx.drawImage(img, 0, 0)
+                                        addLayer("AI Generated", canvas)
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to load generated image", e)
+                                }
+                            }}
                         />
                     )
                 }

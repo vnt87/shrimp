@@ -12,14 +12,17 @@ import {
     Check,
 } from 'lucide-react'
 const PreferencesDialog = lazy(() => import('./PreferencesDialog'))
+const IntegrationsDialog = lazy(() => import('./IntegrationsDialog'))
 const AboutDialog = lazy(() => import('./AboutDialog'))
 const KeyboardShortcutsDialog = lazy(() => import('./KeyboardShortcutsDialog'))
 const NewImageDialog = lazy(() => import('./NewImageDialog'))
+const GenerateImageDialog = lazy(() => import('./GenerateImageDialog'))
 import ShrimpIcon from './ShrimpIcon'
 import { useTheme } from './ThemeContext'
 import { useEditor, type LayerFilter } from './EditorContext'
 import { useLayout } from './LayoutContext'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useIntegrationStore } from '../hooks/useIntegrationStore'
 const FiltersDialog = lazy(() => import('./FiltersDialog'))
 
 import { MENU_TOOL_GROUPS, shortcuts, toolGroups } from '../data/tools'
@@ -53,6 +56,8 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const [showAbout, setShowAbout] = useState(false)
     const [showShortcuts, setShowShortcuts] = useState(false)
     const [showNewImage, setShowNewImage] = useState(false)
+    const [showGenerateImage, setShowGenerateImage] = useState(false)
+    const [showIntegrations, setShowIntegrations] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
     const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
     const menuRef = useRef<HTMLDivElement>(null)
@@ -84,6 +89,9 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         activeDocument, // for saving
         loadDocument // for loading
     } = useEditor()
+    const { isAIEnabled } = useIntegrationStore()
+    // Alias for readability in menu construction active region
+    const showIntegrationsButton = isAIEnabled;
 
     // Key handlers
     useEffect(() => {
@@ -242,6 +250,18 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         return () => window.removeEventListener('keydown', handleGlobalKeyDown)
     }, [])
 
+    // Cmd+D for deselect
+    useEffect(() => {
+        const handleDeselectKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+                e.preventDefault()
+                selectNone()
+            }
+        }
+        window.addEventListener('keydown', handleDeselectKeyDown)
+        return () => window.removeEventListener('keydown', handleDeselectKeyDown)
+    }, [selectNone])
+
     const handleMenuAction = (option: string | MenuOption) => {
         const command = typeof option === 'string' ? option : option.command || option.label
 
@@ -273,6 +293,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
         switch (command) {
             case 'New...': setShowNewImage(true); break
+            case 'Generate Image...': setShowGenerateImage(true); break
 
             case 'Open...':
                 if (fileInputRef.current) {
@@ -384,6 +405,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 break
             case 'Keyboard Shortcuts': setShowShortcuts(true); break
             case 'About': setShowAbout(true); break
+            case 'Integrations...': setShowIntegrations(true); break
             case 'Github Source': window.open('https://github.com/vunam/webgimp', '_blank'); break
         }
         setActiveMenu(null)
@@ -402,6 +424,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const menuData: Record<string, MenuOption[]> = {
         [t('menu.file')]: [
             { label: t('menu.file.new'), command: 'New...' },
+            ...(showIntegrationsButton ? [{ label: 'Generate Image...', command: 'Generate Image...' }] : []),
             { label: t('menu.file.open'), command: 'Open...' },
             { label: t('menu.file.open_layers'), command: 'Open as Layers...' },
             { label: t('menu.file.save'), command: 'Save', shortcut: 'Cmd+S' },
@@ -423,6 +446,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             '---',
             { label: t('menu.edit.free_transform'), command: 'Free Transform' },
             '---',
+
             ...MENU_TOOL_GROUPS.map(group => ({
                 label: t(group.label as any),
                 children: group.tools.map(tool => ({
@@ -596,7 +620,13 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                                     <SlidersHorizontal size={14} style={{ marginRight: 8 }} />
                                     {t('header.settings.preferences')}
                                 </div>
-                                <div className="header-menu-dropdown-item">
+                                <div
+                                    className="header-menu-dropdown-item"
+                                    onClick={() => {
+                                        setSettingsOpen(false)
+                                        setShowIntegrations(true)
+                                    }}
+                                >
                                     <Puzzle size={14} style={{ marginRight: 8 }} />
                                     {t('header.settings.integrations')}
                                 </div>
@@ -661,9 +691,31 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
             <Suspense fallback={null}>
                 {showPreferences && <PreferencesDialog open={showPreferences} onClose={() => setShowPreferences(false)} />}
+                {showIntegrations && <IntegrationsDialog open={showIntegrations} onClose={() => setShowIntegrations(false)} />}
                 {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
                 {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
                 {showNewImage && <NewImageDialog open={showNewImage} onClose={() => setShowNewImage(false)} />}
+                {showGenerateImage && <GenerateImageDialog onClose={() => setShowGenerateImage(false)} onLayerCreate={async (url) => {
+                    try {
+                        const img = new Image()
+                        img.crossOrigin = "Anonymous"
+                        img.src = url
+                        await new Promise((resolve, reject) => {
+                            img.onload = resolve
+                            img.onerror = reject
+                        })
+                        const canvas = document.createElement('canvas')
+                        canvas.width = img.width
+                        canvas.height = img.height
+                        const ctx = canvas.getContext('2d')
+                        if (ctx) {
+                            ctx.drawImage(img, 0, 0)
+                            openImage("AI Generated", canvas)
+                        }
+                    } catch (e) {
+                        console.error("Failed to load generated image", e)
+                    }
+                }} />}
                 {showFilters && <FiltersDialog initialFilterType={initialFilterType} onClose={() => setShowFilters(false)} />}
             </Suspense>
         </>

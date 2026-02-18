@@ -232,11 +232,12 @@ export const en = {
     'tool.eraser': 'Eraser',
     'tool.bucket': 'Bucket Fill',
     'tool.gradient': 'Gradient',
-    'tool.picker': 'Color Picker',
+    'tool.picker': 'Eye Dropper',
     'tool.text': 'Text',
     'tool.zoom': 'Zoom',
     'tool.paths': 'Paths',
     'tool.clone': 'Clone Stamp',
+    'tool.heal': 'Healing Brush',
     'tooloptions.sample': 'Sample',
     'tooloptions.sample.current': 'Current Layer',
     'tooloptions.sample.all': 'All Layers',
@@ -411,6 +412,23 @@ export const en = {
     'tooloptions.path.stroke_name': 'Path Stroke',
     'tooloptions.selection_tools': 'Selection tools',
     'tooloptions.no_options': 'No options for this tool',
+
+    // Healing Brush Tool
+    'tooloptions.heal.strength': 'Strength',
+    'tooloptions.heal.hint': 'Alt+Click to set source, then paint to heal',
+
+    // Generative Fill Tool
+    'tool.gen_fill': 'Generative Fill',
+    'tooloptions.gen_fill.prompt_placeholder': 'Describe what to generate or fill...',
+    'tooloptions.gen_fill.generate': 'Generate',
+    'tooloptions.gen_fill.generating': 'Generating...',
+    'tooloptions.gen_fill.output_mode': 'Output',
+    'tooloptions.gen_fill.output_mode.new_layer': 'New Layer',
+    'tooloptions.gen_fill.output_mode.fill_selection': 'Fill Selection',
+    'tooloptions.gen_fill.error_no_prompt': 'Please enter a prompt.',
+    'tooloptions.gen_fill.error_failed': 'Generation failed. Check AI settings.',
+    'tooloptions.gen_fill.no_selection_hint': 'Draw a selection first to fill a region',
+    'tooloptions.gen_fill.size_hint': 'Size',
 
     // Info Panel
     'info.x': 'X:',

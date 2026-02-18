@@ -772,6 +772,12 @@ body,
   white-space: nowrap;
 }
 
+/* Spinner keyframe used by the gen-fill loading indicator */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .tool-options-dropdown svg {
   width: 16px;
   height: 16px;
@@ -1414,6 +1420,7 @@ body,
   color: var(--text-primary);
   white-space: nowrap;
 }
+
 
 .dialogue-input {
   display: flex;

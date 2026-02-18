@@ -54,6 +54,9 @@ export interface ToolOptions {
     // Clone options
     cloneSampleMode: 'current' | 'all'
     cloneTarget: 'active' | 'new'
+    // Heal options
+    healSampleMode: 'current' | 'all'
+    healStrength: number
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -91,12 +94,28 @@ const defaultToolOptions: ToolOptions = {
     pathPolygonal: false,
     cloneSampleMode: 'current',
     cloneTarget: 'active',
+    healSampleMode: 'current',
+    healStrength: 80,
 }
 
 export default function App() {
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
     const [activeTool, setActiveTool] = useState<string>('move')
     const [toolOptions, setToolOptions] = useState<ToolOptions>(defaultToolOptions)
+
+    // Prevent the browser from zooming the entire UI when the user performs a
+    // pinch gesture (or Ctrl+Wheel) anywhere outside the canvas viewport.
+    // Pinch-to-zoom on the canvas is handled by Canvas.tsx's handleWheel instead.
+    useEffect(() => {
+        const preventBrowserZoom = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault()
+            }
+        }
+        // { passive: false } is required to be able to call preventDefault()
+        document.addEventListener('wheel', preventBrowserZoom, { passive: false })
+        return () => document.removeEventListener('wheel', preventBrowserZoom)
+    }, [])
 
     const updateToolOption = useCallback(<K extends keyof ToolOptions>(key: K, value: ToolOptions[K]) => {
         setToolOptions(prev => ({ ...prev, [key]: value }))
@@ -133,6 +152,7 @@ export default function App() {
                 case 't': setActiveTool('text'); break
                 case 'z': setActiveTool('zoom'); break
                 case 'p': setActiveTool('paths'); break
+                case 'h': setActiveTool('heal'); break
                 case 'escape': setActiveTool('move'); break
                 case '[':
                     setToolOptions(prev => ({
