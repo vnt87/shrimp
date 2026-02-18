@@ -87,7 +87,6 @@ export default function ColorPickerDialog({
                     <ColorPicker
                         color={tempColor}
                         onChange={setTempColor}
-                        onClose={() => { }} // We handle closing via the dialog
                         style={{
                             position: 'relative',
                             zIndex: 'auto',

@@ -3,7 +3,6 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 interface ColorPickerProps {
     color: string
     onChange: (color: string) => void
-    onClose: () => void
     style?: React.CSSProperties
 }
 
@@ -86,7 +85,7 @@ function rgbToHex(r: number, g: number, b: number): string {
  *
  * All state is internal; `onChange` is called on every interaction.
  */
-export default function ColorPicker({ color, onChange, onClose, style }: ColorPickerProps) {
+export default function ColorPicker({ color, onChange, style }: ColorPickerProps) {
     // ── State ──────────────────────────────────────────────────────────────────
     /** Current HSV values [hue 0-360, sat 0-100, val 0-100] */
     const [hsv, setHsv] = useState<[number, number, number]>(() => hexToHsv(color))
@@ -214,8 +213,8 @@ export default function ColorPicker({ color, onChange, onClose, style }: ColorPi
 
     // ── Sizes ──────────────────────────────────────────────────────────────────
     const SV_SIZE = 240   // width & height of the SV square (px)
-    const HUE_W  = 20     // width of the hue strip (px)
-    const HUE_H  = SV_SIZE // hue strip is same height as SV square
+    const HUE_W = 20     // width of the hue strip (px)
+    const HUE_H = SV_SIZE // hue strip is same height as SV square
 
     return (
         <div

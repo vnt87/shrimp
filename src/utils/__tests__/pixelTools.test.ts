@@ -40,7 +40,7 @@ describe('pixelTools', () => {
             const [r, g, b] = [255, 255, 255];
             const [h, s, l] = rgbToHsl(r, g, b);
             expect(l).toBe(1);
-            const [r2, g2, b2] = hslToRgb(h, s, l);
+            const [r2, _g2, _b2] = hslToRgb(h, s, l);
             expect(r2).toBe(255);
         });
     });
