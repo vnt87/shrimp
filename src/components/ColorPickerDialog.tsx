@@ -61,7 +61,8 @@ export default function ColorPickerDialog({
             <div
                 className="filters-dialog"
                 style={{
-                    width: 280,
+                    /* Wide enough to fit the Photoshop-style picker: SV square (240) + hue strip (20) + inputs (120) + gaps */
+                    width: 440,
                     transform: `translate(${position.x}px, ${position.y}px)`,
                     position: 'relative'
                 }}

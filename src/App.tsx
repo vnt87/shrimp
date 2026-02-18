@@ -74,6 +74,10 @@ export interface ToolOptions {
     dodgeMode: 'dodge' | 'burn'
     dodgeRange: 'shadows' | 'midtones' | 'highlights'
     dodgeExposure: number
+    // Move tool options
+    moveAutoSelect: boolean          // Auto-select topmost layer under cursor on click
+    moveAutoSelectTarget: 'layer' | 'group'  // Whether to pick individual layer or group
+    moveShowTransformControls: boolean       // Show bounding-box handles (like Transform tool)
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -126,6 +130,10 @@ const defaultToolOptions: ToolOptions = {
     dodgeMode: 'dodge',
     dodgeRange: 'midtones',
     dodgeExposure: 50,
+    // Move tool defaults — match Photoshop defaults (auto-select off, no transform handles)
+    moveAutoSelect: false,
+    moveAutoSelectTarget: 'layer',
+    moveShowTransformControls: false,
 }
 
 export default function App() {

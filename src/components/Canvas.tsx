@@ -533,12 +533,17 @@ function PixiScene({ transform, cursorRef, toolOptions, activeTool, hiddenLayerI
             {/* Clone Source Indicator (also used for heal tool) */}
             {(activeTool === 'clone' || activeTool === 'heal') && <CloneSourceCursor source={useEditor().cloneSource} />}
 
-            {/* Transform Overlay (Pixi) */}
-            {
-                activeTool === 'transform' && (
-                    <TransformOverlayWrapper layerId={activeLayerId} />
-                )
-            }
+            {/*
+              * Transform Overlay (Pixi)
+              * Shown for the dedicated Transform tool, OR when the Move tool has
+              * "Show Transform Controls" checked — matching Photoshop behaviour
+              * where the bounding-box handles appear directly on the canvas while
+              * the Move tool is active.
+              */}
+            {(activeTool === 'transform' ||
+                (activeTool === 'move' && toolOptions?.moveShowTransformControls)) && (
+                <TransformOverlayWrapper layerId={activeLayerId} />
+            )}
         </pixiContainer>
     )
 }
@@ -1966,54 +1971,124 @@ export default function Canvas({
             }
             return
         }
-        if (activeTool === 'move' && activeLayerId) {
-            const layer = layers.find(l => l.id === activeLayerId)
+        if (activeTool === 'move') {
+            // ── Auto-Select: find the topmost non-locked visible layer at cursor ──
+            // Triggered either when moveAutoSelect is on, or when clicking on a text
+            // layer that isn't currently active (legacy behaviour).
+            const autoSelect = toolOptions?.moveAutoSelect ?? false
 
-            // Check if clicking on another text layer to auto-select it
-            // This allows moving text layers even if not currently selected
-            const clickedTextLayer = [...layers].reverse().find(l => {
-                if (!l.visible) return false;
+            /**
+             * Walk layers (topmost rendered first = reversed array) and return the
+             * first layer whose opaque pixel is under the cursor.  For groups this
+             * descends into children unless moveAutoSelectTarget === 'group'.
+             */
+            const findLayerAtPoint = (list: import('./EditorContext').Layer[]): import('./EditorContext').Layer | null => {
+                const target = toolOptions?.moveAutoSelectTarget ?? 'layer'
+                // Iterate in reverse so we check topmost (visually) layers first
+                for (let i = list.length - 1; i >= 0; i--) {
+                    const l = list[i]
+                    if (!l.visible || l.locked) continue
 
-                // For text layers, we need a better hit test than just x/y
-                if (l.type === 'text' && l.text) {
-                    const s = l.textStyle || { fontSize: 24 }
-                    const estWidth = l.text.length * s.fontSize * 0.6
-                    const lines = l.text.split('\n')
-                    const estHeight = lines.length * s.fontSize * 1.4
-                    return canvasX >= l.x && canvasX <= l.x + estWidth &&
-                        canvasY >= l.y && canvasY <= l.y + estHeight
+                    if (l.type === 'group' && l.children) {
+                        if (target === 'group') {
+                            // Hit-test any child, but return the group itself
+                            const child = findLayerAtPoint(l.children)
+                            if (child) return l
+                        } else {
+                            // Descend into the group and return the child
+                            const child = findLayerAtPoint(l.children)
+                            if (child) return child
+                        }
+                    } else if (l.type === 'text' && l.text) {
+                        // Bounding box estimate for text layers
+                        const s = l.textStyle || { fontSize: 24 }
+                        const estWidth = l.text.length * s.fontSize * 0.6
+                        const lines = l.text.split('\n')
+                        const estHeight = lines.length * s.fontSize * 1.4
+                        if (canvasX >= l.x && canvasX <= l.x + estWidth &&
+                            canvasY >= l.y && canvasY <= l.y + estHeight) {
+                            return l
+                        }
+                    } else if (l.data) {
+                        // Check bounds first (fast path)
+                        const lx = Math.round(canvasX - l.x)
+                        const ly = Math.round(canvasY - l.y)
+                        if (lx >= 0 && ly >= 0 && lx < l.data.width && ly < l.data.height) {
+                            // Sample alpha to skip fully transparent pixels
+                            try {
+                                const ctx = l.data.getContext('2d')
+                                if (ctx) {
+                                    const px = ctx.getImageData(lx, ly, 1, 1)
+                                    if (px.data[3] > 0) return l
+                                }
+                            } catch {
+                                // getImageData may throw for tainted canvases
+                                return l
+                            }
+                        }
+                    }
                 }
-
-                return false;
-            })
-
-            if (clickedTextLayer && clickedTextLayer.id !== activeLayerId) {
-                setActiveLayer(clickedTextLayer.id)
-                setIsDragging(true)
-                dragStart.current = {
-                    x: e.clientX,
-                    y: e.clientY,
-                    offsetX: 0,
-                    offsetY: 0,
-                    layerX: clickedTextLayer.x,
-                    layerY: clickedTextLayer.y,
-                    canvasX,
-                    canvasY
-                }
-                return;
+                return null
             }
 
-            if (layer) {
-                setIsDragging(true)
-                dragStart.current = {
-                    x: e.clientX,
-                    y: e.clientY,
-                    offsetX: 0,
-                    offsetY: 0,
-                    layerX: layer.x,
-                    layerY: layer.y,
-                    canvasX,
-                    canvasY
+            // When auto-select is on, pick the layer under the cursor
+            if (autoSelect) {
+                const found = findLayerAtPoint(layers)
+                if (found && found.id !== activeLayerId) {
+                    setActiveLayer(found.id)
+                    // Start dragging the newly selected layer
+                    setIsDragging(true)
+                    dragStart.current = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        offsetX: 0,
+                        offsetY: 0,
+                        layerX: found.x,
+                        layerY: found.y,
+                        canvasX,
+                        canvasY
+                    }
+                    return
+                }
+            } else {
+                // Legacy: auto-select text layers even when moveAutoSelect is off
+                // (kept for backward compatibility so clicking a text layer still
+                //  selects it without needing to go to the Layers panel first)
+                const clickedTextLayer = findLayerAtPoint(
+                    layers.filter(l => l.type === 'text')
+                )
+                if (clickedTextLayer && clickedTextLayer.id !== activeLayerId) {
+                    setActiveLayer(clickedTextLayer.id)
+                    setIsDragging(true)
+                    dragStart.current = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        offsetX: 0,
+                        offsetY: 0,
+                        layerX: clickedTextLayer.x,
+                        layerY: clickedTextLayer.y,
+                        canvasX,
+                        canvasY
+                    }
+                    return
+                }
+            }
+
+            // Start drag for the currently active layer (regardless of auto-select)
+            if (activeLayerId) {
+                const layer = layers.find(l => l.id === activeLayerId)
+                if (layer) {
+                    setIsDragging(true)
+                    dragStart.current = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        offsetX: 0,
+                        offsetY: 0,
+                        layerX: layer.x,
+                        layerY: layer.y,
+                        canvasX,
+                        canvasY
+                    }
                 }
             }
         } else if (activeTool === 'shapes') {

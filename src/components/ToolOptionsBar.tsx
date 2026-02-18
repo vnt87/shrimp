@@ -27,6 +27,7 @@ import {
     Pentagon
 } from 'lucide-react'
 import FontSelector from './FontSelector'
+import ColorPickerDialog from './ColorPickerDialog'
 import { createFilledPathCanvas, createStrokedPathCanvas, pathToSelectionPolygon } from '../path/rasterize'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useIntegrationStore } from '../hooks/useIntegrationStore'
@@ -55,6 +56,9 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         selection,
         setGenFillModalOpen,
         setCAFModalOpen,
+        // Move tool needs: active layer id, position update, and layer list
+        activeLayerId,
+        updateLayerPosition,
     } = useEditor()
     const { t } = useLanguage()
     // AI integration status — used to gate the Generative Fill button
@@ -87,6 +91,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
 
     const label = toolLabels[activeTool] || activeTool
     const [isCmdPressed, setIsCmdPressed] = useState(false)
+    /** Controls whether the Photoshop-style color picker dialog is open for the text tool color */
+    const [textColorPickerOpen, setTextColorPickerOpen] = useState(false)
 
     const {
         brushPresets, addBrushPreset,
@@ -605,13 +611,38 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             <div className="tool-options-divider" />
             <div className="tool-options-slider-group">
                 <span className="slider-label">{t('tooloptions.text.color')}</span>
-                <input
-                    type="color"
-                    className="tool-options-color"
-                    style={{ width: 100, height: 24, padding: 0, border: 'none' }}
-                    value={toolOptions.textColor}
-                    onChange={(e) => onToolOptionChange('textColor', e.target.value)}
+
+                {/*
+                 * Circle color swatch — clicking opens the Photoshop-style ColorPickerDialog.
+                 * The circle is 20×20 px with the current textColor as its background.
+                 * A thin ring border makes it visible even against matching backgrounds.
+                 */}
+                <button
+                    onClick={() => setTextColorPickerOpen(true)}
+                    title={t('tooloptions.text.color')}
+                    style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        background: toolOptions.textColor,
+                        border: '2px solid var(--border-main)',
+                        boxShadow: '0 0 0 1px rgba(0,0,0,0.3)',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        padding: 0,
+                    }}
                 />
+
+                {/* Photoshop-style color picker dialog — mounted only while open */}
+                {textColorPickerOpen && (
+                    <ColorPickerDialog
+                        title={t('tooloptions.text.color')}
+                        color={toolOptions.textColor}
+                        onChange={(c) => onToolOptionChange('textColor', c)}
+                        onClose={() => setTextColorPickerOpen(false)}
+                    />
+                )}
+
                 <button
                     className="pref-btn pref-btn-secondary"
                     style={{ height: 24, fontSize: 10, padding: '0 6px', minWidth: 'auto' }}
@@ -1141,6 +1172,214 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
         )
     }
 
+    // ─── Move Tool Helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Returns the pixel dimensions of a layer (data canvas or text estimate).
+     */
+    const getLayerSize = (layerId: string): { width: number; height: number } | null => {
+        const layer = layers.find(l => l.id === layerId)
+        if (!layer) return null
+        if (layer.data) return { width: layer.data.width, height: layer.data.height }
+        // Text layer: rough estimate from text + style
+        if (layer.type === 'text' && layer.text) {
+            const s = layer.textStyle || { fontSize: 24 }
+            const estWidth = layer.text.length * s.fontSize * 0.6
+            const lines = layer.text.split('\n')
+            const estHeight = lines.length * s.fontSize * 1.4
+            return { width: estWidth, height: estHeight }
+        }
+        return null
+    }
+
+    /**
+     * Align the active layer relative to the canvas in the given direction.
+     * Directions: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom'
+     */
+    const alignActiveLayer = (alignment: string) => {
+        if (!activeLayerId) return
+        const layer = layers.find(l => l.id === activeLayerId)
+        if (!layer) return
+        const size = getLayerSize(activeLayerId)
+        const lw = size?.width ?? 0
+        const lh = size?.height ?? 0
+
+        let newX = layer.x
+        let newY = layer.y
+
+        switch (alignment) {
+            case 'left':     newX = 0; break
+            case 'center-h': newX = (canvasSize.width - lw) / 2; break
+            case 'right':    newX = canvasSize.width - lw; break
+            case 'top':      newY = 0; break
+            case 'center-v': newY = (canvasSize.height - lh) / 2; break
+            case 'bottom':   newY = canvasSize.height - lh; break
+        }
+
+        updateLayerPosition(activeLayerId, newX, newY, true)
+    }
+
+    /**
+     * Inline SVG icons for the 6 layer-alignment buttons.
+     * Each icon shows two rectangles (of differing widths/heights) aligned to an edge or centre.
+     */
+    const AlignLeftEdgesIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            {/* Left guide line */}
+            <rect x="1" y="1" width="1.5" height="12" opacity="0.9" />
+            {/* Short bar (top) */}
+            <rect x="2.5" y="2.5" width="6" height="3.5" opacity="0.7" rx="0.5" />
+            {/* Long bar (bottom) */}
+            <rect x="2.5" y="8" width="9" height="3.5" opacity="0.7" rx="0.5" />
+        </svg>
+    )
+    const AlignCenterHIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            {/* Center guide line */}
+            <rect x="6.25" y="1" width="1.5" height="12" opacity="0.9" />
+            {/* Short bar */}
+            <rect x="3" y="2.5" width="8" height="3.5" opacity="0.7" rx="0.5" />
+            {/* Long bar */}
+            <rect x="1.5" y="8" width="11" height="3.5" opacity="0.7" rx="0.5" />
+        </svg>
+    )
+    const AlignRightEdgesIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            {/* Right guide line */}
+            <rect x="11.5" y="1" width="1.5" height="12" opacity="0.9" />
+            {/* Short bar */}
+            <rect x="5.5" y="2.5" width="6" height="3.5" opacity="0.7" rx="0.5" />
+            {/* Long bar */}
+            <rect x="2.5" y="8" width="9" height="3.5" opacity="0.7" rx="0.5" />
+        </svg>
+    )
+    const AlignTopEdgesIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            {/* Top guide line */}
+            <rect x="1" y="1" width="12" height="1.5" opacity="0.9" />
+            {/* Narrow bar */}
+            <rect x="2.5" y="2.5" width="3.5" height="6" opacity="0.7" rx="0.5" />
+            {/* Wide bar */}
+            <rect x="8"   y="2.5" width="3.5" height="9" opacity="0.7" rx="0.5" />
+        </svg>
+    )
+    const AlignCenterVIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            {/* Centre guide line */}
+            <rect x="1" y="6.25" width="12" height="1.5" opacity="0.9" />
+            {/* Short bar */}
+            <rect x="2.5" y="3" width="3.5" height="8" opacity="0.7" rx="0.5" />
+            {/* Tall bar */}
+            <rect x="8"   y="1.5" width="3.5" height="11" opacity="0.7" rx="0.5" />
+        </svg>
+    )
+    const AlignBottomEdgesIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+            {/* Bottom guide line */}
+            <rect x="1" y="11.5" width="12" height="1.5" opacity="0.9" />
+            {/* Narrow bar */}
+            <rect x="2.5" y="5.5" width="3.5" height="6" opacity="0.7" rx="0.5" />
+            {/* Wide bar */}
+            <rect x="8"   y="2.5" width="3.5" height="9" opacity="0.7" rx="0.5" />
+        </svg>
+    )
+
+    /** Renders the Move tool's option bar — matching the Photoshop Move tool options. */
+    const renderMoveOptions = () => {
+        const canAlign = !!activeLayerId && layers.length > 0
+
+        return (
+            <>
+                {/* ── Auto-Select ──────────────────────────────────────────── */}
+                <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {/* Checkbox label acts as a toggle */}
+                    <div className="tool-options-checkbox-group" style={{ margin: 0 }}>
+                        <input
+                            type="checkbox"
+                            id="moveAutoSelect"
+                            checked={toolOptions.moveAutoSelect}
+                            onChange={(e) => onToolOptionChange('moveAutoSelect', e.target.checked)}
+                        />
+                        <label htmlFor="moveAutoSelect" style={{ whiteSpace: 'nowrap' }}>Auto-Select:</label>
+                    </div>
+                    {/* Layer / Group target — only relevant when auto-select is on */}
+                    <select
+                        className="tool-options-select"
+                        disabled={!toolOptions.moveAutoSelect}
+                        value={toolOptions.moveAutoSelectTarget}
+                        onChange={(e) => onToolOptionChange('moveAutoSelectTarget', e.target.value as 'layer' | 'group')}
+                        style={{
+                            height: 24,
+                            fontSize: 11,
+                            background: 'var(--bg-input)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-main)',
+                            borderRadius: 4,
+                            opacity: toolOptions.moveAutoSelect ? 1 : 0.45,
+                        }}
+                    >
+                        <option value="layer">Layer</option>
+                        <option value="group">Group</option>
+                    </select>
+                </div>
+
+                <div className="tool-options-divider" />
+
+                {/* ── Show Transform Controls ──────────────────────────────── */}
+                <div className="tool-options-checkbox-group">
+                    <input
+                        type="checkbox"
+                        id="moveShowTransform"
+                        checked={toolOptions.moveShowTransformControls}
+                        onChange={(e) => onToolOptionChange('moveShowTransformControls', e.target.checked)}
+                    />
+                    <label htmlFor="moveShowTransform" style={{ whiteSpace: 'nowrap' }}>
+                        Show Transform Controls
+                    </label>
+                </div>
+
+                <div className="tool-options-divider" />
+
+                {/* ── Alignment Buttons ────────────────────────────────────── */}
+                {/* Six buttons: align left, centre-H, right edges; align top, centre-V, bottom edges */}
+                <div
+                    className="tool-options-group"
+                    style={{ display: 'flex', alignItems: 'center', gap: 2 }}
+                    title={canAlign ? 'Align active layer relative to canvas' : 'Select a layer to align'}
+                >
+                    {[
+                        { key: 'left',     Icon: AlignLeftEdgesIcon,  tip: 'Align left edges to canvas' },
+                        { key: 'center-h', Icon: AlignCenterHIcon,    tip: 'Centre horizontally in canvas' },
+                        { key: 'right',    Icon: AlignRightEdgesIcon,  tip: 'Align right edges to canvas' },
+                        { key: 'top',      Icon: AlignTopEdgesIcon,    tip: 'Align top edges to canvas' },
+                        { key: 'center-v', Icon: AlignCenterVIcon,     tip: 'Centre vertically in canvas' },
+                        { key: 'bottom',   Icon: AlignBottomEdgesIcon, tip: 'Align bottom edges to canvas' },
+                    ].map(({ key, Icon, tip }) => (
+                        <button
+                            key={key}
+                            className="pref-btn pref-btn-secondary"
+                            disabled={!canAlign}
+                            title={tip}
+                            onClick={() => alignActiveLayer(key)}
+                            style={{
+                                width: 26,
+                                minWidth: 26,
+                                height: 24,
+                                padding: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: canAlign ? 1 : 0.4,
+                            }}
+                        >
+                            <Icon />
+                        </button>
+                    ))}
+                </div>
+            </>
+        )
+    }
+
     const renderToolSpecificOptions = () => {
         switch (activeTool) {
             case 'brush':
@@ -1167,6 +1406,8 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
                 return renderZoomOptions()
             case 'paths':
                 return renderPathOptions()
+            case 'move':
+                return renderMoveOptions()
             case 'lasso-select':
             case 'rect-select':
             case 'ellipse-select':
