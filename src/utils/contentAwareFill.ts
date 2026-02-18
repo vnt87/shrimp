@@ -70,11 +70,10 @@ export async function loadCAFModule(): Promise<CAFModuleInstance> {
 
     _loadingPromise = (async (): Promise<CAFModuleInstance> => {
         // Dynamic import of the Emscripten-generated JS glue code.
-        // Vite treats anything in public/ as a static asset served at root.
-        // @vite-ignore suppresses the "dynamic import" warning for this path.
-        const { default: createModule } = await import(
-            /* @vite-ignore */ '/wasm/caf.js'
-        )
+        // Vite serves public/ at the root; @vite-ignore silences the dynamic-import warning.
+        // @ts-ignore — /wasm/caf.js is a static asset, not a TS module; types live in src/types/caf-module.d.ts
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        const { default: createModule } = await import(/* @vite-ignore */ '/wasm/caf.js')
         const mod = await createModule() as CAFModuleInstance
         _moduleInstance = mod
         return mod
