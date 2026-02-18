@@ -2419,39 +2419,24 @@ export default function Canvas({
                                     </div>
                                 )}
 
-                                {/* React overlays (HTML) - now transformed to match Pixi */}
+                                {/* React overlays (HTML) - transformed to match Pixi canvas coordinate space.
+                                    NOTE: CropOverlay is intentionally NOT placed here because it needs to
+                                    cover the full viewport with its dark-dimming SVG. Placing it inside a
+                                    CSS-transformed parent causes the SVG "100% width/height" to only visually
+                                    cover the transformed canvas region rather than the full screen. */}
                                 <div
                                     className="overlays"
                                     style={{
                                         position: 'absolute',
                                         top: 0,
                                         left: 0,
-                                        // Width and height must be set so child elements using 100% dimensions
-                                        // (e.g. CropOverlay's SVG) correctly cover the full viewport area.
                                         width: '100%',
                                         height: '100%',
                                         transform: `translate(${transform.offsetX}px, ${transform.offsetY}px) scale(${transform.scale})`,
                                         transformOrigin: '0 0',
-                                        pointerEvents: 'none', // Pass events to Pixi unless interacting with handles
+                                        pointerEvents: 'none',
                                     }}
                                 >
-                                    {activeTool === 'crop' && (
-                                        <div style={{ pointerEvents: 'auto' }}>
-                                            <CropOverlay
-                                                onCrop={(rect) => {
-                                                    cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
-                                                    onToolChange?.('move')
-                                                }}
-                                                onCancel={() => onToolChange?.('move')}
-                                                scale={1}
-                                                zoomLevel={transform.scale}
-                                                offsetX={0}
-                                                offsetY={0}
-                                                toolOptions={toolOptions}
-                                            />
-                                        </div>
-                                    )}
-
                                     {activeTool === 'paths' && (
                                         <div style={{ pointerEvents: 'auto' }}>
                                             <PathOverlay
@@ -2460,9 +2445,25 @@ export default function Canvas({
                                             />
                                         </div>
                                     )}
-
-
                                 </div>
+
+                                {/* CropOverlay lives OUTSIDE the transformed container so its dark
+                                    overlay SVG fills the true viewport. It receives real screen-space
+                                    transform values and converts canvas coords → screen coords itself. */}
+                                {activeTool === 'crop' && (
+                                    <CropOverlay
+                                        onCrop={(rect) => {
+                                            cropCanvas(rect.x, rect.y, rect.width, rect.height, toolOptions?.cropDeletePixels)
+                                            onToolChange?.('move')
+                                        }}
+                                        onCancel={() => onToolChange?.('move')}
+                                        scale={transform.scale}
+                                        zoomLevel={1}
+                                        offsetX={transform.offsetX}
+                                        offsetY={transform.offsetY}
+                                        toolOptions={toolOptions}
+                                    />
+                                )}
 
                                 {/* Scrollbars would go here if we implemented custom ones */}
 
