@@ -3,8 +3,8 @@ import { rgbToHsl, hslToRgb, applyDodgeBurn, smudgePatch, applyBlurSharpen } fro
 
 beforeAll(() => {
     // Polyfill ImageData for Vitest (Node environment)
-    if (typeof global.ImageData === 'undefined') {
-        (global as any).ImageData = class ImageData {
+    if (typeof globalThis.ImageData === 'undefined') {
+        (globalThis as any).ImageData = class ImageData {
             data: Uint8ClampedArray;
             width: number;
             height: number;
