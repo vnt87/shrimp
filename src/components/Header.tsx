@@ -24,6 +24,7 @@ import { useLayout } from './LayoutContext'
 import { useLanguage } from '../i18n/LanguageContext'
 import { useIntegrationStore } from '../hooks/useIntegrationStore'
 const FiltersDialog = lazy(() => import('./FiltersDialog'))
+const ExportDialog = lazy(() => import('./ExportDialog'))
 
 import { MENU_TOOL_GROUPS, shortcuts, toolGroups } from '../data/tools'
 import { FILTER_CATALOG, isSupportedFilterType } from '../data/filterCatalog'
@@ -59,6 +60,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const [showGenerateImage, setShowGenerateImage] = useState(false)
     const [showIntegrations, setShowIntegrations] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
+    const [showExport, setShowExport] = useState(false)
     const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
@@ -367,6 +369,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             case 'Export As PNG': exportImage('png'); break
             case 'Export As JPEG': exportImage('jpeg'); break
             case 'Export As WebP': exportImage('webp'); break
+            case 'Export...': setShowExport(true); break
             case 'Close': closeImage(); break
             case 'Close All': closeImage(); break
             case 'Undo': undo(); break
@@ -431,9 +434,12 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             { label: t('menu.file.open_layers'), command: 'Open as Layers...' },
             { label: t('menu.file.save'), command: 'Save', shortcut: 'Cmd+S' },
             { label: t('menu.file.save_as'), command: 'Save As' },
+            { label: t('menu.file.export'), command: 'Export...' },
+            '---',
             { label: t('menu.file.export_png'), command: 'Export As PNG' },
             { label: t('menu.file.export_jpeg'), command: 'Export As JPEG' },
             { label: t('menu.file.export_webp'), command: 'Export As WebP' },
+            '---',
             { label: t('menu.file.close'), command: 'Close' },
             { label: t('menu.file.close_all'), command: 'Close All' }
         ],
@@ -719,6 +725,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                     }
                 }} />}
                 {showFilters && <FiltersDialog initialFilterType={initialFilterType} onClose={() => setShowFilters(false)} />}
+                {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
             </Suspense>
         </>
     )
