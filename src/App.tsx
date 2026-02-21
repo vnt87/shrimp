@@ -78,6 +78,12 @@ export interface ToolOptions {
     moveAutoSelect: boolean          // Auto-select topmost layer under cursor on click
     moveAutoSelectTarget: 'layer' | 'group'  // Whether to pick individual layer or group
     moveShowTransformControls: boolean       // Show bounding-box handles (like Transform tool)
+    // Pressure Dynamics
+    pressureSize: boolean            // Pressure affects brush size
+    pressureOpacity: boolean         // Pressure affects opacity
+    pressureHardness: boolean        // Pressure affects hardness
+    pressureMinSize: number          // Minimum size at 0% pressure (0-100%)
+    pressureMinOpacity: number       // Minimum opacity at 0% pressure (0-100%)
 }
 
 const defaultToolOptions: ToolOptions = {
@@ -134,6 +140,12 @@ const defaultToolOptions: ToolOptions = {
     moveAutoSelect: false,
     moveAutoSelectTarget: 'layer',
     moveShowTransformControls: false,
+    // Pressure Dynamics defaults
+    pressureSize: true,
+    pressureOpacity: true,
+    pressureHardness: false,
+    pressureMinSize: 10,
+    pressureMinOpacity: 0,
 }
 
 export default function App() {

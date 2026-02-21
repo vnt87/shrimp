@@ -8,7 +8,6 @@ export class BrushEngine {
     // private wasmModule: any = null;
     // private surface: any = null;
     // private brush: any = null;
-    private canvas: HTMLCanvasElement | null = null;
     private ctx: CanvasRenderingContext2D | null = null;
 
     // Internal state
@@ -46,7 +45,6 @@ export class BrushEngine {
      * Set the target canvas for drawing.
      */
     setSurface(canvas: HTMLCanvasElement): void {
-        this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
     }
 
@@ -133,10 +131,33 @@ export class BrushEngine {
         // In real WASM engine, we would call: this.wasmModule.stroke_to(surface, input.x, input.y, pressure, tilt, dtime);
 
         const pressure = input.pressure;
-        this.ctx.lineWidth = this.currentSettings.radius * 2 * pressure;
+        const settings = this.currentSettings;
+
+        // Calculate pressure-based adjustments
+        // Default to full effect if settings not provided
+        const pressureSize = settings.pressureSize ?? true;
+        const pressureOpacity = settings.pressureOpacity ?? true;
+        const minSizeFactor = (settings.pressureMinSize ?? 10) / 100;
+        const minOpacityFactor = (settings.pressureMinOpacity ?? 0) / 100;
+
+        // Size: interpolate between minSizeFactor and 1.0 based on pressure
+        const sizeFactor = pressureSize
+            ? minSizeFactor + (1 - minSizeFactor) * pressure
+            : 1;
+
+        // Opacity: interpolate between minOpacityFactor and 1.0 based on pressure
+        const opacityFactor = pressureOpacity
+            ? minOpacityFactor + (1 - minOpacityFactor) * pressure
+            : 1;
+
+        // Calculate effective radius and opacity
+        const effectiveRadius = settings.radius * sizeFactor;
+        const effectiveOpacity = settings.opacity * opacityFactor;
+
+        this.ctx.lineWidth = effectiveRadius * 2;
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
-        this.ctx.strokeStyle = `rgba(${this.currentSettings.color.r}, ${this.currentSettings.color.g}, ${this.currentSettings.color.b}, ${this.currentSettings.opacity})`;
+        this.ctx.strokeStyle = `rgba(${settings.color.r}, ${settings.color.g}, ${settings.color.b}, ${effectiveOpacity})`;
 
         this.ctx.beginPath();
         this.ctx.moveTo(this.lastInput.x, this.lastInput.y);

@@ -221,6 +221,43 @@ export default function ToolOptionsBar({ activeTool, toolOptions, onToolOptionCh
             {renderSlider('brushOpacity', t('tooloptions.opacity'), 1, 100, 1, '%')}
             <div className="tool-options-divider" />
             {renderSlider('brushHardness', t('tooloptions.hardness'), 0, 100, 1, '%')}
+            <div className="tool-options-divider" />
+            {/* Pressure Dynamics */}
+            <div className="tool-options-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="slider-label" style={{ color: 'var(--text-secondary)' }}>{t('tooloptions.pressure.dynamics')}</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                        className={`pref-btn ${toolOptions.pressureSize ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                        style={{ height: 24, fontSize: 10, padding: '0 6px', minWidth: 'auto' }}
+                        onClick={() => onToolOptionChange('pressureSize', !toolOptions.pressureSize)}
+                        title={t('tooloptions.pressure.size_hint')}
+                    >
+                        {t('tooloptions.pressure.size')}
+                    </button>
+                    <button
+                        className={`pref-btn ${toolOptions.pressureOpacity ? 'pref-btn-primary' : 'pref-btn-secondary'}`}
+                        style={{ height: 24, fontSize: 10, padding: '0 6px', minWidth: 'auto' }}
+                        onClick={() => onToolOptionChange('pressureOpacity', !toolOptions.pressureOpacity)}
+                        title={t('tooloptions.pressure.opacity_hint')}
+                    >
+                        {t('tooloptions.pressure.opacity')}
+                    </button>
+                </div>
+            </div>
+            {/* Min Size slider - only show when pressureSize is enabled */}
+            {toolOptions.pressureSize && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('pressureMinSize', t('tooloptions.pressure.min_size'), 0, 100, 1, '%')}
+                </>
+            )}
+            {/* Min Opacity slider - only show when pressureOpacity is enabled */}
+            {toolOptions.pressureOpacity && (
+                <>
+                    <div className="tool-options-divider" />
+                    {renderSlider('pressureMinOpacity', t('tooloptions.pressure.min_opacity'), 0, 100, 1, '%')}
+                </>
+            )}
         </>
     )
 

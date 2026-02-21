@@ -415,6 +415,15 @@ export const vi: Record<TranslationKey, string> = {
     'tooloptions.selection_tools': 'Công cụ vùng chọn',
     'tooloptions.no_options': 'Không có tùy chọn cho công cụ này',
 
+    // Pressure Dynamics
+    'tooloptions.pressure.dynamics': 'Áp lực',
+    'tooloptions.pressure.size': 'Kích thước',
+    'tooloptions.pressure.size_hint': 'Thay đổi kích thước cọ theo áp lực bút',
+    'tooloptions.pressure.opacity': 'Độ mờ',
+    'tooloptions.pressure.opacity_hint': 'Thay đổi độ mờ cọ theo áp lực bút',
+    'tooloptions.pressure.min_size': 'Kích thước tối thiểu',
+    'tooloptions.pressure.min_opacity': 'Độ mờ tối thiểu',
+
     // Healing Brush Tool
     'tooloptions.heal.strength': 'Cường độ',
     'tooloptions.heal.hint': 'Alt+Click để chọn nguồn, sau đó vẽ để chữa lành',
@@ -479,7 +488,7 @@ export const vi: Record<TranslationKey, string> = {
     // Smudge Tool Options
     'tool.smudge': 'Làm nhòe',
     'tooloptions.smudge.strength': 'Cường độ',
-    'tooloptions.smudge.sample_all': 'Mẫu tất cả lớp',
+    'tooloptions.smudge.sample_all': 'Sample tất cả các lớp',
 
     // Blur/Sharpen Tool Options
     'tool.blur_sharpen': 'Mờ / Sắc nét',

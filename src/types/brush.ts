@@ -21,6 +21,13 @@ export interface BrushSettings {
     speedSensitivity?: number;
     pressureSensitivity?: number;
 
+    // Pressure Dynamics
+    pressureSize?: boolean;      // Pressure affects brush size
+    pressureOpacity?: boolean;   // Pressure affects opacity
+    pressureHardness?: boolean;  // Pressure affects hardness
+    pressureMinSize?: number;    // Minimum size at 0% pressure (0-100% of base)
+    pressureMinOpacity?: number; // Minimum opacity at 0% pressure (0-100% of base)
+
     // Custom tip (if not using standard MyPaint procedural)
     brushTipImage?: HTMLImageElement | HTMLCanvasElement;
 }

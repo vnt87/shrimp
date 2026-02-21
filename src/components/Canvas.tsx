@@ -949,7 +949,12 @@ export default function Canvas({
             },
             opacity: (toolOptions?.brushOpacity ?? 100) / 100,
             radius: (toolOptions?.brushSize ?? 10) / 2, // Radius vs Diameter
-            hardness: (toolOptions?.brushHardness ?? 100) / 100
+            hardness: (toolOptions?.brushHardness ?? 100) / 100,
+            // Pressure dynamics
+            pressureSize: toolOptions?.pressureSize,
+            pressureOpacity: toolOptions?.pressureOpacity,
+            pressureMinSize: toolOptions?.pressureMinSize,
+            pressureMinOpacity: toolOptions?.pressureMinOpacity,
         })
     }, [brushEngine, foregroundColor, toolOptions])
 
@@ -981,7 +986,7 @@ export default function Canvas({
     const smudgeBuffer = useRef<ImageData | null>(null)
 
     // --- Drawing helper: draw stroke segment ---
-    const drawStrokeTo = useCallback((canvasX: number, canvasY: number, isFirst: boolean, history: boolean = true) => {
+    const drawStrokeTo = useCallback((canvasX: number, canvasY: number, isFirst: boolean, history: boolean = true, pressure: number = 1.0) => {
         let ctx: CanvasRenderingContext2D | null = null
         let layerX = 0
         let layerY = 0
@@ -1014,7 +1019,7 @@ export default function Canvas({
             brushEngine.continueStroke({
                 x: lx,
                 y: ly,
-                pressure: 0.5, // Todo: Get from pointer event if possible
+                pressure: pressure, // Use actual pressure from pointer event
                 time: Date.now()
             })
             // Update lastDrawPoint for continuity if needed
@@ -2536,6 +2541,55 @@ export default function Canvas({
 
     }, [tempGuide, draggingGuideId, transform, addGuide, removeGuide, activeLayerId, layers, activeTool, isDragging, updateLayerData, updateLayerPosition, renderGradientPreview, clearGradientState, viewportRef, addLayer])
 
+    // Pointer event handlers (wrappers around mouse handlers with pressure support)
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        // Store pressure for use in drawing
+        if (e.pressure > 0 && e.pressure < 1) {
+            ;(e as any)._pressure = e.pressure
+        }
+        handleMouseDown(e as any)
+    }, [handleMouseDown])
+
+    const handlePointerMove = useCallback((e: React.PointerEvent) => {
+        // Store pressure for use in drawing
+        const pressure = (e.pressure > 0 && e.pressure < 1) ? e.pressure : 1.0
+        ;(e as any)._pressure = pressure
+        
+        // For brush tool, pass pressure to drawStrokeTo
+        if (isDrawing.current && activeTool === 'brush') {
+            const rect = viewportRef?.getBoundingClientRect()
+            if (rect) {
+                const canvasX = (e.clientX - rect.left - transform.offsetX) / transform.scale
+                const canvasY = (e.clientY - rect.top - transform.offsetY) / transform.scale
+                
+                // Call brush engine directly with pressure
+                if (activeLayerId) {
+                    const layer = layers.find(l => l.id === activeLayerId)
+                    if (layer && layer.data) {
+                        const lx = canvasX - layer.x
+                        const ly = canvasY - layer.y
+                        brushEngine.continueStroke({
+                            x: lx,
+                            y: ly,
+                            pressure: pressure,
+                            time: Date.now()
+                        })
+                        refreshLayerRender(activeLayerId)
+                        cursorRef.current = { x: canvasX, y: canvasY }
+                        if (onCursorMove) onCursorMove({ x: Math.round(canvasX), y: Math.round(canvasY) })
+                        return
+                    }
+                }
+            }
+        }
+        
+        handleMouseMove(e as any)
+    }, [handleMouseMove, activeTool, activeLayerId, layers, brushEngine, transform, viewportRef, refreshLayerRender, onCursorMove])
+
+    const handlePointerUp = useCallback((e: React.PointerEvent) => {
+        handleMouseUp(e as any)
+    }, [handleMouseUp])
+
     // Global event listeners for dragging
     useEffect(() => {
         if (isDragging || tempGuide || draggingGuideId) {
@@ -2639,9 +2693,9 @@ export default function Canvas({
                         <div
                             ref={setViewportRef}
                             className={`canvas-viewport ${isPanning ? 'panning-active' : isSpaceHeld ? 'panning-ready' : ''} ${activeTool === 'move' ? 'cursor-move' : ''} ${activeTool.includes('select') ? 'crosshair' : ''} ${activeTool === 'picker' ? 'cursor-picker' : ''}`}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={(e) => {
-                                handleMouseMove(e)
+                            onPointerDown={handlePointerDown}
+                            onPointerMove={(e) => {
+                                handlePointerMove(e)
                                 if (activeTool === 'picker') {
                                     const rect = viewportRef?.getBoundingClientRect()
                                     if (rect) {
@@ -2655,9 +2709,9 @@ export default function Canvas({
                                     setHoverColor(null)
                                 }
                             }}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={(e) => {
-                                handleMouseUp(e)
+                            onPointerUp={handlePointerUp}
+                            onPointerLeave={(e) => {
+                                handlePointerUp(e)
                                 setHoverColor(null)
                             }}
                             onWheel={handleWheel}

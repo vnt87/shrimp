@@ -414,6 +414,15 @@ export const en = {
     'tooloptions.selection_tools': 'Selection tools',
     'tooloptions.no_options': 'No options for this tool',
 
+    // Pressure Dynamics
+    'tooloptions.pressure.dynamics': 'Pressure',
+    'tooloptions.pressure.size': 'Size',
+    'tooloptions.pressure.size_hint': 'Vary brush size with pen pressure',
+    'tooloptions.pressure.opacity': 'Opacity',
+    'tooloptions.pressure.opacity_hint': 'Vary brush opacity with pen pressure',
+    'tooloptions.pressure.min_size': 'Min Size',
+    'tooloptions.pressure.min_opacity': 'Min Opacity',
+
     // Healing Brush Tool
     'tooloptions.heal.strength': 'Strength',
     'tooloptions.heal.hint': 'Alt+Click to set source, then paint to heal',
