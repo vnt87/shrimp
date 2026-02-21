@@ -653,6 +653,7 @@ export default function Canvas({
         addTextLayer,
         updateLayerPosition,
         updateLayerData,
+        refreshLayerRender,
         updateLayerText,
         selection,
         setSelection,
@@ -1018,6 +1019,12 @@ export default function Canvas({
             })
             // Update lastDrawPoint for continuity if needed
             lastDrawPoint.current = { x: canvasX, y: canvasY }
+            
+            // Force texture update to show brush stroke immediately without adding to history
+            if (!dragStart.current.isDrawingToNewLayer && currentLayer && currentLayer.data && activeLayerId) {
+                refreshLayerRender(activeLayerId)
+            }
+            
             return
         }
 

@@ -269,11 +269,12 @@ export default function PixiLayerSprite({ layer, transform }: PixiLayerSpritePro
     // ... (useEffect for update same)
     // When layer.data canvas content changes (but the same canvas object),
     // we need to force texture update
+    // Also listen to renderVersion for explicit update triggers
     useEffect(() => {
         if (textureRef.current && layer.data) {
             textureRef.current.source.update()
         }
-    }, [layer.data, layer.opacity])
+    }, [layer.data, layer.opacity, layer.renderVersion])
 
     // ... (pixiFilters logic same)
     // Build the Pixi filter array from our LayerFilter descriptors

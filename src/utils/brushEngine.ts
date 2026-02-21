@@ -35,7 +35,6 @@ export class BrushEngine {
             // const bytes = await response.arrayBuffer();
             // this.wasmModule = await WebAssembly.instantiate(bytes, { ... });
 
-            console.log('BrushEngine: Simulating WASM init...');
             this.isInitialized = true;
         } catch (e) {
             console.error('BrushEngine: Failed to init WASM', e);
@@ -49,7 +48,6 @@ export class BrushEngine {
     setSurface(canvas: HTMLCanvasElement): void {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        console.log('BrushEngine: Surface set', this.canvas);
     }
 
     /**
@@ -153,5 +151,12 @@ export class BrushEngine {
      */
     endStroke(): void {
         this.lastInput = null;
+    }
+    
+    /**
+     * Get the last input position for continuity when canvas is replaced.
+     */
+    getLastInput(): BrushInput | null {
+        return this.lastInput;
     }
 }

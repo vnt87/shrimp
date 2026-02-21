@@ -28,6 +28,7 @@ export interface Layer {
     type: 'layer' | 'group' | 'text'
     children?: Layer[] // For groups
     expanded?: boolean
+    renderVersion?: number // Used to force texture updates without changing canvas reference
     // Text specific
     text?: string
     textStyle?: {
@@ -164,6 +165,7 @@ interface EditorContextType {
     setLayerBlendMode: (id: string, mode: string) => void
     updateLayerData: (id: string, canvas: HTMLCanvasElement, history?: boolean) => void
     updateLayerPosition: (id: string, x: number, y: number, history?: boolean) => void
+    refreshLayerRender: (id: string) => void // Force texture update without changing data
     updateLayerText: (id: string, text: string) => void
     updateLayerTextStyle: (id: string, style: Partial<NonNullable<Layer['textStyle']>>, history?: boolean) => void
     addFilter: (layerId: string, filter: LayerFilter) => void
@@ -970,6 +972,19 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         if (history) updateState(updater)
         else replaceState(updater)
     }, [updateState, replaceState])
+
+    // Force texture update without adding to history - used by brush tool for real-time preview
+    const refreshLayerRender = useCallback((id: string) => {
+        const updater = (prevState: EditorContent) => {
+            const layer = findLayerById(prevState.layers, id)
+            if (!layer) return {}
+            const newVersion = (layer.renderVersion || 0) + 1
+            return {
+                layers: updateLayerInTree(prevState.layers, id, { renderVersion: newVersion })
+            }
+        }
+        replaceState(updater)
+    }, [replaceState])
 
     const deleteLayer = useCallback((id: string) => {
         updateState(prevState => {
@@ -2006,6 +2021,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             setLayerBlendMode,
             updateLayerData,
             updateLayerPosition,
+            refreshLayerRender,
             updateLayerText,
             addFilter,
             setLayerFilters,
