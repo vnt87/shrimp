@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { ThemeProvider } from './components/ThemeContext'
-import { EditorProvider } from './components/EditorContext'
+import { EditorProvider, useEditor } from './components/EditorContext'
 import { PresetsProvider } from './components/PresetsContext'
 import Header from './components/Header'
 import ToolOptionsBar from './components/ToolOptionsBar'
@@ -148,6 +148,42 @@ const defaultToolOptions: ToolOptions = {
     pressureMinOpacity: 0,
 }
 
+// Inner component to handle copy/paste shortcuts with editor context access
+function CopyPasteHandler({ children }: { children: React.ReactNode }) {
+    const { copySelection, pasteSelection } = useEditor()
+
+    useEffect(() => {
+        const handleCopyPaste = (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+                return
+            }
+
+            const isCmd = e.metaKey || e.ctrlKey
+
+            if (isCmd) {
+                switch (e.key.toLowerCase()) {
+                    case 'c':
+                        // Ctrl+Shift+C = Copy Merged, Ctrl+C = Copy
+                        e.preventDefault()
+                        copySelection(e.shiftKey)
+                        break
+                    case 'v':
+                        // Ctrl+V = Paste
+                        e.preventDefault()
+                        pasteSelection()
+                        break
+                }
+            }
+        }
+
+        window.addEventListener('keydown', handleCopyPaste)
+        return () => window.removeEventListener('keydown', handleCopyPaste)
+    }, [copySelection, pasteSelection])
+
+    return <>{children}</>
+}
+
 export default function App() {
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
     const [activeTool, setActiveTool] = useState<string>('move')
@@ -178,11 +214,10 @@ export default function App() {
                 return
             }
 
-
-            const isCmd = e.metaKey || e.ctrlKey
-
-            // Ignore shortcuts if Cmd/Ctrl is pressed (handled by global shortcuts or browser)
-            if (isCmd) return
+            // Don't handle tool shortcuts when Ctrl/Meta is pressed (those are for copy/paste etc.)
+            if (e.ctrlKey || e.metaKey) {
+                return
+            }
 
             switch (e.key.toLowerCase()) {
                 case 'c': setActiveTool('crop'); break
@@ -231,24 +266,26 @@ export default function App() {
             <PresetsProvider>
                 <LayoutProvider>
                     <EditorProvider>
-                        <div className="app">
-                            <Header onToolSelect={setActiveTool} />
-                            <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
-                            <div className="main-content">
-                                <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
-                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
-                                    <DocumentTabs />
-                                    <Canvas
-                                        onCursorMove={setCursorPos}
-                                        activeTool={activeTool}
-                                        onToolChange={setActiveTool}
-                                        toolOptions={toolOptions}
-                                    />
+                        <CopyPasteHandler>
+                            <div className="app">
+                                <Header onToolSelect={setActiveTool} />
+                                <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
+                                <div className="main-content">
+                                    <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
+                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
+                                        <DocumentTabs />
+                                        <Canvas
+                                            onCursorMove={setCursorPos}
+                                            activeTool={activeTool}
+                                            onToolChange={setActiveTool}
+                                            toolOptions={toolOptions}
+                                        />
+                                    </div>
+                                    <RightPanel />
                                 </div>
-                                <RightPanel />
+                                <StatusBar cursorPos={cursorPos} />
                             </div>
-                            <StatusBar cursorPos={cursorPos} />
-                        </div>
+                        </CopyPasteHandler>
                     </EditorProvider>
                 </LayoutProvider>
             </PresetsProvider>

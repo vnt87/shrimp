@@ -55,6 +55,12 @@ export interface Selection {
     path?: { x: number; y: number }[]
 }
 
+export interface ClipboardData {
+    canvas: HTMLCanvasElement
+    x: number  // Original position in canvas coordinates
+    y: number
+}
+
 export interface Guide {
     id: string
     orientation: 'horizontal' | 'vertical'
@@ -180,6 +186,10 @@ interface EditorContextType {
     selectAll: () => void
     selectNone: () => void
     invertSelection: () => void
+
+    // Copy/Paste actions
+    copySelection: (merged?: boolean) => void
+    pasteSelection: () => void
 
     // Image actions
     flattenImage: () => void
@@ -501,6 +511,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     // Content-Aware Fill modal visibility
     const [cafModalOpen, setCAFModalOpen] = useState(false)
+
+    // Clipboard state (not persisted)
+    const [clipboard, setClipboard] = useState<ClipboardData | null>(null)
 
     const [cursorInfo, setCursorInfo] = useState<{ x: number, y: number, color: string | null }>({ x: 0, y: 0, color: null })
     const [viewTransform, setViewTransform] = useState<{ scale: number, offsetX: number, offsetY: number }>({ scale: 1, offsetX: 0, offsetY: 0 })
@@ -1674,6 +1687,214 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
     }, [updateState])
 
+    // --- Copy/Paste Actions ---
+    
+    // Helper to check if a point is inside a selection
+    const isPointInSelection = (x: number, y: number, sel: Selection): boolean => {
+        if (sel.type === 'rect') {
+            return x >= sel.x && x < sel.x + sel.width && y >= sel.y && y < sel.y + sel.height
+        } else if (sel.type === 'ellipse') {
+            const cx = sel.x + sel.width / 2
+            const cy = sel.y + sel.height / 2
+            const rx = Math.abs(sel.width) / 2
+            const ry = Math.abs(sel.height) / 2
+            if (rx === 0 || ry === 0) return false
+            return Math.pow((x - cx) / rx, 2) + Math.pow((y - cy) / ry, 2) <= 1
+        } else if (sel.type === 'path' && sel.path) {
+            // Ray casting algorithm for polygon
+            let inside = false
+            for (let i = 0, j = sel.path.length - 1; i < sel.path.length; j = i++) {
+                const xi = sel.path[i].x, yi = sel.path[i].y
+                const xj = sel.path[j].x, yj = sel.path[j].y
+                const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+                if (intersect) inside = !inside
+            }
+            return inside
+        }
+        return false
+    }
+
+    // Copy selection to clipboard
+    // merged: false = copy active layer only, true = copy merged (all visible layers)
+    const copySelection = useCallback((merged: boolean = false) => {
+        if (!activeLayerId && !merged) return
+        
+        // Determine bounds
+        let bounds = selection
+        if (!bounds) {
+            // No selection, copy entire canvas
+            bounds = {
+                type: 'rect',
+                x: 0,
+                y: 0,
+                width: canvasSize.width,
+                height: canvasSize.height
+            }
+        }
+
+        // Create a canvas for the copied content
+        const copyCanvas = document.createElement('canvas')
+        copyCanvas.width = Math.max(1, Math.abs(bounds.width))
+        copyCanvas.height = Math.max(1, Math.abs(bounds.height))
+        const copyCtx = copyCanvas.getContext('2d')
+        if (!copyCtx) return
+
+        // Normalize bounds for negative width/height
+        const bx = bounds.width < 0 ? bounds.x + bounds.width : bounds.x
+        const by = bounds.height < 0 ? bounds.y + bounds.height : bounds.y
+        const bw = Math.abs(bounds.width)
+        const bh = Math.abs(bounds.height)
+
+        if (merged) {
+            // Copy merged - flatten all visible layers
+            const collectVisible = (list: Layer[]): Layer[] => {
+                const result: Layer[] = []
+                for (const l of list) {
+                    if (!l.visible) continue
+                    if (l.type === 'group' && l.children) {
+                        result.push(...collectVisible(l.children))
+                    } else if (l.data || l.type === 'text') {
+                        result.push(l)
+                    }
+                }
+                return result
+            }
+
+            const visibleLayers = collectVisible(layers).reverse()
+
+            // Create temp canvas for merged content
+            const tempCanvas = document.createElement('canvas')
+            tempCanvas.width = canvasSize.width
+            tempCanvas.height = canvasSize.height
+            const tempCtx = tempCanvas.getContext('2d')
+            if (!tempCtx) return
+
+            for (const layer of visibleLayers) {
+                tempCtx.globalAlpha = layer.opacity / 100
+                tempCtx.globalCompositeOperation = layer.blendMode === 'normal' ? 'source-over' : (layer.blendMode as GlobalCompositeOperation) || 'source-over'
+                if (layer.type === 'text') {
+                    renderTextLayerToCanvas(tempCtx, layer)
+                } else if (layer.data) {
+                    tempCtx.drawImage(layer.data, layer.x, layer.y)
+                }
+            }
+
+            // Copy the selection region
+            if (selection) {
+                // Create a mask for non-rect selections
+                if (selection.type !== 'rect') {
+                    copyCtx.save()
+                    copyCtx.beginPath()
+                    if (selection.type === 'ellipse') {
+                        const cx = selection.x + selection.width / 2 - bx
+                        const cy = selection.y + selection.height / 2 - by
+                        copyCtx.ellipse(cx, cy, Math.abs(selection.width / 2), Math.abs(selection.height / 2), 0, 0, Math.PI * 2)
+                    } else if (selection.path) {
+                        copyCtx.moveTo(selection.path[0].x - bx, selection.path[0].y - by)
+                        for (let i = 1; i < selection.path.length; i++) {
+                            copyCtx.lineTo(selection.path[i].x - bx, selection.path[i].y - by)
+                        }
+                        copyCtx.closePath()
+                    }
+                    copyCtx.clip()
+                }
+                copyCtx.drawImage(tempCanvas, bx, by, bw, bh, 0, 0, bw, bh)
+                if (selection && selection.type !== 'rect') {
+                    copyCtx.restore()
+                }
+            } else {
+                copyCtx.drawImage(tempCanvas, bx, by, bw, bh, 0, 0, bw, bh)
+            }
+        } else {
+            // Copy active layer only
+            const layer = findLayerById(layers, activeLayerId!)
+            if (!layer) return
+
+            if (layer.type === 'text') {
+                // Render text layer to temp canvas first
+                const tempCanvas = document.createElement('canvas')
+                tempCanvas.width = canvasSize.width
+                tempCanvas.height = canvasSize.height
+                const tempCtx = tempCanvas.getContext('2d')
+                if (tempCtx) {
+                    renderTextLayerToCanvas(tempCtx, layer)
+                    
+                    if (selection && selection.type !== 'rect') {
+                        copyCtx.save()
+                        copyCtx.beginPath()
+                        if (selection.type === 'ellipse') {
+                            const cx = selection.x + selection.width / 2 - bx
+                            const cy = selection.y + selection.height / 2 - by
+                            copyCtx.ellipse(cx, cy, Math.abs(selection.width / 2), Math.abs(selection.height / 2), 0, 0, Math.PI * 2)
+                        } else if (selection.path) {
+                            copyCtx.moveTo(selection.path[0].x - bx, selection.path[0].y - by)
+                            for (let i = 1; i < selection.path.length; i++) {
+                                copyCtx.lineTo(selection.path[i].x - bx, selection.path[i].y - by)
+                            }
+                            copyCtx.closePath()
+                        }
+                        copyCtx.clip()
+                    }
+                    copyCtx.drawImage(tempCanvas, bx, by, bw, bh, 0, 0, bw, bh)
+                    if (selection && selection.type !== 'rect') {
+                        copyCtx.restore()
+                    }
+                }
+            } else if (layer.data) {
+                // Apply selection mask if not rectangular
+                if (selection && selection.type !== 'rect') {
+                    copyCtx.save()
+                    copyCtx.beginPath()
+                    if (selection.type === 'ellipse') {
+                        const cx = selection.x + selection.width / 2 - bx
+                        const cy = selection.y + selection.height / 2 - by
+                        copyCtx.ellipse(cx, cy, Math.abs(selection.width / 2), Math.abs(selection.height / 2), 0, 0, Math.PI * 2)
+                    } else if (selection.path) {
+                        copyCtx.moveTo(selection.path[0].x - bx, selection.path[0].y - by)
+                        for (let i = 1; i < selection.path.length; i++) {
+                            copyCtx.lineTo(selection.path[i].x - bx, selection.path[i].y - by)
+                        }
+                        copyCtx.closePath()
+                    }
+                    copyCtx.clip()
+                }
+
+                // Draw the layer content offset by layer position
+                copyCtx.drawImage(layer.data, layer.x - bx, layer.y - by)
+
+                if (selection && selection.type !== 'rect') {
+                    copyCtx.restore()
+                }
+            }
+        }
+
+        setClipboard({
+            canvas: copyCanvas,
+            x: bx,
+            y: by
+        })
+    }, [activeLayerId, selection, canvasSize, layers])
+
+    // Paste clipboard content as a new layer
+    const pasteSelection = useCallback(() => {
+        if (!clipboard) return
+
+        // Create a new layer from clipboard
+        const newCanvas = document.createElement('canvas')
+        newCanvas.width = clipboard.canvas.width
+        newCanvas.height = clipboard.canvas.height
+        const ctx = newCanvas.getContext('2d')
+        if (!ctx) return
+
+        ctx.drawImage(clipboard.canvas, 0, 0)
+
+        // Add as new layer at the original position
+        const layerId = addLayer('Pasted Layer', newCanvas)
+        
+        // Update position to where it was copied from
+        updateLayerPosition(layerId, clipboard.x, clipboard.y, true)
+    }, [clipboard, addLayer, updateLayerPosition])
+
     // Helper: render a text layer to a 2D canvas context
     const renderTextLayerToCanvas = (ctx: CanvasRenderingContext2D, layer: Layer) => {
         if (layer.type !== 'text' || !layer.text) return
@@ -2032,6 +2253,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             selectAll,
             selectNone,
             invertSelection,
+            // Copy/Paste actions
+            copySelection,
+            pasteSelection,
             // Image actions
             flattenImage,
             mergeDown,
