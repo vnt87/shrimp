@@ -98,9 +98,22 @@ export default function PreferencesDialog({ open: _open, onClose }: PreferencesD
         'Input Devices': true, // Updated to match new IDs
     })
     const { theme: currentTheme } = useTheme()
+    
+    // Load stored preferences from localStorage
+    const loadStoredPrefs = (): Partial<PrefsState> => {
+        try {
+            const stored = localStorage.getItem('shrimp_preferences');
+            return stored ? JSON.parse(stored) : {};
+        } catch {
+            return {};
+        }
+    };
+    const storedPrefs = loadStoredPrefs();
+    
     const [prefs, setPrefs] = useState<PrefsState>(() => ({
         ...defaultPrefs,
         uiTheme: currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1),
+        ...storedPrefs, // Override with stored values
     }))
 
     // Generate sidebar tree with translated labels
@@ -169,7 +182,16 @@ export default function PreferencesDialog({ open: _open, onClose }: PreferencesD
     }
 
     const update = <K extends keyof PrefsState>(key: K, value: PrefsState[K]) => {
-        setPrefs((prev) => ({ ...prev, [key]: value }))
+        setPrefs((prev) => {
+            const newPrefs = { ...prev, [key]: value }
+            // Save to localStorage
+            try {
+                localStorage.setItem('shrimp_preferences', JSON.stringify(newPrefs))
+            } catch {
+                console.warn('Failed to save preferences to localStorage')
+            }
+            return newPrefs
+        })
     }
 
     // ── Find page title ─────────────────────────────────────────

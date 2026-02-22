@@ -332,6 +332,8 @@ export const vi: Record<TranslationKey, string> = {
     'layers.adjustments.open_dialog': 'Mở hộp thoại điều chỉnh',
     'layers.history.undo': 'Hoàn tác',
     'layers.history.redo': 'Làm lại',
+    'layers.history.max_entries': 'Số lượng lịch sử tối đa:',
+    'layers.history.max_memory': 'Bộ nhớ hoàn tác tối đa:',
     'layers.paths.selected': 'Đã chọn',
 
     // Tool Options Bar

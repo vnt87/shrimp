@@ -412,40 +412,60 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const canUndo = activeDocument ? activeDocument.history.past.length > 0 : false
     const canRedo = activeDocument ? activeDocument.history.future.length > 0 : false
 
-    // Generic state update for active document
-    // historyMode: 'push' (default) | 'replace'
-    const modifyContent = useCallback((
-        updates: Partial<EditorContent> | ((prev: EditorContent) => Partial<EditorContent>),
-        historyMode: 'push' | 'replace' = 'push'
-    ) => {
-        updateActiveDocument(doc => {
-            const current = doc.history.present
-            const changes = typeof updates === 'function' ? updates(current) : updates
-            const newContent = { ...current, ...changes }
+// Load max history entries from localStorage or use default
+const getMaxHistoryEntries = (): number => {
+    try {
+        const stored = localStorage.getItem('shrimp_preferences');
+        if (stored) {
+            const prefs = JSON.parse(stored);
+            if (prefs.undoLevels && typeof prefs.undoLevels === 'number') {
+                return Math.max(1, prefs.undoLevels); // At least 1 entry
+            }
+        }
+    } catch {
+        // Ignore errors, use default
+    }
+    return 50; // Default
+};
 
-            // If no change, return original doc (optimization)
-            // (Deep equality check is expensive, so likely just shallow check or rely on updates occurring)
+// Generic state update for active document
+// historyMode: 'push' (default) | 'replace'
+const modifyContent = useCallback((
+    updates: Partial<EditorContent> | ((prev: EditorContent) => Partial<EditorContent>),
+    historyMode: 'push' | 'replace' = 'push'
+) => {
+    const maxHistory = getMaxHistoryEntries();
+    
+    updateActiveDocument(doc => {
+        const current = doc.history.present
+        const changes = typeof updates === 'function' ? updates(current) : updates
+        const newContent = { ...current, ...changes }
 
-            if (historyMode === 'replace') {
-                return {
-                    ...doc,
-                    history: {
-                        ...doc.history,
-                        present: newContent
-                    }
-                }
-            } else {
-                return {
-                    ...doc,
-                    history: {
-                        past: [...doc.history.past, current],
-                        present: newContent,
-                        future: [] // clearer future on new action
-                    }
+        // If no change, return original doc (optimization)
+        // (Deep equality check is expensive, so likely just shallow check or rely on updates occurring)
+
+        if (historyMode === 'replace') {
+            return {
+                ...doc,
+                history: {
+                    ...doc.history,
+                    present: newContent
                 }
             }
-        })
-    }, [updateActiveDocument])
+        } else {
+            // Limit history entries to prevent unbounded memory growth
+            const newPast = [...doc.history.past, current].slice(-maxHistory);
+            return {
+                ...doc,
+                history: {
+                    past: newPast,
+                    present: newContent,
+                    future: [] // clearer future on new action
+                }
+            }
+        }
+    })
+}, [updateActiveDocument])
 
     // Helper to replace "setHistoryState" and "replaceHistoryState"
     // setHistoryState -> modifyContent(..., 'push')

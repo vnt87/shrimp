@@ -331,6 +331,8 @@ export const en = {
     'layers.adjustments.open_dialog': 'Open adjustment dialog',
     'layers.history.undo': 'Undo',
     'layers.history.redo': 'Redo',
+    'layers.history.max_entries': 'Maximum history entries:',
+    'layers.history.max_memory': 'Maximum undo memory:',
     'layers.paths.selected': 'Selected',
 
     // Tool Options Bar

@@ -961,6 +961,7 @@ export default function Canvas({
     // Drawing state
     const isDrawing = useRef(false)
     const lastDrawPoint = useRef<{ x: number; y: number } | null>(null)
+    const isShiftHeldForStroke = useRef(false) // Track if Shift was held during current stroke for operation batching
 
     // Gradient state
     const isGradientDragging = useRef(false)
@@ -1902,6 +1903,20 @@ export default function Canvas({
                 setIsDragging(false)
                 setIsPanning(false)
             }
+            // Handle Shift release for batched stroke commit
+            if (e.key === 'Shift' && isShiftHeldForStroke.current && activeLayerId) {
+                const layer = layers.find(l => l.id === activeLayerId)
+                if (layer?.data) {
+                    // Commit batched strokes to history when Shift is released
+                    const newCanvas = document.createElement('canvas')
+                    newCanvas.width = layer.data.width
+                    newCanvas.height = layer.data.height
+                    const newCtx = newCanvas.getContext('2d')
+                    newCtx?.drawImage(layer.data, 0, 0)
+                    updateLayerData(activeLayerId, newCanvas, true)
+                }
+                isShiftHeldForStroke.current = false
+            }
         }
         window.addEventListener('keydown', handleKeyDown)
         window.addEventListener('keyup', handleKeyUp)
@@ -1909,7 +1924,7 @@ export default function Canvas({
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [setSelection, undo, redo, cancelGradientDrag])
+    }, [setSelection, undo, redo, cancelGradientDrag, layers, activeLayerId, updateLayerData])
 
     // Mouse handlers
     const handleGuideDragStart = (orientation: 'horizontal' | 'vertical') => (e: React.MouseEvent) => {
@@ -2112,6 +2127,8 @@ export default function Canvas({
             setIsDragging(true)
             isDrawing.current = true
             lastDrawPoint.current = null
+            // Track if Shift is held for operation batching (grouping multiple strokes)
+            isShiftHeldForStroke.current = e.shiftKey
 
             // Start Stroke for Brush Engine
             if (activeTool === 'brush' && activeLayerId) {
@@ -2466,20 +2483,31 @@ export default function Canvas({
                 return newCanvas
             }
 
+            // Check if Shift was held during this stroke for operation batching
+            // When Shift is held, we don't save to history until Shift is released
+            const wasShiftHeld = isShiftHeldForStroke.current
+
             if (activeTool === 'brush') {
                 brushEngine.endStroke()
                 // Clone the canvas to enable proper history tracking
                 const layer = layers.find(l => l.id === activeLayerId)
                 if (layer && layer.data) {
-                    const newCanvas = cloneCanvasForHistory(layer.data)
-                    updateLayerData(activeLayerId, newCanvas, true)
+                    // Only save to history if Shift is NOT held (batch mode)
+                    // When Shift is held, we're batching strokes - don't create separate history entries
+                    if (!wasShiftHeld) {
+                        const newCanvas = cloneCanvasForHistory(layer.data)
+                        updateLayerData(activeLayerId, newCanvas, true)
+                    }
                 }
             } else if (activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone' || activeTool === 'smudge' || activeTool === 'blur-sharpen' || activeTool === 'dodge-burn') {
                 // Clone canvas for all drawing tools to enable proper history tracking
                 const layer = layers.find(l => l.id === activeLayerId)
                 if (layer && layer.data) {
-                    const newCanvas = cloneCanvasForHistory(layer.data)
-                    updateLayerData(activeLayerId, newCanvas, true)
+                    // Only save to history if Shift is NOT held (batch mode)
+                    if (!wasShiftHeld) {
+                        const newCanvas = cloneCanvasForHistory(layer.data)
+                        updateLayerData(activeLayerId, newCanvas, true)
+                    }
                 }
             } else {
                 const layer = layers.find(l => l.id === activeLayerId)
