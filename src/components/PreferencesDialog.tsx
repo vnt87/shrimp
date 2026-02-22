@@ -1,22 +1,13 @@
 import { useState, useEffect } from 'react'
 import {
     X,
-    Cpu,
-    MousePointer2,
-    Image as ImageIcon,
-    Layout,
-    Monitor,
-    FolderOpen as Folder,
     ChevronDown,
     ChevronRight,
-    Keyboard
+    Layout,
+    History
 } from 'lucide-react'
 import { useTheme } from './ThemeContext'
 import { useLanguage } from '../i18n/LanguageContext'
-
-// ── Icons ───────────────────────────────────────────────────────
-// Fix icon mapping
-const MousePointer = MousePointer2
 
 // ── Sidebar tree structure ──────────────────────────────────────
 interface SidebarItem {
@@ -28,20 +19,8 @@ interface SidebarItem {
 
 // ── Preference state ────────────────────────────────────────────
 interface PrefsState {
+    // History
     undoLevels: number
-    maxUndoMemory: number
-    undoMemoryUnit: string
-    tileCacheSize: number
-    tileCacheUnit: string
-    maxImageSize: number
-    imageSizeUnit: string
-    swapCompression: string
-    threads: number
-    useOpenCL: boolean
-    thumbnailSize: string
-    maxThumbFilesize: number
-    thumbFilesizeUnit: string
-    keepDocHistory: boolean
     // Color management
     colorProfile: string
     renderIntent: string
@@ -57,20 +36,7 @@ interface PrefsState {
 }
 
 const defaultPrefs: PrefsState = {
-    undoLevels: 5,
-    maxUndoMemory: 2083269,
-    undoMemoryUnit: 'Kilobytes',
-    tileCacheSize: 8333076,
-    tileCacheUnit: 'Kilobytes',
-    maxImageSize: 128,
-    imageSizeUnit: 'Megabytes',
-    swapCompression: 'Best performance',
-    threads: 8,
-    useOpenCL: false,
-    thumbnailSize: 'Normal (128x128)',
-    maxThumbFilesize: 4,
-    thumbFilesizeUnit: 'Megabytes',
-    keepDocHistory: true,
+    undoLevels: 50,
     colorProfile: 'sRGB IEC61966-2.1',
     renderIntent: 'Relative Colorimetric',
     softProofing: false,
@@ -89,13 +55,10 @@ interface PreferencesDialogProps {
 // ── Component ───────────────────────────────────────────────────
 export default function PreferencesDialog({ open: _open, onClose }: PreferencesDialogProps) {
     const { t } = useLanguage() // Added
-    const [activeItem, setActiveItem] = useState<string>('System Resources') // Changed initial state and type
+    const [activeItem, setActiveItem] = useState<string>('History') // Changed initial state and type
     const [expanded, setExpanded] = useState<Record<string, boolean>>({
-        'Default Image': true, // Updated to match new IDs
-        'Interface': true, // Updated to match new IDs
-        'Display': true, // Updated to match new IDs
-        'Image Windows': true, // Updated to match new IDs
-        'Input Devices': true, // Updated to match new IDs
+        'Interface': true,
+        'System Resources': true,
     })
     const { theme: currentTheme } = useTheme()
     
@@ -119,50 +82,17 @@ export default function PreferencesDialog({ open: _open, onClose }: PreferencesD
     // Generate sidebar tree with translated labels
     const sidebarTree: SidebarItem[] = [
         {
-            label: t('dialog.preferences.sidebar.system_resources'), icon: <Cpu size={14} />, id: 'System Resources', children: [
-                { label: t('dialog.preferences.sidebar.resource_consumption'), id: 'Resource Consumption' },
-                { label: t('dialog.preferences.sidebar.color_management'), id: 'Color Management' },
-                { label: t('dialog.preferences.sidebar.image_import_export'), id: 'Image Import & Export' },
-            ]
-        },
-        {
-            label: t('dialog.preferences.sidebar.tool_options'), icon: <MousePointer size={14} />, id: 'Tool Options', children: [
-                { label: t('dialog.preferences.sidebar.general'), id: 'Tool Options General' },
-                { label: t('dialog.preferences.sidebar.snapping'), id: 'Snapping' },
-                { label: t('dialog.preferences.sidebar.default_image'), id: 'Default Image' },
-                { label: t('dialog.preferences.sidebar.default_grid'), id: 'Default Grid' },
-            ]
-        },
-        {
             label: t('dialog.preferences.sidebar.interface'), icon: <Layout size={14} />, id: 'Interface', children: [
                 { label: t('dialog.preferences.sidebar.theme'), id: 'Theme' },
-                { label: t('dialog.preferences.sidebar.icon_theme'), id: 'Icon Theme' },
                 { label: t('dialog.preferences.sidebar.toolbox'), id: 'Toolbox' },
-                { label: t('dialog.preferences.sidebar.dialog_defaults'), id: 'Dialog Defaults' },
-                { label: t('dialog.preferences.sidebar.help_system'), id: 'Help System' },
             ]
         },
         {
-            label: t('dialog.preferences.sidebar.display'), icon: <Monitor size={14} />, id: 'Display', children: [
-                { label: t('dialog.preferences.sidebar.window_management'), id: 'Window Management' },
+            label: t('dialog.preferences.sidebar.system_resources'), icon: <History size={14} />, id: 'System Resources', children: [
+                { label: t('dialog.preferences.sidebar.history'), id: 'History' },
+                { label: t('dialog.preferences.sidebar.color_management'), id: 'Color Management' },
             ]
         },
-        {
-            label: t('dialog.preferences.sidebar.image_windows'), icon: <ImageIcon size={14} />, id: 'Image Windows', children: [
-                { label: t('dialog.preferences.sidebar.appearance'), id: 'Appearance' },
-                { label: t('dialog.preferences.sidebar.title_status'), id: 'Title & Status' },
-            ]
-        },
-        {
-            label: t('dialog.preferences.sidebar.input_devices'), icon: <Keyboard size={14} />, id: 'Input Devices', children: [
-                { label: t('dialog.preferences.sidebar.input_controllers'), id: 'Input Controllers' },
-            ]
-        },
-        {
-            label: t('dialog.preferences.sidebar.folders'), icon: <Folder size={14} />, id: 'Folders', children: [
-                { label: t('dialog.preferences.sidebar.data'), id: 'Data' },
-            ]
-        }
     ]
 
     // Close on Escape
@@ -239,15 +169,15 @@ export default function PreferencesDialog({ open: _open, onClose }: PreferencesD
     // ── Content pages ───────────────────────────────────────────
     const renderContent = () => {
         switch (activeItem) {
-            case 'System Resources': // Updated ID
-                return <SystemResourcesPage prefs={prefs} update={update} />
-            case 'Color Management': // Updated ID
+            case 'History':
+                return <HistoryPage prefs={prefs} update={update} />
+            case 'Color Management':
                 return <ColorManagementPage prefs={prefs} update={update} />
-            case 'Theme': // Updated ID
+            case 'Theme':
                 return <ThemePage prefs={prefs} update={update} />
-            case 'Toolbox': // Updated ID
+            case 'Toolbox':
                 return <ToolboxPage prefs={prefs} update={update} />
-            case 'Display': // Updated ID
+            case 'Display':
                 return <DisplayPage prefs={prefs} update={update} />
             default:
                 return <PlaceholderPage title={getPageTitle()} />
@@ -366,55 +296,21 @@ function PrefSelect({ value, options, onChange, width }: { value: string; option
 
 // ── Pages ───────────────────────────────────────────────────────
 
-function SystemResourcesPage({ prefs, update }: { prefs: PrefsState; update: UpdateFn }) {
+function HistoryPage({ prefs, update }: { prefs: PrefsState; update: UpdateFn }) {
     return (
-        <>
-            <PrefSection title="Resource Consumption">
-                <PrefRow label="Minimal number of undo levels:">
-                    <PrefSpinner value={prefs.undoLevels} onChange={(v) => update('undoLevels', v)} width={70} />
-                </PrefRow>
-                <PrefRow label="Maximum undo memory:">
-                    <PrefSpinner value={prefs.maxUndoMemory} onChange={(v) => update('maxUndoMemory', v)} />
-                    <PrefSelect value={prefs.undoMemoryUnit} options={['Kilobytes', 'Megabytes', 'Gigabytes']} onChange={(v) => update('undoMemoryUnit', v)} />
-                </PrefRow>
-                <PrefRow label="Tile cache size:">
-                    <PrefSpinner value={prefs.tileCacheSize} onChange={(v) => update('tileCacheSize', v)} />
-                    <PrefSelect value={prefs.tileCacheUnit} options={['Kilobytes', 'Megabytes', 'Gigabytes']} onChange={(v) => update('tileCacheUnit', v)} />
-                </PrefRow>
-                <PrefRow label="Maximum new image size:">
-                    <PrefSpinner value={prefs.maxImageSize} onChange={(v) => update('maxImageSize', v)} width={70} />
-                    <PrefSelect value={prefs.imageSizeUnit} options={['Kilobytes', 'Megabytes', 'Gigabytes']} onChange={(v) => update('imageSizeUnit', v)} />
-                </PrefRow>
-                <PrefRow label="Swap compression:">
-                    <PrefSelect value={prefs.swapCompression} options={['Best performance', 'Balanced', 'Best compression']} onChange={(v) => update('swapCompression', v)} width={220} />
-                </PrefRow>
-                <PrefRow label="Number of threads to use:">
-                    <PrefSpinner value={prefs.threads} onChange={(v) => update('threads', v)} width={70} />
-                </PrefRow>
-            </PrefSection>
-
-            <PrefSection title="Hardware Acceleration">
-                <PrefCheckbox checked={prefs.useOpenCL} label="Use OpenCL" onChange={(v) => update('useOpenCL', v)} />
-                <div className="pref-warning">
-                    <span className="pref-warning-icon">⚠</span>
-                    <em>OpenCL drivers and support are experimental, expect slowdowns and possible crashes (please report).</em>
-                </div>
-            </PrefSection>
-
-            <PrefSection title="Image Thumbnails">
-                <PrefRow label="Size of thumbnails:">
-                    <PrefSelect value={prefs.thumbnailSize} options={['No thumbnails', 'Normal (128x128)', 'Large (256x256)']} onChange={(v) => update('thumbnailSize', v)} width={220} />
-                </PrefRow>
-                <PrefRow label="Maximum filesize for thumbnailing:">
-                    <PrefSpinner value={prefs.maxThumbFilesize} onChange={(v) => update('maxThumbFilesize', v)} width={70} />
-                    <PrefSelect value={prefs.thumbFilesizeUnit} options={['Kilobytes', 'Megabytes']} onChange={(v) => update('thumbFilesizeUnit', v)} />
-                </PrefRow>
-            </PrefSection>
-
-            <PrefSection title="Document History">
-                <PrefCheckbox checked={prefs.keepDocHistory} label="Keep record of used files in the Recent Documents list" onChange={(v) => update('keepDocHistory', v)} />
-            </PrefSection>
-        </>
+        <PrefSection title="History Limits">
+            <PrefRow label="Maximum history entries:">
+                <PrefSpinner value={prefs.undoLevels} onChange={(v) => update('undoLevels', v)} width={70} />
+            </PrefRow>
+            <div className="pref-info">
+                <strong>Recommended values:</strong><br />
+                • 20-30: Basic usage, limited memory<br />
+                • 50: Default, balanced performance<br />
+                • 100+: Power users, more memory usage<br />
+                <br />
+                Higher values allow more undo steps but consume more memory.
+            </div>
+        </PrefSection>
     )
 }
 

@@ -148,7 +148,7 @@
   --bg-header: #f0f0f0;
   --bg-toolbar: #f0f0f0;
   --bg-panel: #f5f5f5;
-  --bg-canvas: #d0d0d0;
+  --bg-canvas: #e8e8e8;
   --bg-input: #ffffff;
   --bg-tab-active: #f5f5f5;
   --bg-tab-inactive: #e0e0e0;
@@ -212,8 +212,8 @@
   --histogram-grid: rgba(0, 0, 0, 0.06);
 
   /* Canvas checkerboard */
-  --canvas-check-1: #e0e0e0;
-  --canvas-check-2: #d8d8d8;
+  --canvas-check-1: #dddddd;
+  --canvas-check-2: #cccccc;
 
   /* Empty state card */
   --empty-card-bg: rgba(255, 255, 255, 0.9);
@@ -778,8 +778,13 @@ body,
 
 /* Spinner keyframe used by the gen-fill loading indicator */
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .tool-options-dropdown svg {
@@ -1120,8 +1125,14 @@ body,
 
 /* Canvas viewport — Infinite Canvas */
 .canvas-viewport {
-  background:
-    repeating-conic-gradient(var(--canvas-check-1) 0% 25%, var(--canvas-check-2) 0% 50%) 0 0 / 20px 20px;
+  background-color: var(--canvas-check-1);
+  background-image:
+    linear-gradient(45deg, var(--canvas-check-2) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--canvas-check-2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--canvas-check-2) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--canvas-check-2) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
   position: relative;
   overflow: hidden;
   cursor: default;
@@ -3805,7 +3816,7 @@ body,
   padding: 16px;
   overflow: hidden;
   position: relative;
-  background: 
+  background:
     repeating-conic-gradient(var(--canvas-check-1) 0% 25%, var(--canvas-check-2) 0% 50%) 0 0 / 20px 20px;
 }
 

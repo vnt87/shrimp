@@ -21,12 +21,10 @@ export default function StatusBar({
     }
 
     const activeLayer = activeLayerId ? findLayerById(layers, activeLayerId) : null
-    const width = activeLayer?.data ? activeLayer.data.width : '---'
-    const height = activeLayer?.data ? activeLayer.data.height : '---'
 
     return (
         <footer className="status-bar">
-            <div className="status-group">
+            <div className="status-group" style={{ marginLeft: 4 }}>
                 <span className="status-text">{t('statusbar.cursor_position')}</span>
                 <span className="status-text" style={{ marginLeft: 8 }}>x:</span>
                 <span
@@ -53,55 +51,42 @@ export default function StatusBar({
                     {cursorPos ? cursorPos.y : '---'}
                 </span>
             </div>
-            <div className="status-group">
-                <span className="status-text">{t('statusbar.width')}:</span>
-                <span
-                    className="status-text"
-                    style={{
-                        width: 60,
-                        display: 'inline-block',
-                        textAlign: 'left',
-                        fontVariantNumeric: 'tabular-nums',
-                        marginLeft: 8,
-                    }}
-                >
-                    {typeof width === 'number' ? `${width}px` : width}
+            <div className="status-group" style={{ marginLeft: 16 }}>
+                <span className="status-text" style={{ fontWeight: 500 }}>
+                    {activeLayer?.name || 'No layer'}
                 </span>
-                <span className="status-text" style={{ marginLeft: 26 }}>{t('statusbar.height')}:</span>
-                <span
-                    className="status-text"
-                    style={{
-                        width: 60,
-                        display: 'inline-block',
-                        textAlign: 'left',
-                        fontVariantNumeric: 'tabular-nums',
-                        marginLeft: 8,
-                    }}
-                >
-                    {typeof height === 'number' ? `${height}px` : height}
-                </span>
-            </div>
-            <div className="status-group">
-                <span className="status-text">{t('statusbar.position_change')} x: ---</span>
-                <span className="status-text" style={{ marginLeft: 26 }}>y: ---</span>
-            </div>
-            <div className="status-group">
-                <span className="status-text">{t('statusbar.starting_position')} x: ---</span>
-                <span className="status-text" style={{ marginLeft: 26 }}>y: ---</span>
-            </div>
-            <div className="status-group">
-                <span className="status-text">{t('statusbar.angle')} x: ---</span>
-                <span className="status-text" style={{ marginLeft: 26 }}>y: ---</span>
-            </div>
-            <div className="status-group">
-                <span className="status-text">{t('statusbar.color_profile')}: GNU RGB</span>
+                {activeLayer?.x !== undefined && activeLayer?.y !== undefined && (
+                    <>
+                        <span className="status-text" style={{ marginLeft: 12 }}>x:</span>
+                        <span
+                            className="status-text"
+                            style={{
+                                width: 40,
+                                display: 'inline-block',
+                                textAlign: 'left',
+                                fontVariantNumeric: 'tabular-nums',
+                            }}
+                        >
+                            {activeLayer.x}
+                        </span>
+                        <span className="status-text" style={{ marginLeft: 8 }}>y:</span>
+                        <span
+                            className="status-text"
+                            style={{
+                                width: 40,
+                                display: 'inline-block',
+                                textAlign: 'left',
+                                fontVariantNumeric: 'tabular-nums',
+                            }}
+                        >
+                            {activeLayer.y}
+                        </span>
+                    </>
+                )}
             </div>
             <div className="status-spacer" />
-            <div className="status-group" style={{ marginRight: 40 }}>
-                <span className="status-text">{t('statusbar.bits_per_channel')}</span>
-            </div>
-            <div className="status-group" style={{ marginRight: 0 }}>
-                <span className="status-text">{canvasSize.width} x {canvasSize.height} 72 dpi</span>
+            <div className="status-group" style={{ marginRight: 8 }}>
+                <span className="status-text">{canvasSize.width} x {canvasSize.height}</span>
             </div>
         </footer>
     )
