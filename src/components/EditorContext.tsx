@@ -7,6 +7,10 @@ import { BrushEngine } from '../utils/brushEngine'
 import { BrushPreset } from '../types/brush'
 import type { GradientResource } from '../types/gradient'
 import { GGRParser } from '../utils/ggrParser'
+import type { VectorShape, ShapeLayerData, ShapePrimitiveType, ShapeFill, ShapeStroke } from '../types/shape'
+import { DEFAULT_SHAPE_FILL, DEFAULT_SHAPE_STROKE } from '../types/shape'
+import { createShapeLayerData, createVectorShape, cloneShape, renderShapeLayer } from '../utils/shapeUtils'
+import { createRectPath, createEllipsePath, createPolygonPath, createLinePath } from '../utils/shapeUtils'
 
 export interface LayerFilter {
     type: 'blur' | 'brightness' | 'hue-saturation' | 'noise' | 'color-matrix' | 'pixelate' | 'glitch' | 'old-film' | 'adjustment' | 'ascii' | 'dot' | 'emboss' | 'cross-hatch' | 'bulge-pinch' | 'twist' | 'reflection' | 'shockwave' | 'crt' | 'rgb-split' | 'bloom' | 'godray' | 'tilt-shift' | 'zoom-blur' | 'motion-blur' | 'custom'
@@ -25,7 +29,7 @@ export interface Layer {
     filters: LayerFilter[]         // Non-destructive GPU filter stack
     x: number
     y: number
-    type: 'layer' | 'group' | 'text'
+    type: 'layer' | 'group' | 'text' | 'shape'
     children?: Layer[] // For groups
     expanded?: boolean
     renderVersion?: number // Used to force texture updates without changing canvas reference
@@ -44,6 +48,8 @@ export interface Layer {
         wordWrap?: boolean
         wordWrapWidth?: number
     }
+    // Shape specific
+    shapeData?: ShapeLayerData
 }
 
 export interface Selection {
@@ -274,6 +280,26 @@ interface EditorContextType {
     activeGradient: GradientResource | null
     setActiveGradient: (gradient: GradientResource | null) => void
     importGradient: (file: File) => Promise<void>
+
+    // Shape Layers
+    addShapeLayer: (name?: string) => string
+    addShapeToLayer: (layerId: string, shapeType: ShapePrimitiveType, params: {
+        x: number
+        y: number
+        width: number
+        height: number
+        cornerRadius?: number
+        sides?: number
+        fill?: Partial<ShapeFill>
+        stroke?: Partial<ShapeStroke>
+    }) => string | null
+    updateShape: (layerId: string, shapeId: string, updates: Partial<VectorShape>, history?: boolean) => void
+    deleteShape: (layerId: string, shapeId: string) => void
+    setActiveShape: (layerId: string, shapeId: string | null) => void
+    duplicateShape: (layerId: string, shapeId: string) => string | null
+    updateShapeFill: (layerId: string, shapeId: string, fill: Partial<ShapeFill>, history?: boolean) => void
+    updateShapeStroke: (layerId: string, shapeId: string, stroke: Partial<ShapeStroke>, history?: boolean) => void
+    renderShapeLayerToCanvas: (layerId: string) => HTMLCanvasElement | null
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
@@ -1568,6 +1594,302 @@ const modifyContent = useCallback((
         }))
     }, [updateState])
 
+    // --- Shape Layer Actions ---
+
+    /**
+     * Create a new shape layer
+     */
+    const addShapeLayer = useCallback((name: string = 'Shape Layer'): string => {
+        let newLayerId = ''
+        updateState((prevState) => {
+            const newLayer: Layer = {
+                id: Math.random().toString(36).substr(2, 9),
+                name,
+                visible: true,
+                locked: false,
+                opacity: 100,
+                blendMode: 'normal',
+                data: null,
+                filters: [],
+                x: 0,
+                y: 0,
+                type: 'shape',
+                shapeData: createShapeLayerData(),
+            }
+            newLayerId = newLayer.id
+            return {
+                layers: [newLayer, ...prevState.layers],
+                activeLayerId: newLayer.id,
+            }
+        })
+        return newLayerId
+    }, [updateState])
+
+    /**
+     * Add a shape to an existing shape layer
+     */
+    const addShapeToLayer = useCallback((
+        layerId: string,
+        shapeType: ShapePrimitiveType,
+        params: {
+            x: number
+            y: number
+            width: number
+            height: number
+            cornerRadius?: number
+            sides?: number
+            fill?: Partial<ShapeFill>
+            stroke?: Partial<ShapeStroke>
+        }
+    ): string | null => {
+        let shapeId: string | null = null
+        
+        updateState((prevState) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || layer.type !== 'shape' || !layer.shapeData) return {}
+
+            // Create the appropriate path based on shape type
+            let path
+            switch (shapeType) {
+                case 'rect':
+                    path = createRectPath(params.x, params.y, params.width, params.height, params.cornerRadius ?? 0)
+                    break
+                case 'ellipse':
+                    const cx = params.x + params.width / 2
+                    const cy = params.y + params.height / 2
+                    path = createEllipsePath(cx, cy, params.width / 2, params.height / 2)
+                    break
+                case 'polygon':
+                    const pcx = params.x + params.width / 2
+                    const pcy = params.y + params.height / 2
+                    const radius = Math.min(params.width, params.height) / 2
+                    path = createPolygonPath(pcx, pcy, radius, params.sides ?? 5)
+                    break
+                case 'line':
+                    path = createLinePath(params.x, params.y, params.x + params.width, params.y + params.height)
+                    break
+                default:
+                    return {}
+            }
+
+            const shape = createVectorShape({
+                type: shapeType,
+                path,
+                fill: params.fill ? { ...DEFAULT_SHAPE_FILL, ...params.fill } : undefined,
+                stroke: params.stroke ? { ...DEFAULT_SHAPE_STROKE, ...params.stroke } : undefined,
+            })
+            
+            shapeId = shape.id
+
+            const newShapeData: ShapeLayerData = {
+                ...layer.shapeData,
+                shapes: [...layer.shapeData.shapes, shape],
+                activeShapeId: shape.id,
+            }
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { shapeData: newShapeData }),
+            }
+        })
+
+        return shapeId
+    }, [updateState])
+
+    /**
+     * Update a shape within a shape layer
+     */
+    const updateShape = useCallback((
+        layerId: string,
+        shapeId: string,
+        updates: Partial<VectorShape>,
+        history: boolean = true
+    ) => {
+        const updater = (prevState: EditorContent) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || layer.type !== 'shape' || !layer.shapeData) return {}
+
+            const shapeIndex = layer.shapeData.shapes.findIndex(s => s.id === shapeId)
+            if (shapeIndex < 0) return {}
+
+            const updatedShapes = [...layer.shapeData.shapes]
+            updatedShapes[shapeIndex] = {
+                ...updatedShapes[shapeIndex],
+                ...updates,
+                updatedAt: Date.now(),
+            }
+
+            const newShapeData: ShapeLayerData = {
+                ...layer.shapeData,
+                shapes: updatedShapes,
+            }
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { shapeData: newShapeData }),
+            }
+        }
+
+        if (history) updateState(updater)
+        else replaceState(updater)
+    }, [updateState, replaceState])
+
+    /**
+     * Delete a shape from a shape layer
+     */
+    const deleteShape = useCallback((layerId: string, shapeId: string) => {
+        updateState((prevState) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || layer.type !== 'shape' || !layer.shapeData) return {}
+
+            const newShapes = layer.shapeData.shapes.filter(s => s.id !== shapeId)
+            if (newShapes.length === layer.shapeData.shapes.length) return {}
+
+            const newShapeData: ShapeLayerData = {
+                ...layer.shapeData,
+                shapes: newShapes,
+                activeShapeId: layer.shapeData.activeShapeId === shapeId 
+                    ? (newShapes[0]?.id ?? null) 
+                    : layer.shapeData.activeShapeId,
+                selectedShapeIds: layer.shapeData.selectedShapeIds.filter(id => id !== shapeId),
+            }
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { shapeData: newShapeData }),
+            }
+        })
+    }, [updateState])
+
+    /**
+     * Set the active shape in a shape layer
+     */
+    const setActiveShape = useCallback((layerId: string, shapeId: string | null) => {
+        updateState((prevState) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || layer.type !== 'shape' || !layer.shapeData) return {}
+
+            const newShapeData: ShapeLayerData = {
+                ...layer.shapeData,
+                activeShapeId: shapeId,
+            }
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { shapeData: newShapeData }),
+            }
+        })
+    }, [updateState])
+
+    /**
+     * Duplicate a shape within a shape layer
+     */
+    const duplicateShape = useCallback((layerId: string, shapeId: string): string | null => {
+        let newShapeId: string | null = null
+        
+        updateState((prevState) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || layer.type !== 'shape' || !layer.shapeData) return {}
+
+            const shape = layer.shapeData.shapes.find(s => s.id === shapeId)
+            if (!shape) return {}
+
+            const duplicated = cloneShape(shape)
+            newShapeId = duplicated.id
+
+            const newShapeData: ShapeLayerData = {
+                ...layer.shapeData,
+                shapes: [...layer.shapeData.shapes, duplicated],
+                activeShapeId: duplicated.id,
+            }
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { shapeData: newShapeData }),
+            }
+        })
+
+        return newShapeId
+    }, [updateState])
+
+    /**
+     * Update shape fill
+     */
+    const updateShapeFill = useCallback((
+        layerId: string,
+        shapeId: string,
+        fill: Partial<ShapeFill>,
+        history: boolean = true
+    ) => {
+        const updater = (prevState: EditorContent) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || layer.type !== 'shape' || !layer.shapeData) return {}
+
+            const shapeIndex = layer.shapeData.shapes.findIndex(s => s.id === shapeId)
+            if (shapeIndex < 0) return {}
+
+            const updatedShapes = [...layer.shapeData.shapes]
+            updatedShapes[shapeIndex] = {
+                ...updatedShapes[shapeIndex],
+                fill: { ...updatedShapes[shapeIndex].fill, ...fill },
+                updatedAt: Date.now(),
+            }
+
+            const newShapeData: ShapeLayerData = {
+                ...layer.shapeData,
+                shapes: updatedShapes,
+            }
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { shapeData: newShapeData }),
+            }
+        }
+
+        if (history) updateState(updater)
+        else replaceState(updater)
+    }, [updateState, replaceState])
+
+    /**
+     * Update shape stroke
+     */
+    const updateShapeStroke = useCallback((
+        layerId: string,
+        shapeId: string,
+        stroke: Partial<ShapeStroke>,
+        history: boolean = true
+    ) => {
+        const updater = (prevState: EditorContent) => {
+            const layer = findLayerById(prevState.layers, layerId)
+            if (!layer || layer.type !== 'shape' || !layer.shapeData) return {}
+
+            const shapeIndex = layer.shapeData.shapes.findIndex(s => s.id === shapeId)
+            if (shapeIndex < 0) return {}
+
+            const updatedShapes = [...layer.shapeData.shapes]
+            updatedShapes[shapeIndex] = {
+                ...updatedShapes[shapeIndex],
+                stroke: { ...updatedShapes[shapeIndex].stroke, ...stroke },
+                updatedAt: Date.now(),
+            }
+
+            const newShapeData: ShapeLayerData = {
+                ...layer.shapeData,
+                shapes: updatedShapes,
+            }
+
+            return {
+                layers: updateLayerInTree(prevState.layers, layerId, { shapeData: newShapeData }),
+            }
+        }
+
+        if (history) updateState(updater)
+        else replaceState(updater)
+    }, [updateState, replaceState])
+
+    /**
+     * Render shape layer to a canvas (for display/export)
+     */
+    const renderShapeLayerToCanvas = useCallback((layerId: string): HTMLCanvasElement | null => {
+        const layer = findLayerById(layers, layerId)
+        if (!layer || layer.type !== 'shape' || !layer.shapeData) return null
+
+        return renderShapeLayer(layer.shapeData.shapes, canvasSize.width, canvasSize.height)
+    }, [layers, canvasSize])
 
     // --- Guide Actions ---
 
@@ -2337,7 +2659,18 @@ const modifyContent = useCallback((
             availableGradients,
             activeGradient,
             setActiveGradient,
-            importGradient
+            importGradient,
+
+            // Shape Layers
+            addShapeLayer,
+            addShapeToLayer,
+            updateShape,
+            deleteShape,
+            setActiveShape,
+            duplicateShape,
+            updateShapeFill,
+            updateShapeStroke,
+            renderShapeLayerToCanvas,
         }}>
             {children}
         </EditorContext.Provider>

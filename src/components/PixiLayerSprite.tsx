@@ -30,6 +30,7 @@ import {
     MotionBlurFilter
 } from 'pixi-filters'
 import type { Layer, LayerFilter, TransformData } from './EditorContext'
+import { renderShapeLayer } from '../utils/shapeUtils'
 
 // Register the Sprite component with @pixi/react
 extend({ Sprite })
@@ -242,29 +243,44 @@ function createPixiFilter(filter: LayerFilter): Filter | null {
 interface PixiLayerSpriteProps {
     layer: Layer
     transform?: TransformData
+    canvasSize?: { width: number; height: number }
 }
 
 /**
  * Renders a single editor layer as a Pixi.js Sprite with GPU-accelerated
  * blend modes and non-destructive filters.
+ * Supports regular raster layers, text layers, and shape layers.
  */
-export default function PixiLayerSprite({ layer, transform }: PixiLayerSpriteProps) {
+export default function PixiLayerSprite({ layer, transform, canvasSize }: PixiLayerSpriteProps) {
     const textureRef = useRef<Texture | null>(null)
+    const shapeCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
-    // ... (texture logic same)
+    // For shape layers, render shapes to a canvas
+    const shapeCanvas = useMemo(() => {
+        if (layer.type !== 'shape' || !layer.shapeData || !canvasSize) return null
+        
+        // Render shapes to canvas
+        const canvas = renderShapeLayer(layer.shapeData.shapes, canvasSize.width, canvasSize.height)
+        shapeCanvasRef.current = canvas
+        return canvas
+    }, [layer.type, layer.shapeData, canvasSize])
+
+    // Get the effective data source (either layer.data or shape canvas)
+    const layerData = layer.type === 'shape' ? shapeCanvas : layer.data
+
     // Create texture from the layer's HTMLCanvasElement data
     const texture = useMemo(() => {
         if (textureRef.current) {
             textureRef.current.destroy(true)
         }
-        if (!layer.data) {
+        if (!layerData) {
             textureRef.current = null
             return Texture.EMPTY
         }
-        const tex = Texture.from({ resource: layer.data, alphaMode: 'premultiply-alpha-on-upload' })
+        const tex = Texture.from({ resource: layerData, alphaMode: 'premultiply-alpha-on-upload' })
         textureRef.current = tex
         return tex
-    }, [layer.data])
+    }, [layerData])
 
     // ... (useEffect for update same)
     // When layer.data canvas content changes (but the same canvas object),

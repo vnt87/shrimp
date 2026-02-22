@@ -9,6 +9,7 @@ import PixiLayerSprite from './PixiLayerSprite'
 import SelectionOverlay from './SelectionOverlay'
 import CropOverlay from './CropOverlay'
 import PathOverlay from './PathOverlay'
+import ShapeOverlay from './ShapeOverlay'
 import GenFillModal from './GenFillModal'
 import ContentAwareFillModal from './ContentAwareFillModal'
 import type { ToolOptions } from '../App'
@@ -683,6 +684,9 @@ export default function Canvas({
         addLayer,
         genFillModalOpen,
         cafModalOpen,
+        // Shape layers
+        addShapeLayer,
+        addShapeToLayer,
     } = useEditor()
 
     const windowSize = useWindowSize()
@@ -1275,80 +1279,7 @@ export default function Canvas({
         return false
     }, [selection])
 
-    /**
-     * Helper to draw a shape onto a Canvas 2D context.
-     */
-    const drawShapeToCanvas = useCallback((ctx: CanvasRenderingContext2D, start: { x: number, y: number }, end: { x: number, y: number }, options: ToolOptions) => {
-        const x = Math.min(start.x, end.x)
-        const y = Math.min(start.y, end.y)
-        const width = Math.abs(end.x - start.x)
-        const height = Math.abs(end.y - start.y)
 
-        ctx.save()
-        ctx.fillStyle = foregroundColor
-        ctx.strokeStyle = foregroundColor
-        ctx.lineWidth = options.shapeStrokeWidth
-        ctx.lineJoin = 'round'
-
-        const type = options.shapeType
-        const fill = options.shapeFill
-        const stroke = options.shapeStroke
-
-        ctx.beginPath()
-        if (type === 'rect') {
-            const r = options.shapeCornerRadius
-            if (r > 0) {
-                ctx.roundRect(x, y, width, height, r)
-            } else {
-                ctx.rect(x, y, width, height)
-            }
-        } else if (type === 'ellipse') {
-            ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2)
-        } else if (type === 'line') {
-            ctx.moveTo(start.x, start.y)
-            ctx.lineTo(end.x, end.y)
-        } else if (type === 'polygon') {
-            const sides = options.shapeSides
-            const centerX = x + width / 2
-            const centerY = y + height / 2
-            const radiusX = width / 2
-            const radiusY = height / 2
-            for (let i = 0; i < sides; i++) {
-                const angle = (i / sides) * Math.PI * 2 - Math.PI / 2
-                const px = centerX + radiusX * Math.cos(angle)
-                const py = centerY + radiusY * Math.sin(angle)
-                if (i === 0) ctx.moveTo(px, py)
-                else ctx.lineTo(px, py)
-            }
-            ctx.closePath()
-        }
-
-        if (fill && type !== 'line') ctx.fill()
-        if (stroke || type === 'line') ctx.stroke()
-        ctx.restore()
-    }, [foregroundColor])
-
-    const drawShapeToLayer = useCallback((start: { x: number, y: number }, end: { x: number, y: number }, history: boolean = true) => {
-        if (!activeLayerId) return
-        const layer = layers.find(l => l.id === activeLayerId)
-        if (!layer || !layer.data || layer.locked) return
-
-        const ctx = layer.data.getContext('2d')
-        if (!ctx) return
-
-        // Convert canvas coords to layer coords
-        const lS = { x: start.x - layer.x, y: start.y - layer.y }
-        const lE = { x: end.x - layer.x, y: end.y - layer.y }
-
-        drawShapeToCanvas(ctx, lS, lE, toolOptions!)
-
-        // Trigger update
-        const newCanvas = document.createElement('canvas')
-        newCanvas.width = layer.data.width
-        newCanvas.height = layer.data.height
-        newCanvas.getContext('2d')?.drawImage(layer.data, 0, 0)
-        updateLayerData(activeLayerId, newCanvas, history)
-    }, [activeLayerId, layers, toolOptions, drawShapeToCanvas, updateLayerData])
 
     const renderGradientPreview = useCallback((endPoint: { x: number; y: number }, history: boolean) => {
         if (!activeLayerId || !gradientStart.current || !gradientBaseCanvas.current) return
@@ -2575,7 +2506,49 @@ export default function Canvas({
             const rect = viewportRef.getBoundingClientRect()
             const cX = (e.clientX - rect.left - transform.offsetX) / transform.scale
             const cY = (e.clientY - rect.top - transform.offsetY) / transform.scale
-            drawShapeToLayer(shapeStartPoint.current, { x: cX, y: cY }, true)
+            
+            // Calculate shape bounds
+            const start = shapeStartPoint.current
+            const x = Math.min(start.x, cX)
+            const y = Math.min(start.y, cY)
+            const width = Math.abs(cX - start.x)
+            const height = Math.abs(cY - start.y)
+            
+            // Only create shape if it has some size
+            if (width > 1 && height > 1) {
+                // Check if current active layer is a shape layer
+                const activeLayer = layers.find(l => l.id === activeLayerId)
+                let targetLayerId: string | null = null
+                
+                if (activeLayer?.type === 'shape') {
+                    // Add shape to existing shape layer
+                    targetLayerId = activeLayerId
+                } else {
+                    // Create a new shape layer
+                    targetLayerId = addShapeLayer('Shape')
+                }
+                
+                // Add the shape to the layer
+                if (targetLayerId) {
+                    const shapeType = toolOptions?.shapeType || 'rect'
+                    
+                    addShapeToLayer(targetLayerId, shapeType as any, {
+                        x,
+                        y,
+                        width,
+                        height,
+                        cornerRadius: toolOptions?.shapeCornerRadius ?? 0,
+                        sides: toolOptions?.shapeSides ?? 5,
+                        fill: toolOptions?.shapeFill ? { color: foregroundColor, opacity: 1 } : undefined,
+                        stroke: toolOptions?.shapeStroke || shapeType === 'line' ? { 
+                            color: foregroundColor, 
+                            width: toolOptions?.shapeStrokeWidth ?? 2, 
+                            opacity: 1 
+                        } : undefined,
+                    })
+                }
+            }
+            
             isDrawingShape.current = false
             shapeStartPoint.current = null
             setShapePreview(null)
@@ -2879,12 +2852,19 @@ export default function Canvas({
                                         pointerEvents: 'none',
                                     }}
                                 >
-                                    {activeTool === 'paths' && (
+                                {activeTool === 'paths' && (
                                         <div style={{ pointerEvents: 'auto' }}>
                                             <PathOverlay
                                                 zoomLevel={transform.scale}
                                                 toolOptions={toolOptions}
                                             />
+                                        </div>
+                                    )}
+
+                                    {/* Shape Selection Overlay */}
+                                    {activeTool === 'shapes' && (
+                                        <div style={{ pointerEvents: 'auto' }}>
+                                            <ShapeOverlay zoomLevel={transform.scale} />
                                         </div>
                                     )}
                                 </div>

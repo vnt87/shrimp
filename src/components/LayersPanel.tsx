@@ -26,6 +26,7 @@ import { getFilterCatalogEntry, isSupportedFilterType } from '../data/filterCata
 import { useLanguage } from '../i18n/LanguageContext'
 import { TranslationKey } from '../i18n/en'
 import { useIntegrationStore } from '../hooks/useIntegrationStore'
+import { renderShapeLayer } from '../utils/shapeUtils'
 
 // --- Layer Thumbnail ---
 function LayerThumbnail({ layer }: { layer: Layer }) {
@@ -42,7 +43,11 @@ function LayerThumbnail({ layer }: { layer: Layer }) {
         canvas.height = 64
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-        if (layer.data) {
+        if (layer.type === 'shape' && layer.shapeData) {
+            // Render shapes to thumbnail
+            const shapeCanvas = renderShapeLayer(layer.shapeData.shapes, 64, 64)
+            ctx.drawImage(shapeCanvas, 0, 0)
+        } else if (layer.data) {
             const hRatio = canvas.width / layer.data.width
             const vRatio = canvas.height / layer.data.height
             const ratio = Math.min(hRatio, vRatio)
@@ -54,7 +59,7 @@ function LayerThumbnail({ layer }: { layer: Layer }) {
 
             ctx.drawImage(layer.data, 0, 0, layer.data.width, layer.data.height, x, y, w, h)
         }
-    }, [layer.data])
+    }, [layer.data, layer.type, layer.shapeData])
 
     return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 }
