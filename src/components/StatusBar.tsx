@@ -1,13 +1,36 @@
 import { useEditor, Layer } from './EditorContext'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useHistoryMemory, getMemoryPressure, getMemoryPressureColor } from '../hooks/useHistoryMemory'
+
+// Helper to get memory limit from preferences
+const getMemoryLimitMB = (): number => {
+    try {
+        const stored = localStorage.getItem('shrimp_preferences')
+        if (stored) {
+            const prefs = JSON.parse(stored)
+            if (prefs.historyMemoryMB && typeof prefs.historyMemoryMB === 'number') {
+                return Math.max(100, prefs.historyMemoryMB)
+            }
+        }
+    } catch {
+        // Ignore errors
+    }
+    return 500 // Default
+}
 
 export default function StatusBar({
     cursorPos,
 }: {
     cursorPos: { x: number; y: number } | null
 }) {
-    const { activeLayerId, layers, canvasSize } = useEditor()
+    const { activeLayerId, layers, canvasSize, documents, activeDocumentId } = useEditor()
     const { t } = useLanguage()
+    
+    // Monitor memory usage with limit from preferences
+    const memoryLimitMB = getMemoryLimitMB()
+    const memoryStats = useHistoryMemory(documents, activeDocumentId, memoryLimitMB)
+    const memoryPressure = getMemoryPressure(memoryStats.totalMB, memoryStats.maxMB)
+    const memoryColor = getMemoryPressureColor(memoryPressure)
 
     const findLayerById = (layers: Layer[], id: string): Layer | null => {
         for (const layer of layers) {
@@ -86,6 +109,20 @@ export default function StatusBar({
             </div>
             <div className="status-spacer" />
             <div className="status-group" style={{ marginRight: 8 }}>
+                {/* Memory indicator */}
+                <span 
+                    className="status-text" 
+                    style={{ color: memoryColor, cursor: 'default' }}
+                    title={`History memory: ${memoryStats.totalMB.toFixed(1)} MB\nHistory entries: ${memoryStats.entryCount}\nMax limit: ${memoryStats.maxMB} MB`}
+                >
+                    💾 {memoryStats.totalMB.toFixed(0)} MB
+                </span>
+                {memoryPressure === 'high' || memoryPressure === 'critical' ? (
+                    <span className="status-text" style={{ color: memoryColor, marginLeft: 4 }} title="Memory pressure is high. Consider reducing undo levels.">
+                        ⚠️
+                    </span>
+                ) : null}
+                <span className="status-separator" style={{ margin: '0 8px', opacity: 0.3 }}>|</span>
                 <span className="status-text">{canvasSize.width} x {canvasSize.height}</span>
             </div>
         </footer>

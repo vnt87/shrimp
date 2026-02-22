@@ -21,6 +21,7 @@ interface SidebarItem {
 interface PrefsState {
     // History
     undoLevels: number
+    historyMemoryMB: number
     // Color management
     colorProfile: string
     renderIntent: string
@@ -37,6 +38,7 @@ interface PrefsState {
 
 const defaultPrefs: PrefsState = {
     undoLevels: 50,
+    historyMemoryMB: 500,
     colorProfile: 'sRGB IEC61966-2.1',
     renderIntent: 'Relative Colorimetric',
     softProofing: false,
@@ -298,19 +300,36 @@ function PrefSelect({ value, options, onChange, width }: { value: string; option
 
 function HistoryPage({ prefs, update }: { prefs: PrefsState; update: UpdateFn }) {
     return (
-        <PrefSection title="History Limits">
-            <PrefRow label="Maximum history entries:">
-                <PrefSpinner value={prefs.undoLevels} onChange={(v) => update('undoLevels', v)} width={70} />
-            </PrefRow>
-            <div className="pref-info">
-                <strong>Recommended values:</strong><br />
-                • 20-30: Basic usage, limited memory<br />
-                • 50: Default, balanced performance<br />
-                • 100+: Power users, more memory usage<br />
-                <br />
-                Higher values allow more undo steps but consume more memory.
-            </div>
-        </PrefSection>
+        <>
+            <PrefSection title="History Limits">
+                <PrefRow label="Maximum history entries:">
+                    <PrefSpinner value={prefs.undoLevels} onChange={(v) => update('undoLevels', Math.max(1, Math.min(200, v)))} width={70} />
+                </PrefRow>
+                <PrefRow label="Memory limit (MB):">
+                    <PrefSpinner value={prefs.historyMemoryMB} onChange={(v) => update('historyMemoryMB', Math.max(100, Math.min(2000, v)))} width={90} />
+                </PrefRow>
+                <div className="pref-info">
+                    <strong>Recommended values:</strong><br />
+                    • 20-30 entries: Basic usage, limited memory<br />
+                    • 50 entries: Default, balanced performance<br />
+                    • 100+ entries: Power users, more memory usage<br />
+                    <br />
+                    <strong>Memory limit:</strong><br />
+                    • 200-300 MB: Small canvases<br />
+                    • 500 MB: Default, works for most cases<br />
+                    • 1000+ MB: Large documents with many layers<br />
+                    <br />
+                    Higher values allow more undo steps but consume more memory.
+                    Changes take effect after restarting the app.
+                </div>
+            </PrefSection>
+            <PrefSection title="History Storage">
+                <div className="pref-info">
+                    History is automatically saved with your document.
+                    When memory limit is reached, older history entries are automatically removed.
+                </div>
+            </PrefSection>
+        </>
     )
 }
 

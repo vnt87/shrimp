@@ -10,6 +10,7 @@ import RightPanel from './components/RightPanel'
 import StatusBar from './components/StatusBar'
 import DocumentTabs from './components/DocumentTabs'
 import { LayoutProvider } from './components/LayoutContext'
+import { ErrorBoundary, CanvasErrorBoundary } from './components/ErrorBoundary'
 
 export interface ToolOptions {
     brushSize: number
@@ -262,33 +263,37 @@ export default function App() {
     }, [])
 
     return (
-        <ThemeProvider>
-            <PresetsProvider>
-                <LayoutProvider>
-                    <EditorProvider>
-                        <CopyPasteHandler>
-                            <div className="app">
-                                <Header onToolSelect={setActiveTool} />
-                                <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
-                                <div className="main-content">
-                                    <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
-                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
-                                        <DocumentTabs />
-                                        <Canvas
-                                            onCursorMove={setCursorPos}
-                                            activeTool={activeTool}
-                                            onToolChange={setActiveTool}
-                                            toolOptions={toolOptions}
-                                        />
+        <ErrorBoundary>
+            <ThemeProvider>
+                <PresetsProvider>
+                    <LayoutProvider>
+                        <EditorProvider>
+                            <CopyPasteHandler>
+                                <div className="app">
+                                    <Header onToolSelect={setActiveTool} />
+                                    <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
+                                    <div className="main-content">
+                                        <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
+                                            <DocumentTabs />
+                                            <CanvasErrorBoundary>
+                                                <Canvas
+                                                    onCursorMove={setCursorPos}
+                                                    activeTool={activeTool}
+                                                    onToolChange={setActiveTool}
+                                                    toolOptions={toolOptions}
+                                                />
+                                            </CanvasErrorBoundary>
+                                        </div>
+                                        <RightPanel />
                                     </div>
-                                    <RightPanel />
+                                    <StatusBar cursorPos={cursorPos} />
                                 </div>
-                                <StatusBar cursorPos={cursorPos} />
-                            </div>
-                        </CopyPasteHandler>
-                    </EditorProvider>
-                </LayoutProvider>
-            </PresetsProvider>
-        </ThemeProvider>
+                            </CopyPasteHandler>
+                        </EditorProvider>
+                    </LayoutProvider>
+                </PresetsProvider>
+            </ThemeProvider>
+        </ErrorBoundary>
     )
 }
