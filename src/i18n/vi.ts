@@ -43,6 +43,12 @@ export const vi: Record<TranslationKey, string> = {
     'menu.file.close': 'Đóng',
     'menu.file.close_all': 'Đóng tất cả',
 
+    // Confirmation Dialog
+    'dialog.confirm.close_document.title': 'Đóng tài liệu',
+    'dialog.confirm.close_document.message': 'Bạn có chắc chắn muốn đóng "{name}"? Mọi thay đổi chưa lưu sẽ bị mất.',
+    'dialog.confirm.close_document.confirm': 'Đóng',
+    'dialog.confirm.close_document.cancel': 'Hủy',
+
     'menu.edit': 'Chỉnh sửa',
     'menu.edit.undo': 'Hoàn tác',
     'menu.edit.redo': 'Làm lại',

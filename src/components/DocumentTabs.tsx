@@ -1,5 +1,8 @@
 import { useEditor } from './EditorContext'
 import { X, Plus } from 'lucide-react'
+import { useState } from 'react'
+import ConfirmationDialog from './ConfirmationDialog'
+import { useLanguage } from '../i18n/LanguageContext'
 
 export default function DocumentTabs() {
     const {
@@ -9,6 +12,9 @@ export default function DocumentTabs() {
         closeDocument,
         addDocument
     } = useEditor()
+    const { t } = useLanguage()
+
+    const [docToClose, setDocToClose] = useState<{ id: string, name: string } | null>(null)
 
     return (
         <div className="document-tabs">
@@ -27,7 +33,7 @@ export default function DocumentTabs() {
                                 className="tab-close-btn"
                                 onClick={(e) => {
                                     e.stopPropagation()
-                                    closeDocument(doc.id)
+                                    setDocToClose({ id: doc.id, name: doc.name })
                                 }}
                             >
                                 <X size={12} />
@@ -43,6 +49,21 @@ export default function DocumentTabs() {
             >
                 <Plus size={14} />
             </button>
+
+            {docToClose && (
+                <ConfirmationDialog
+                    title={t('dialog.confirm.close_document.title')}
+                    message={t('dialog.confirm.close_document.message').replace('{name}', docToClose.name)}
+                    confirmLabel={t('dialog.confirm.close_document.confirm')}
+                    cancelLabel={t('dialog.confirm.close_document.cancel')}
+                    confirmVariant="danger"
+                    onConfirm={() => {
+                        closeDocument(docToClose.id)
+                        setDocToClose(null)
+                    }}
+                    onCancel={() => setDocToClose(null)}
+                />
+            )}
         </div>
     )
 }

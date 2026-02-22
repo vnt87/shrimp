@@ -41,6 +41,12 @@ export const en = {
     'menu.file.close': 'Close',
     'menu.file.close_all': 'Close All',
 
+    // Confirmation Dialog
+    'dialog.confirm.close_document.title': 'Close Document',
+    'dialog.confirm.close_document.message': 'Are you sure you want to close "{name}"? Any unsaved changes will be lost.',
+    'dialog.confirm.close_document.confirm': 'Close',
+    'dialog.confirm.close_document.cancel': 'Cancel',
+
     'menu.edit': 'Edit',
     'menu.edit.undo': 'Undo',
     'menu.edit.redo': 'Redo',

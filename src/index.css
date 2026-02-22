@@ -33,6 +33,7 @@
   /* Accent/indicator colors */
   --accent-active: #5294e2;
   --accent-selected: #4a6fa5;
+  --accent-danger: #cc4444;
   --accent-indicator: #f0a030;
   --accent-warning: #f0c040;
   --color-fg: #ffffff;
@@ -94,6 +95,7 @@
   --pref-close-hover: #cc4444;
   --pref-btn-primary-hover: #6aa4ea;
   --pref-btn-secondary-hover: #4a4a4a;
+  --pref-btn-danger-hover: #e05555;
 
   /* Spacing */
   --sp-1: 1px;
@@ -173,6 +175,7 @@
   /* Accent/indicator colors */
   --accent-active: #3b7dd8;
   --accent-selected: #4a6fa5;
+  --accent-danger: #e04040;
   --accent-indicator: #d48a20;
   --accent-warning: #d4a020;
   --color-fg: #000000;
@@ -232,6 +235,7 @@
   --pref-close-hover: #e04040;
   --pref-btn-primary-hover: #5a90e0;
   --pref-btn-secondary-hover: #d8d8d8;
+  --pref-btn-danger-hover: #f05050;
 }
 
 /* ===== Reset ===== */
@@ -2641,6 +2645,16 @@ body,
 .pref-btn-secondary:hover {
   background: var(--pref-btn-secondary-hover);
   border-color: var(--text-muted);
+}
+
+.pref-btn-danger {
+  background: var(--accent-danger);
+  color: white;
+  border-color: var(--accent-danger);
+}
+
+.pref-btn-danger:hover {
+  background: var(--pref-btn-danger-hover);
 }
 
 /* Crop Overlay */

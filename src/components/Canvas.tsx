@@ -2456,12 +2456,30 @@ export default function Canvas({
         // Finish drawing stroke
         if (isDrawing.current && activeLayerId) {
 
+            // Helper function to clone canvas for proper history tracking
+            const cloneCanvasForHistory = (sourceCanvas: HTMLCanvasElement): HTMLCanvasElement => {
+                const newCanvas = document.createElement('canvas')
+                newCanvas.width = sourceCanvas.width
+                newCanvas.height = sourceCanvas.height
+                const newCtx = newCanvas.getContext('2d')
+                newCtx?.drawImage(sourceCanvas, 0, 0)
+                return newCanvas
+            }
+
             if (activeTool === 'brush') {
                 brushEngine.endStroke()
-                // Force update layer data
+                // Clone the canvas to enable proper history tracking
                 const layer = layers.find(l => l.id === activeLayerId)
                 if (layer && layer.data) {
-                    updateLayerData(activeLayerId, layer.data, true)
+                    const newCanvas = cloneCanvasForHistory(layer.data)
+                    updateLayerData(activeLayerId, newCanvas, true)
+                }
+            } else if (activeTool === 'pencil' || activeTool === 'eraser' || activeTool === 'clone' || activeTool === 'smudge' || activeTool === 'blur-sharpen' || activeTool === 'dodge-burn') {
+                // Clone canvas for all drawing tools to enable proper history tracking
+                const layer = layers.find(l => l.id === activeLayerId)
+                if (layer && layer.data) {
+                    const newCanvas = cloneCanvasForHistory(layer.data)
+                    updateLayerData(activeLayerId, newCanvas, true)
                 }
             } else {
                 const layer = layers.find(l => l.id === activeLayerId)

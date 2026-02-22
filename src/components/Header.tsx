@@ -25,6 +25,7 @@ import { useLanguage } from '../i18n/LanguageContext'
 import { useIntegrationStore } from '../hooks/useIntegrationStore'
 const FiltersDialog = lazy(() => import('./FiltersDialog'))
 const ExportDialog = lazy(() => import('./ExportDialog'))
+import ConfirmationDialog from './ConfirmationDialog'
 
 import { MENU_TOOL_GROUPS, shortcuts, toolGroups } from '../data/tools'
 import { FILTER_CATALOG, isSupportedFilterType } from '../data/filterCatalog'
@@ -61,6 +62,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const [showIntegrations, setShowIntegrations] = useState(false)
     const [showFilters, setShowFilters] = useState(false)
     const [showExport, setShowExport] = useState(false)
+    const [showCloseConfirm, setShowCloseConfirm] = useState(false)
     const [initialFilterType, setInitialFilterType] = useState<LayerFilter['type']>('blur')
     const menuRef = useRef<HTMLDivElement>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
@@ -370,8 +372,10 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             case 'Export As JPEG': exportImage('jpeg'); break
             case 'Export As WebP': exportImage('webp'); break
             case 'Export...': setShowExport(true); break
-            case 'Close': closeImage(); break
-            case 'Close All': closeImage(); break
+            case 'Close':
+            case 'Close All':
+                setShowCloseConfirm(true)
+                break
             case 'Undo': undo(); break
             case 'Redo': redo(); break
             case 'Cut': /* Implement cut */ break
@@ -726,6 +730,20 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
                 }} />}
                 {showFilters && <FiltersDialog initialFilterType={initialFilterType} onClose={() => setShowFilters(false)} />}
                 {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
+                {showCloseConfirm && activeDocument && (
+                    <ConfirmationDialog
+                        title={t('dialog.confirm.close_document.title')}
+                        message={t('dialog.confirm.close_document.message').replace('{name}', activeDocument.name)}
+                        confirmLabel={t('dialog.confirm.close_document.confirm')}
+                        cancelLabel={t('dialog.confirm.close_document.cancel')}
+                        confirmVariant="danger"
+                        onConfirm={() => {
+                            closeImage()
+                            setShowCloseConfirm(false)
+                        }}
+                        onCancel={() => setShowCloseConfirm(false)}
+                    />
+                )}
             </Suspense>
         </>
     )

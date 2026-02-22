@@ -1689,30 +1689,6 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     // --- Copy/Paste Actions ---
     
-    // Helper to check if a point is inside a selection
-    const isPointInSelection = (x: number, y: number, sel: Selection): boolean => {
-        if (sel.type === 'rect') {
-            return x >= sel.x && x < sel.x + sel.width && y >= sel.y && y < sel.y + sel.height
-        } else if (sel.type === 'ellipse') {
-            const cx = sel.x + sel.width / 2
-            const cy = sel.y + sel.height / 2
-            const rx = Math.abs(sel.width) / 2
-            const ry = Math.abs(sel.height) / 2
-            if (rx === 0 || ry === 0) return false
-            return Math.pow((x - cx) / rx, 2) + Math.pow((y - cy) / ry, 2) <= 1
-        } else if (sel.type === 'path' && sel.path) {
-            // Ray casting algorithm for polygon
-            let inside = false
-            for (let i = 0, j = sel.path.length - 1; i < sel.path.length; j = i++) {
-                const xi = sel.path[i].x, yi = sel.path[i].y
-                const xj = sel.path[j].x, yj = sel.path[j].y
-                const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
-                if (intersect) inside = !inside
-            }
-            return inside
-        }
-        return false
-    }
 
     // Copy selection to clipboard
     // merged: false = copy active layer only, true = copy merged (all visible layers)
