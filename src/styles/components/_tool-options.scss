@@ -1,0 +1,217 @@
+@use '../abstracts/mixins' as *;
+
+// ===== Tool Options Bar =====
+
+.tool-options {
+  height: var(--tooloptions-h);
+  background: var(--bg-toolbar);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border-main);
+  gap: 0;
+}
+
+.tool-options-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+}
+
+.tool-options-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  margin-right: 5px;
+  white-space: nowrap;
+}
+
+.tool-options-icon-btn {
+  @include icon-btn-base(20px);
+
+  &:hover {
+    @include active-overlay;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+  }
+}
+
+.tool-options-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border-input);
+  margin: 0 5px;
+  flex-shrink: 0;
+}
+
+.tool-options-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  margin: 0 5px;
+
+  .checkbox-box {
+    width: 16px;
+    height: 16px;
+    @include flex-center;
+    flex-shrink: 0;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    &.checked svg {
+      color: var(--accent-active);
+    }
+
+    &.unchecked svg {
+      color: var(--checkbox-unchecked);
+    }
+  }
+
+  span {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+}
+
+.tool-options-checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  margin: 0 5px;
+  white-space: nowrap;
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--border-input);
+    border-radius: 3px;
+    background: var(--bg-input);
+    display: grid;
+    place-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    @include transition(background-color, border-color);
+
+    &::before {
+      content: "";
+      width: 8px;
+      height: 5px;
+      border-left: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      transform: rotate(-45deg) scale(0);
+      transform-origin: center;
+      @include transition(transform);
+    }
+
+    &:checked {
+      background: var(--accent-active);
+      border-color: var(--accent-active);
+
+      &::before {
+        transform: rotate(-45deg) scale(1);
+      }
+    }
+  }
+
+  label {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    line-height: 1;
+    cursor: pointer;
+  }
+}
+
+.tool-options-slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .slider-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+}
+
+.tool-options-slider {
+  width: 105px;
+  height: 12px;
+  @include slider-base;
+
+  &::-webkit-slider-thumb {
+    @include slider-thumb;
+  }
+}
+
+.tool-options-number-input {
+  width: 50px;
+  height: 22px;
+  font-size: 11px;
+  text-align: center;
+  @include input-base;
+  padding: 0 4px;
+
+  &:focus {
+    border-color: var(--accent-active);
+  }
+}
+
+.slider-unit {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-left: -4px;
+}
+
+.slider-value {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 32px;
+  text-align: right;
+}
+
+.tool-options-dropdown {
+  display: flex;
+  align-items: center;
+  @include input-base;
+  padding: 0 8px;
+  height: 22px;
+  gap: 4px;
+  cursor: pointer;
+
+  span {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+}
+
+// Spinner keyframe used by the gen-fill loading indicator
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,17 @@
+// ===== App Layout =====
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: var(--header-h) var(--tooloptions-h) 1fr var(--statusbar-h);
+  grid-template-columns: 1fr;
+  overflow: hidden;
+}
+
+.main-content {
+  display: grid;
+  grid-template-columns: var(--toolbox-w) 1fr var(--panel-w);
+  overflow: hidden;
+  min-height: 0;
+}

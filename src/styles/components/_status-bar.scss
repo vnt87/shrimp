@@ -1,0 +1,30 @@
+// ===== Status Bar =====
+
+.status-bar {
+  height: var(--statusbar-h);
+  background: var(--bg-status);
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 105px;
+  border-top: 1px solid var(--border-main);
+  gap: 0;
+  overflow: hidden;
+}
+
+.status-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 30px;
+  white-space: nowrap;
+}
+
+.status-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+}
+
+.status-spacer {
+  flex: 1;
+}

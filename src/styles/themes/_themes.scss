@@ -1,0 +1,97 @@
+// ===== Light Theme =====
+
+[data-theme="light"] {
+  // Surface colors
+  --bg-app: #e8e8e8;
+  --bg-header: #f0f0f0;
+  --bg-toolbar: #f0f0f0;
+  --bg-panel: #f5f5f5;
+  --bg-canvas: #e8e8e8;
+  --bg-input: #ffffff;
+  --bg-tab-active: #f5f5f5;
+  --bg-tab-inactive: #e0e0e0;
+  --bg-layer-hover: #e8e8e8;
+  --bg-layer-selected: #d4e4f4;
+  --bg-status: #f0f0f0;
+  --bg-ruler: #ebebeb;
+  --bg-brush-cell: #e0e0e0;
+  --bg-scrollbar-track: transparent;
+  --bg-scrollbar-thumb: #bbbbbb;
+
+  // Text colors
+  --text-primary: #2c2c2c;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --text-active: #111111;
+
+  // Border colors
+  --border-main: #c8c8c8;
+  --border-subtle: #d8d8d8;
+  --border-input: #bbbbbb;
+  --border-divider: #d8d8d8;
+
+  // Accent/indicator colors
+  --accent-active: #3b7dd8;
+  --accent-selected: #4a6fa5;
+  --accent-danger: #e04040;
+  --accent-indicator: #d48a20;
+  --accent-warning: #d4a020;
+  --color-fg: #000000;
+  --color-bg: #ffffff;
+
+  // Histogram
+  --hist-1: rgba(50, 90, 180, 0.5);
+  --hist-2: rgba(60, 150, 90, 0.4);
+  --hist-3: rgba(180, 140, 40, 0.4);
+  --hist-4: rgba(180, 60, 60, 0.35);
+  --hist-5: rgba(140, 60, 180, 0.3);
+
+  // Toggle / checkbox
+  --toggle-on: #3b7dd8;
+  --toggle-off: #bbbbbb;
+  --checkbox-checked: #3b7dd8;
+  --checkbox-unchecked: #bbbbbb;
+
+  // Overlay / hover / shadow
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --active-overlay: rgba(0, 0, 0, 0.06);
+  --strong-overlay: rgba(0, 0, 0, 0.1);
+  --subtle-overlay: rgba(0, 0, 0, 0.03);
+  --border-overlay: rgba(0, 0, 0, 0.1);
+  --border-overlay-hover: rgba(0, 0, 0, 0.16);
+  --shortcut-hover: rgba(255, 255, 255, 0.9);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-settings: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-card-inset: 0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  --shadow-canvas-img: 0 2px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  --shadow-dialog: 0 12px 40px rgba(0, 0, 0, 0.2);
+  --overlay-bg: rgba(0, 0, 0, 0.3);
+  --histogram-grid: rgba(0, 0, 0, 0.06);
+
+  // Canvas checkerboard
+  --canvas-check-1: #dddddd;
+  --canvas-check-2: #cccccc;
+
+  // Empty state card
+  --empty-card-bg: rgba(255, 255, 255, 0.9);
+  --empty-card-border: rgba(0, 0, 0, 0.08);
+  --empty-btn-bg: rgba(0, 0, 0, 0.03);
+  --empty-btn-border: rgba(0, 0, 0, 0.1);
+  --empty-btn-hover-bg: rgba(0, 0, 0, 0.06);
+  --empty-btn-hover-border: rgba(0, 0, 0, 0.16);
+  --empty-btn-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --empty-btn-primary-bg: linear-gradient(135deg, rgba(59, 125, 216, 0.15), rgba(59, 125, 216, 0.08));
+  --empty-btn-primary-border: rgba(59, 125, 216, 0.35);
+  --empty-btn-primary-hover-bg: linear-gradient(135deg, rgba(59, 125, 216, 0.25), rgba(59, 125, 216, 0.12));
+  --empty-btn-primary-hover-border: rgba(59, 125, 216, 0.5);
+  --empty-btn-primary-hover-shadow: 0 4px 16px rgba(59, 125, 216, 0.12);
+
+  // Hardcoded colors
+  --pref-titlebar-bg: #e0e0e0;
+  --pref-sidebar-bg: #eaeaea;
+  --pref-close-hover: #e04040;
+  --pref-btn-primary-hover: #5a90e0;
+  --pref-btn-secondary-hover: #d8d8d8;
+  --pref-btn-danger-hover: #f05050;
+}

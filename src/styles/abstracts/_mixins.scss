@@ -1,0 +1,239 @@
+// ===== SHRIMP Design System Mixins =====
+
+// Flexbox utilities
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-row-center {
+  display: flex;
+  align-items: center;
+}
+
+// Transition helper
+@mixin transition($properties...) {
+  transition: $properties var(--transition);
+}
+
+// Hover overlay effect
+@mixin hover-overlay {
+  background: var(--hover-overlay);
+}
+
+@mixin active-overlay {
+  background: var(--active-overlay);
+}
+
+// Input base styles
+@mixin input-base {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-ui);
+}
+
+@mixin input-transparent {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+// Panel/dialog base
+@mixin panel-base {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+}
+
+// Icon button base
+@mixin icon-btn-base($size: 20px) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: $size;
+  height: $size;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  @include transition(background);
+}
+
+@mixin icon-btn-hover {
+  &:hover {
+    @include active-overlay;
+  }
+  
+  &:disabled,
+  &.disabled {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
+  }
+}
+
+// Scrollbar styles
+@mixin custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--bg-scrollbar-thumb);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-secondary);
+  }
+}
+
+@mixin hide-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  scrollbar-width: none;
+}
+
+// Text ellipsis
+@mixin text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Dropdown base
+@mixin dropdown-base {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  box-shadow: var(--shadow-dropdown);
+  border-radius: var(--radius-md);
+}
+
+// Dropdown item
+@mixin dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  @include transition(background);
+
+  &:hover {
+    background: var(--accent-active);
+    color: white;
+  }
+}
+
+// Dialog titlebar
+@mixin dialog-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 10px;
+  background: var(--pref-titlebar-bg);
+  border-bottom: 1px solid var(--border-main);
+  flex-shrink: 0;
+}
+
+@mixin dialog-titlebar-text {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+@mixin dialog-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  @include transition(background, color);
+
+  &:hover {
+    background: var(--pref-close-hover);
+    color: white;
+  }
+}
+
+// Button base
+@mixin btn-base {
+  height: 26px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border: 1px solid var(--border-main);
+  @include transition(background, border-color, color);
+}
+
+@mixin btn-primary {
+  background: var(--accent-active);
+  color: white;
+  border-color: var(--accent-active);
+
+  &:hover {
+    background: var(--pref-btn-primary-hover);
+  }
+}
+
+@mixin btn-secondary {
+  background: var(--bg-input);
+  color: var(--text-primary);
+
+  &:hover {
+    background: var(--pref-btn-secondary-hover);
+    border-color: var(--text-muted);
+  }
+}
+
+@mixin btn-danger {
+  background: var(--accent-danger);
+  color: white;
+  border-color: var(--accent-danger);
+
+  &:hover {
+    background: var(--pref-btn-danger-hover);
+  }
+}
+
+// Slider base
+@mixin slider-base {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  outline: none;
+}
+
+@mixin slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  cursor: pointer;
+}

@@ -1,0 +1,153 @@
+@use '../abstracts/mixins' as *;
+
+// ===== Toolbox =====
+
+.toolbox {
+  width: var(--toolbox-w);
+  background: var(--bg-toolbar);
+  border-right: 1px solid var(--border-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 6px;
+  overflow: hidden;
+}
+
+.toolbox-tools {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.toolbox-handle {
+  width: 10px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--text-muted);
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.toolbox-item {
+  width: 30px;
+  height: 30px;
+  @include flex-center;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  margin: 2px 0;
+  position: relative;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--hover-overlay);
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    color: var(--text-secondary);
+  }
+
+  &.active {
+    background: var(--active-overlay);
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: -7px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--accent-active);
+    }
+  }
+}
+
+.toolbox-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border-divider);
+  margin: 5px 0;
+  flex-shrink: 0;
+}
+
+.toolbox-colors {
+  margin-top: 0;
+  margin-bottom: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-divider);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.toolbox-color-swatches {
+  width: 31px;
+  height: 31px;
+  position: relative;
+  cursor: pointer;
+}
+
+.toolbox-color-fg {
+  width: 20px;
+  height: 20px;
+  background: var(--color-fg);
+  border: 2px solid var(--text-secondary);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  border-radius: 50%;
+}
+
+.toolbox-color-bg {
+  width: 20px;
+  height: 20px;
+  background: var(--color-bg);
+  border: 2px solid var(--text-secondary);
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  z-index: 1;
+  border-radius: 50%;
+}
+
+.toolbox-color-actions {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+}
+
+// Custom Tooltip
+.custom-tooltip {
+  position: fixed;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-dropdown);
+  transform: translateY(-50%);
+}

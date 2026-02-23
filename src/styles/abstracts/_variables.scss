@@ -1,0 +1,142 @@
+// ===== SHRIMP Design System Variables =====
+
+:root {
+  // Surface colors
+  --bg-app: #1a1a1a;
+  --bg-header: #2b2b2b;
+  --bg-toolbar: #2b2b2b;
+  --bg-panel: #2b2b2b;
+  --bg-canvas: #3a3a3a;
+  --bg-input: #3c3c3c;
+  --bg-tab-active: #2b2b2b;
+  --bg-tab-inactive: #1e1e1e;
+  --bg-layer-hover: #333333;
+  --bg-layer-selected: #2a3a4a;
+  --bg-status: #2b2b2b;
+  --bg-ruler: #2b2b2b;
+  --bg-brush-cell: #1e1e1e;
+  --bg-scrollbar-track: transparent;
+  --bg-scrollbar-thumb: #555555;
+
+  // Text colors
+  --text-primary: #d4d4d4;
+  --text-secondary: #949494;
+  --text-muted: #6e6e6e;
+  --text-active: #ffffff;
+
+  // Border colors
+  --border-main: #444444;
+  --border-subtle: #3a3a3a;
+  --border-input: #555555;
+  --border-divider: #3a3a3a;
+
+  // Accent/indicator colors
+  --accent-active: #5294e2;
+  --accent-selected: #4a6fa5;
+  --accent-danger: #cc4444;
+  --accent-indicator: #f0a030;
+  --accent-warning: #f0c040;
+  --color-fg: #ffffff;
+  --color-bg: #000000;
+
+  // Histogram stacked area colors
+  --hist-1: rgba(80, 120, 200, 0.5);
+  --hist-2: rgba(100, 180, 120, 0.4);
+  --hist-3: rgba(200, 160, 60, 0.4);
+  --hist-4: rgba(200, 80, 80, 0.35);
+  --hist-5: rgba(160, 80, 200, 0.3);
+
+  // Toggle colors
+  --toggle-on: #5294e2;
+  --toggle-off: #555555;
+
+  // Checkbox colors
+  --checkbox-checked: #5294e2;
+  --checkbox-unchecked: #555555;
+
+  // Overlay / hover / shadow colors (theme-aware)
+  --hover-overlay: rgba(255, 255, 255, 0.06);
+  --active-overlay: rgba(255, 255, 255, 0.08);
+  --strong-overlay: rgba(255, 255, 255, 0.15);
+  --subtle-overlay: rgba(255, 255, 255, 0.04);
+  --border-overlay: rgba(255, 255, 255, 0.1);
+  --border-overlay-hover: rgba(255, 255, 255, 0.16);
+  --shortcut-hover: rgba(255, 255, 255, 0.8);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-settings: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --shadow-card-inset: 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  --shadow-canvas-img: 0 2px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.2);
+  --shadow-dialog: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+  --histogram-grid: rgba(255, 255, 255, 0.04);
+
+  // Canvas checkerboard
+  --canvas-check-1: #323232;
+  --canvas-check-2: #2a2a2a;
+
+  // Empty state card
+  --empty-card-bg: rgba(43, 43, 43, 0.85);
+  --empty-card-border: rgba(255, 255, 255, 0.06);
+  --empty-btn-bg: rgba(255, 255, 255, 0.04);
+  --empty-btn-border: rgba(255, 255, 255, 0.1);
+  --empty-btn-hover-bg: rgba(255, 255, 255, 0.08);
+  --empty-btn-hover-border: rgba(255, 255, 255, 0.16);
+  --empty-btn-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --empty-btn-primary-bg: linear-gradient(135deg, rgba(82, 148, 226, 0.2), rgba(82, 148, 226, 0.1));
+  --empty-btn-primary-border: rgba(82, 148, 226, 0.3);
+  --empty-btn-primary-hover-bg: linear-gradient(135deg, rgba(82, 148, 226, 0.3), rgba(82, 148, 226, 0.15));
+  --empty-btn-primary-hover-border: rgba(82, 148, 226, 0.45);
+  --empty-btn-primary-hover-shadow: 0 4px 16px rgba(82, 148, 226, 0.15);
+
+  // Hardcoded dark-mode colors
+  --pref-titlebar-bg: #222222;
+  --pref-sidebar-bg: #1e1e1e;
+  --pref-close-hover: #cc4444;
+  --pref-btn-primary-hover: #6aa4ea;
+  --pref-btn-secondary-hover: #4a4a4a;
+  --pref-btn-danger-hover: #e05555;
+
+  // Spacing
+  --sp-1: 1px;
+  --sp-2: 2px;
+  --sp-4: 4px;
+  --sp-6: 6px;
+  --sp-8: 8px;
+  --sp-10: 10px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-20: 20px;
+  --sp-24: 24px;
+  --sp-30: 30px;
+
+  // Sizes
+  --header-h: 26px;
+  --tooloptions-h: 40px;
+  --toolbox-w: 44px;
+  --panel-w: 332px;
+  --statusbar-h: 20px;
+  --tab-h: 20px;
+  --layer-row-h: 32px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+  --icon-xl: 24px;
+  --icon-tool: 30px;
+  --brush-cell: 63px;
+  --ruler-size: 16px;
+
+  // Fonts
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-base: 12px;
+  --font-size-md: 13px;
+
+  // Misc
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --transition: 120ms ease;
+}

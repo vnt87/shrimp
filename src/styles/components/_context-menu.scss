@@ -1,0 +1,71 @@
+@use '../abstracts/mixins' as *;
+
+// ===== Context Menu =====
+
+.context-menu {
+  @include dropdown-base;
+  color: var(--text-primary);
+  padding: 4px 0;
+  min-width: 180px;
+  z-index: 1000;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  position: relative;
+  @include transition(background);
+
+  svg {
+    color: var(--text-primary) !important;
+  }
+
+  &:hover {
+    background: var(--accent-active);
+
+    & > span,
+    & > svg {
+      color: white !important;
+    }
+  }
+}
+
+.context-menu-subitem {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  gap: 8px;
+  @include transition(background);
+
+  svg {
+    color: var(--text-primary) !important;
+  }
+
+  &:hover {
+    background: var(--accent-active);
+    color: white;
+
+    svg {
+      color: white !important;
+    }
+  }
+}
+
+.context-submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  @include dropdown-base;
+  padding: 4px 0;
+  min-width: 160px;
+  z-index: 1001;
+  margin-left: -2px;
+  color: var(--text-primary);
+}

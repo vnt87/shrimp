@@ -1,0 +1,92 @@
+@use '../abstracts/mixins' as *;
+
+// ===== Form Elements =====
+
+// These styles are used across various form inputs in dialogs and panels
+
+// Generic input styles are handled by the input-base mixin
+// This file contains additional form-specific styles
+
+// Number input with spinner
+.number-input-spinner {
+  display: flex;
+  align-items: stretch;
+  height: 24px;
+  @include input-base;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    @include input-transparent;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    padding: 0 6px;
+    text-align: center;
+
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+  }
+}
+
+.number-input-spinner-btns {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-input);
+
+  button {
+    flex: 1;
+    @include flex-center;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 7px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+
+    &:hover {
+      @include active-overlay;
+      color: var(--text-primary);
+    }
+  }
+}
+
+// Color input wrapper
+.color-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-input-swatch {
+  width: 32px;
+  height: 24px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: none;
+  padding: 2px;
+}
+
+.color-input-value {
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+// Textarea base
+.textarea-base {
+  @include input-base;
+  padding: 8px;
+  font-size: var(--font-size-sm);
+  resize: vertical;
+  min-height: 60px;
+
+  &:focus {
+    border-color: var(--accent-active);
+  }
+}

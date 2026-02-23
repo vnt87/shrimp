@@ -1,0 +1,30 @@
+// ===== SHRIMP Design System - Main SCSS Entry Point =====
+
+// Abstracts (variables, mixins, functions - no actual CSS output)
+@use 'abstracts/variables';
+@use 'abstracts/mixins';
+
+// Base styles
+@use 'base/reset';
+
+// Themes
+@use 'themes/themes';
+
+// Layout
+@use 'layout/app';
+@use 'layout/canvas';
+@use 'layout/empty-state';
+
+// Components
+@use 'components/header';
+@use 'components/toolbox';
+@use 'components/tool-options';
+@use 'components/buttons';
+@use 'components/forms';
+@use 'components/panels';
+@use 'components/dialogs';
+@use 'components/context-menu';
+@use 'components/status-bar';
+
+// Utilities
+@use 'utilities/utilities';
