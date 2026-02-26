@@ -60,7 +60,17 @@ export default function ContextMenu({ x, y, onClose, onSelect }: ContextMenuProp
     }
 
     return (
-        <div ref={menuRef} style={style} className="context-menu" onContextMenu={(e) => e.preventDefault()}>
+        <div
+            ref={menuRef}
+            style={style}
+            className="context-menu"
+            onContextMenu={(e) => e.preventDefault()}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+        >
             {MENU_TOOL_GROUPS.map((group, idx) => (
                 <ContextSubMenu key={idx} label={t(group.label as TranslationKey)} tools={group.tools} onSelect={onSelect} onClose={onClose} />
             ))}

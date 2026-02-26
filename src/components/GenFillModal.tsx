@@ -257,7 +257,7 @@ export default function GenFillModal() {
         if (!activeLayer?.data) return
 
         // Size the canvas to the computed preview dimensions
-        canvas.width  = previewW
+        canvas.width = previewW
         canvas.height = previewH
 
         const ctx = canvas.getContext('2d')
@@ -308,6 +308,9 @@ export default function GenFillModal() {
             // Prevent canvas tool events from firing through the modal
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
         >
             {/* Upward caret — border layer */}
             <div style={{

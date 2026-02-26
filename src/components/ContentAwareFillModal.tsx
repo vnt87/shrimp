@@ -176,7 +176,7 @@ export default function ContentAwareFillModal() {
                 const composite = outCtx.getImageData(0, 0, canvasSize.width, canvasSize.height)
                 for (let i = 0; i < mask.data.length; i += 4) {
                     if (mask.data[i] > 128) {
-                        composite.data[i]     = resultImageData.data[i]
+                        composite.data[i] = resultImageData.data[i]
                         composite.data[i + 1] = resultImageData.data[i + 1]
                         composite.data[i + 2] = resultImageData.data[i + 2]
                         composite.data[i + 3] = resultImageData.data[i + 3]
@@ -254,7 +254,7 @@ export default function ContentAwareFillModal() {
         // preview canvas, scaling it to fit within previewStyle dimensions.
         const pw = (previewStyle.width as number) || 260
         const ph = (previewStyle.height as number) || 60
-        canvas.width  = pw
+        canvas.width = pw
         canvas.height = ph
 
         const ctx = canvas.getContext('2d')
@@ -308,6 +308,9 @@ export default function ContentAwareFillModal() {
             }}
             onClick={e => e.stopPropagation()}
             onMouseDown={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+            onPointerUp={e => e.stopPropagation()}
+            onPointerMove={e => e.stopPropagation()}
         >
             {/* Upward caret — border layer */}
             <div style={{
@@ -449,8 +452,8 @@ export default function ContentAwareFillModal() {
                                 {progress < 0.2
                                     ? 'Loading algorithm…'
                                     : progress < 0.9
-                                    ? 'Synthesizing texture…'
-                                    : 'Finalising…'}
+                                        ? 'Synthesizing texture…'
+                                        : 'Finalising…'}
                             </span>
                         </div>
                     )}
