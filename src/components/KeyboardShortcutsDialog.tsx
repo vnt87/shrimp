@@ -68,6 +68,7 @@ const shortcutData: ShortcutGroup[] = [
         name: 'common.shrimp',
         shortcuts: [
             { action: 'header.search_placeholder', keys: '⌘/' },
+            { action: 'view.toggle_right_panels', keys: 'Ctrl/Cmd+\\' },
             { action: 'toolbox.swap_title', keys: 'X' },
             { action: 'toolbox.reset_title', keys: 'D' },
             { action: 'tooloptions.size', keys: '[ ]' },

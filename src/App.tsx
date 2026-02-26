@@ -9,7 +9,7 @@ import Canvas from './components/Canvas'
 import RightPanel from './components/RightPanel'
 import StatusBar from './components/StatusBar'
 import DocumentTabs from './components/DocumentTabs'
-import { LayoutProvider } from './components/LayoutContext'
+import { LayoutProvider, useLayout } from './components/LayoutContext'
 import { ErrorBoundary, CanvasErrorBoundary } from './components/ErrorBoundary'
 
 export interface ToolOptions {
@@ -185,6 +185,38 @@ function CopyPasteHandler({ children }: { children: React.ReactNode }) {
     return <>{children}</>
 }
 
+function AppMainContent({
+    activeTool,
+    onToolSelect,
+    toolOptions,
+    onCursorMove,
+}: {
+    activeTool: string
+    onToolSelect: (tool: string) => void
+    toolOptions: ToolOptions
+    onCursorMove: (pos: { x: number; y: number } | null) => void
+}) {
+    const { isRightPanelHidden } = useLayout()
+
+    return (
+        <div className={`main-content${isRightPanelHidden ? ' right-panels-hidden' : ''}`}>
+            <Toolbox activeTool={activeTool} onToolSelect={onToolSelect} />
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
+                <DocumentTabs />
+                <CanvasErrorBoundary>
+                    <Canvas
+                        onCursorMove={onCursorMove}
+                        activeTool={activeTool}
+                        onToolChange={onToolSelect}
+                        toolOptions={toolOptions}
+                    />
+                </CanvasErrorBoundary>
+            </div>
+            <RightPanel />
+        </div>
+    )
+}
+
 export default function App() {
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
     const [activeTool, setActiveTool] = useState<string>('move')
@@ -272,21 +304,12 @@ export default function App() {
                                 <div className="app">
                                     <Header onToolSelect={setActiveTool} />
                                     <ToolOptionsBar activeTool={activeTool} toolOptions={toolOptions} onToolOptionChange={updateToolOption} />
-                                    <div className="main-content">
-                                        <Toolbox activeTool={activeTool} onToolSelect={setActiveTool} />
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden', background: 'var(--bg-canvas)' }}>
-                                            <DocumentTabs />
-                                            <CanvasErrorBoundary>
-                                                <Canvas
-                                                    onCursorMove={setCursorPos}
-                                                    activeTool={activeTool}
-                                                    onToolChange={setActiveTool}
-                                                    toolOptions={toolOptions}
-                                                />
-                                            </CanvasErrorBoundary>
-                                        </div>
-                                        <RightPanel />
-                                    </div>
+                                    <AppMainContent
+                                        activeTool={activeTool}
+                                        onToolSelect={setActiveTool}
+                                        toolOptions={toolOptions}
+                                        onCursorMove={setCursorPos}
+                                    />
                                     <StatusBar cursorPos={cursorPos} />
                                 </div>
                             </CopyPasteHandler>

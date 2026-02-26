@@ -79,7 +79,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
     const { theme, setTheme } = useTheme()
     const { t, language, setLanguage } = useLanguage()
-    const { panels, togglePanelVisibility } = useLayout()
+    const { panels, togglePanelVisibility, toggleRightPanelHidden } = useLayout()
     const {
         undo, redo, canUndo, canRedo,
         selectAll, selectNone, invertSelection,
@@ -101,13 +101,19 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Ignore if typing in an input
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
                 return
             }
 
             const isCmd = e.metaKey || e.ctrlKey // Mac (Meta) or Windows (Ctrl)
 
             if (isCmd) {
+                if (e.code === 'Backslash') {
+                    e.preventDefault()
+                    toggleRightPanelHidden()
+                    return
+                }
+
                 switch (e.key.toLowerCase()) {
                     case 'n':
                         e.preventDefault()
@@ -167,7 +173,7 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [activeLayerId, layers, swapColors])
+    }, [activeDocument, activeLayerId, layers, swapColors, toggleRightPanelHidden])
 
     // Click outside handlers
     useEffect(() => {

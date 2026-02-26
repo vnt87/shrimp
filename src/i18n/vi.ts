@@ -67,6 +67,7 @@ export const vi: Record<TranslationKey, string> = {
     'menu.view.fit': 'Vừa màn hình',
     'menu.view.zoom_in': 'Phóng to',
     'menu.view.zoom_out': 'Thu nhỏ',
+    'view.toggle_right_panels': 'Ẩn/Hiện bảng bên phải',
 
     'menu.image': 'Hình ảnh',
     'menu.image.flatten': 'Làm phẳng hình ảnh',

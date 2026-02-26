@@ -15,10 +15,13 @@ export interface LayoutState {
 
 interface LayoutContextType {
     panels: LayoutState['panels']
+    isRightPanelHidden: boolean
     togglePanelVisibility: (panelId: keyof LayoutState['panels']) => void
     setPanelMinimized: (panelId: keyof LayoutState['panels'], minimized: boolean) => void
     togglePanelMinimized: (panelId: keyof LayoutState['panels']) => void
     openPanel: (panelId: keyof LayoutState['panels']) => void // Ensure it's visible
+    toggleRightPanelHidden: () => void
+    setRightPanelHidden: (hidden: boolean) => void
 }
 
 const defaultPanelState: PanelState = { visible: true, minimized: false }
@@ -35,6 +38,7 @@ const LayoutContext = createContext<LayoutContextType | undefined>(undefined)
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
     const [panels, setPanels] = useState<LayoutState['panels']>(defaultState.panels)
+    const [isRightPanelHidden, setRightPanelHidden] = useState(false)
 
     const togglePanelVisibility = useCallback((panelId: keyof LayoutState['panels']) => {
         setPanels((prev) => ({
@@ -64,12 +68,19 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         }))
     }, [])
 
+    const toggleRightPanelHidden = useCallback(() => {
+        setRightPanelHidden((prev) => !prev)
+    }, [])
+
     const value = {
         panels,
+        isRightPanelHidden,
         togglePanelVisibility,
         setPanelMinimized,
         togglePanelMinimized,
         openPanel,
+        toggleRightPanelHidden,
+        setRightPanelHidden,
     }
 
     return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>

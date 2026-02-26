@@ -65,6 +65,7 @@ export const en = {
     'menu.view.fit': 'Fit Image in Window',
     'menu.view.zoom_in': 'Zoom In',
     'menu.view.zoom_out': 'Zoom Out',
+    'view.toggle_right_panels': 'Toggle Right Panels',
 
     'menu.image': 'Image',
     'menu.image.flatten': 'Flatten Image',

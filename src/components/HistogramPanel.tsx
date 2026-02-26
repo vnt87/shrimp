@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useEditor } from './EditorContext'
 import InfoPanel from './InfoPanel'
@@ -37,8 +37,29 @@ function generateHistogramPath(
 export default function HistogramPanel() {
     const { cursorInfo, histogramData, activeChannels } = useEditor()
     const [activeTab, setActiveTab] = useState<'histogram' | 'navigator' | 'info'>('histogram')
+    const histogramContainerRef = useRef<HTMLDivElement | null>(null)
+    const [histogramSize, setHistogramSize] = useState({ width: 330, height: 132 })
+    const GRID_SPACING = 10
     const chartW = 330
     const chartH = 132
+
+    useLayoutEffect(() => {
+        const container = histogramContainerRef.current
+        if (!container) return
+
+        const updateSize = () => {
+            setHistogramSize({
+                width: Math.max(0, Math.floor(container.clientWidth)),
+                height: Math.max(0, Math.floor(container.clientHeight))
+            })
+        }
+
+        updateSize()
+        const observer = new ResizeObserver(updateSize)
+        observer.observe(container)
+
+        return () => observer.disconnect()
+    }, [])
 
     // Calculate max value for normalization
     const maxValue = histogramData
@@ -79,21 +100,25 @@ export default function HistogramPanel() {
             {/* Content Area */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                 {activeTab === 'histogram' && (
-                    <div className="histogram-container" style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#4a4a4a' }}>
+                    <div
+                        ref={histogramContainerRef}
+                        className="histogram-container"
+                        style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#4a4a4a' }}
+                    >
                         {/* Grid */}
                         <div className="histogram-grid">
-                            {Array.from({ length: 34 }).map((_, i) => (
+                            {Array.from({ length: Math.floor(histogramSize.width / GRID_SPACING) + 1 }).map((_, i) => (
                                 <div
                                     key={`v${i}`}
                                     className="histogram-grid-line-v"
-                                    style={{ left: i * 10, background: 'rgba(255, 255, 255, 0.1)' }}
+                                    style={{ left: i * GRID_SPACING, background: 'rgba(255, 255, 255, 0.1)' }}
                                 />
                             ))}
-                            {Array.from({ length: 14 }).map((_, i) => (
+                            {Array.from({ length: Math.floor(histogramSize.height / GRID_SPACING) + 1 }).map((_, i) => (
                                 <div
                                     key={`h${i}`}
                                     className="histogram-grid-line-h"
-                                    style={{ top: i * 10, background: 'rgba(255, 255, 255, 0.1)' }}
+                                    style={{ top: i * GRID_SPACING, background: 'rgba(255, 255, 255, 0.1)' }}
                                 />
                             ))}
                         </div>

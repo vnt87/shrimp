@@ -8,7 +8,7 @@ const MIN_PANEL_H = 80
 
 export default function RightPanel() {
     const containerRef = useRef<HTMLDivElement>(null)
-    const { panels } = useLayout()
+    const { panels, isRightPanelHidden } = useLayout()
 
     // We still store ratios for the *expanded* panels relative to each other.
     // However, we need to handle the case where some are hidden or minimized.
@@ -113,7 +113,7 @@ export default function RightPanel() {
     const visibleNonMinimized = getResizablePanels()
 
     return (
-        <div className="right-panel" ref={containerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        <div className="right-panel" aria-hidden={isRightPanelHidden} ref={containerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
             {/*  Correct Loop Implementation  */}
             {(() => {
                 const nodes: React.ReactNode[] = []
