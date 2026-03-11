@@ -52,6 +52,8 @@ const themeOptions = [
 
 export default function Header({ onToolSelect }: { onToolSelect?: (tool: string) => void }) {
     const [activeMenu, setActiveMenu] = useState<string | null>(null)
+    const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
+    const brandRef = useRef<HTMLDivElement>(null)
     const [autosave, setAutosave] = useState(true)
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [showPreferences, setShowPreferences] = useState(false)
@@ -186,6 +188,9 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
             }
             if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
                 setShowSearch(false)
+            }
+            if (brandRef.current && !brandRef.current.contains(event.target as Node)) {
+                setBrandDropdownOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
@@ -523,10 +528,33 @@ export default function Header({ onToolSelect }: { onToolSelect?: (tool: string)
         <>
             <div className="header">
                 <div className="header-left">
-                    <div className="header-brand" onClick={() => setShowAbout(true)}>
+                    <div className="header-brand" ref={brandRef} onClick={() => setBrandDropdownOpen(o => !o)}>
                         <ShrimpIcon className="brand-icon" />
                         <span className="brand-text">{t('common.shrimp')}</span>
                         <ChevronDown className="brand-caret" size={12} strokeWidth={3} />
+                        {brandDropdownOpen && (
+                            <div className="brand-dropdown" onClick={e => e.stopPropagation()}>
+                                <div
+                                    className="brand-dropdown-item brand-dropdown-item--active"
+                                    onClick={() => setBrandDropdownOpen(false)}
+                                >
+                                    <span className="brand-active-dot" />
+                                    <span className="brand-dropdown-app-name">SHRIMP</span>
+                                    <span className="brand-dropdown-app-desc">Simple Image Manipulation Program</span>
+                                </div>
+                                <div
+                                    className="brand-dropdown-item"
+                                    onClick={() => {
+                                        window.open('https://video-editor.namvu.net/', '_blank')
+                                        setBrandDropdownOpen(false)
+                                    }}
+                                >
+                                    <span className="brand-dropdown-app-no-dot" />
+                                    <span className="brand-dropdown-app-name">CAVE</span>
+                                    <span className="brand-dropdown-app-desc">CapCut Alternative Video Editor</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="header-menu" ref={menuRef}>
